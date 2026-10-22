@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_8tp3v"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_bv8kt"]
+
+[sub_resource type="Resource" id="Resource_wj4sr"]
+script = ExtResource("2_bv8kt")
+stage_name = "ready"
+
+[resource]
+script = ExtResource("1_8tp3v")
+id = "disrupt"
+display_name = "Disrupt"
+hint = "Queued immediately: reacts to an enemy starting a multi-stage skill"
+kind = 2
+speed = 7
+stage_defs = Array[ExtResource("2_bv8kt")]([SubResource("Resource_wj4sr")])
+reaction_range = 3
+reaction_duration_beats = 6
+reaction_interrupt = 2

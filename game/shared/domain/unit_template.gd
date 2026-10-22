@@ -2,7 +2,8 @@ class_name UnitTemplate
 extends Resource
 ## The stats of one kind of combatant: a player class (warrior, ranger...) or an enemy (ghoul...).
 ## Edit the .tres files under game/content/stats in the Inspector. All numbers are PROVISIONAL.
-## Rules that use them (hit chance, damage formulas, AP) are in code and in config/balance.json.
+## Rules that use them (hit chance, damage formulas, AP) are in code and in config/balance.json; what each skill does is in
+## game/content/skills.
 
 @export_group("Identity")
 ## Lower-case id. For player classes it must match the class names in services/api/app/rules.py and
@@ -25,8 +26,9 @@ extends Resource
 @export_range(-99, 99) var evasion: int = 0
 
 @export_group("Skills")
-## Skill ids from config/skills.json: move, strike, power_strike, bolt, disrupt, revive.
-@export var skills: Array[String] = []
+## The skills this unit can use. Pick skill resources from game/content/skills (move, strike, power_strike, bolt,
+## disrupt, revive, or your own). A skill must also be listed in skills/skill_set.tres.
+@export var skills: Array[SkillDef] = []
 
 
 ## What is wrong with this template, if anything (empty = fine). `known` is the SkillDb.
@@ -40,9 +42,11 @@ func problems(known: SkillDb) -> Array[String]:
 		out.append("%s: max_hp and dexterity must be at least 1" % id)
 	if skills.is_empty():
 		out.append("%s: has no skills" % id)
-	for sid in skills:
-		if known.get_skill(sid) == null:
-			out.append("%s: unknown skill '%s'" % [id, sid])
+	for sk in skills:
+		if sk == null:
+			out.append("%s: a skill slot is empty" % id)
+		elif known.get_skill(sk.id) == null:
+			out.append("%s: skill '%s' is not in the skill set" % [id, sk.id])
 	return out
 
 
@@ -61,5 +65,6 @@ func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i
 	c.armor = armor
 	c.accuracy = accuracy
 	c.evasion = evasion
-	c.skills.assign(skills)
+	for sk in skills:
+		c.skills.append(sk.id)
 	return c

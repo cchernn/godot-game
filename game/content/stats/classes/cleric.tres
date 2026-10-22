@@ -1,6 +1,11 @@
 [gd_resource type="Resource" script_class="UnitTemplate" format=3]
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_rhuw4"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="s_move"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
+[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
+[ext_resource type="Resource" path="res://game/content/skills/revive.tres" id="s_revive"]
 
 [resource]
 script = ExtResource("1_rhuw4")
@@ -10,4 +15,4 @@ max_hp = 30
 dexterity = 10
 power = 1
 armor = 1
-skills = Array[String](["move", "strike", "bolt", "revive"])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_bolt"), ExtResource("s_revive")])

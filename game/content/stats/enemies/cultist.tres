@@ -1,6 +1,10 @@
 [gd_resource type="Resource" script_class="UnitTemplate" format=3]
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_qbqtu"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="s_move"]
+[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
 
 [resource]
 script = ExtResource("1_qbqtu")
@@ -9,4 +13,4 @@ display_name = "Cultist"
 dexterity = 10
 power = 1
 accuracy = 1
-skills = Array[String](["move", "bolt", "strike"])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_bolt"), ExtResource("s_strike")])

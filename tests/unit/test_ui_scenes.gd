@@ -55,6 +55,8 @@ func test_pressing_a_skill_and_clicking_a_tile_queues_a_plan() -> void:
 	c._on_snapshot(_snapshot())
 	c._on_skill_pressed("move")
 	assert_eq(c.mode, "move")
+	assert_eq((c.get_node("%ErrorLabel") as Label).text, c.skills.get_skill("move").hint, "the skill's hint is shown")
+	assert_eq(((c.get_node("%SkillBox") as VBoxContainer).get_child(0) as Button).tooltip_text, c.skills.get_skill("move").hint)
 	c._on_cell_clicked(Vector2i(1, 2), "")
 	assert_eq((c.plan as Array).size(), 1)
 	assert_eq((c.get_node("%QueueList") as ItemList).item_count, 1)

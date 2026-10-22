@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_noe8t"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_vb24b"]
+
+[sub_resource type="Resource" id="Resource_dsmt5"]
+script = ExtResource("2_vb24b")
+stage_name = "bolt"
+damage = 5
+interrupt = 1
+
+[resource]
+script = ExtResource("1_noe8t")
+id = "bolt"
+display_name = "Bolt"
+hint = "Click a tile (it hits whoever stands there)"
+targeting = 2
+attack_range = 5
+stage_defs = Array[ExtResource("2_vb24b")]([SubResource("Resource_dsmt5")])

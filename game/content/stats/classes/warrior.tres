@@ -1,6 +1,11 @@
 [gd_resource type="Resource" script_class="UnitTemplate" format=3]
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q6e1f"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="s_move"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
+[ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="s_power_strike"]
+[ext_resource type="Resource" path="res://game/content/skills/disrupt.tres" id="s_disrupt"]
 
 [resource]
 script = ExtResource("1_q6e1f")
@@ -9,4 +14,4 @@ display_name = "Warrior"
 max_hp = 40
 power = 3
 armor = 2
-skills = Array[String](["move", "strike", "power_strike", "disrupt"])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_power_strike"), ExtResource("s_disrupt")])

@@ -78,4 +78,10 @@ Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `u
 Unit stats are `UnitTemplate` resources (`game/content/stats`), and an `EncounterDef` resource (`game/content/encounters/prototype.tres`) names the map, the party
 classes and the enemy roster. `Encounter.build` validates them (unknown skills, duplicates) and creates the combatants; spawn tiles come from the map's
 markers. `tools/generate_stats.gd` produced the first files from the numbers that used to be in `encounter.gd`, and `tests/unit/test_stats.gd` pins them to
-those original numbers. Skills and balance remain JSON.
+those original numbers. 
+
+## Skills as resources
+Each skill is a `SkillDef` resource (`game/content/skills`, with `SkillStage` sub-resources) listed in `skill_set.tres`; units reference the resources directly.
+`SkillDef` still exposes `stages` (array of dictionaries), `reaction` and `total_ap()`, so the battle rules did not change. `SkillDb.load_file()` returns deep copies
+(tests mutate speed/stability). `tools/generate_skills.gd` converted the former `skills.json`; `tests/unit/test_skills.gd` pins every value to it.
+Only `config/balance.json` remains a JSON tuning file.

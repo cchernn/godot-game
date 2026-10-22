@@ -11,6 +11,17 @@ const ORIGINAL := {
 }
 
 
+func _skill_ids(t: UnitTemplate) -> Array[String]:
+	var ids: Array[String] = []
+	for sk in t.skills:
+		ids.append(sk.id)
+	return ids
+
+
+func _skill(id: String) -> SkillDef:
+	return load("res://game/content/skills/%s.tres" % id) as SkillDef
+
+
 func _all_templates() -> Array[UnitTemplate]:
 	var out: Array[UnitTemplate] = []
 	for dir in ["classes", "enemies"]:
@@ -32,7 +43,7 @@ func test_converted_stats_match_the_original_numbers() -> void:
 		assert_eq(t.armor, want["armor"], "%s armor" % t.id)
 		assert_eq(t.accuracy, want["acc"], "%s accuracy" % t.id)
 		assert_eq(t.evasion, want["eva"], "%s evasion" % t.id)
-		assert_eq(t.skills, want["skills"] as Array[String], "%s skills" % t.id)
+		assert_eq(_skill_ids(t), want["skills"] as Array[String], "%s skills" % t.id)
 	assert_eq(seen.size(), ORIGINAL.size(), "every original unit has a resource")
 
 
@@ -74,7 +85,8 @@ func test_editing_a_template_changes_the_battle() -> void:
 	var tough := def.classes[0].duplicate() as UnitTemplate
 	tough.max_hp = 99
 	tough.power = 7
-	tough.skills = ["move", "strike"] as Array[String]
+	var few: Array[SkillDef] = [_skill("move"), _skill("strike")]
+	tough.skills = few
 	var swapped: Array[UnitTemplate] = [tough]
 	swapped.append_array(def.classes.slice(1))
 	def.classes = swapped
@@ -108,7 +120,10 @@ func test_problems_are_reported_with_the_unit_named() -> void:
 	assert_true(issues.size() >= 3, str(issues))
 	t.id = "archer"
 	t.display_name = "Archer"
-	t.skills = ["move", "fireball"] as Array[String]
+	var ghost := SkillDef.new()
+	ghost.id = "fireball"
+	var mixed: Array[SkillDef] = [_skill("move"), ghost]
+	t.skills = mixed
 	issues = t.problems(known)
 	assert_eq(issues.size(), 1)
 	assert_true(issues[0].contains("fireball") and issues[0].contains("archer"), issues[0])

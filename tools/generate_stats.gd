@@ -63,7 +63,8 @@ func _template(rel: String, d: Dictionary) -> UnitTemplate:
 	t.armor = d["armor"]
 	t.accuracy = d["acc"]
 	t.evasion = d["eva"]
-	t.skills.assign(d["skills"])
+	for sid: String in d["skills"]:
+		t.skills.append(load("res://game/content/skills/%s.tres" % sid) as SkillDef)
 	ResourceSaver.save(t, path)
 	t.take_over_path(path)
 	print("wrote ", path)

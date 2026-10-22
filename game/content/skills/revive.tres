@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_3a5j8"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_ukone"]
+
+[sub_resource type="Resource" id="Resource_vgrvf"]
+script = ExtResource("2_ukone")
+stage_name = "revive"
+ap = 2
+
+[resource]
+script = ExtResource("1_3a5j8")
+id = "revive"
+display_name = "Revive"
+hint = "Click a downed ally"
+kind = 3
+targeting = 1
+stage_defs = Array[ExtResource("2_ukone")]([SubResource("Resource_vgrvf")])

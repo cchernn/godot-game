@@ -12,6 +12,7 @@ project from `project.godot`; the first open imports everything.
 | Tile colours / textures | `game/content/tiles/materials/*.tres` | Inspector |
 | Units (model, labels, animations) | `game/content/units/unit.tscn` and `warrior.tscn`, `ghoul.tscn`... | the 3D editor, AnimationPlayer |
 | Which scene draws which unit | `game/content/units/unit_visuals.tres` | Inspector |
+| What each skill does (damage, AP, range, speed, stages, hint text) | `game/content/skills/*.tres`, listed in `skills/skill_set.tres` | Inspector |
 | Class and enemy stats (HP, dexterity, power, armor, accuracy, evasion, skills) | `game/content/stats/classes/*.tres`, `stats/enemies/*.tres` | Inspector |
 | Which classes and enemies a battle uses | `game/content/encounters/prototype.tres` | Inspector |
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
@@ -89,7 +90,7 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 ## Stats (Inspector)
 Every class and enemy is a `UnitTemplate` resource. Double-click one in the FileSystem dock (e.g. `stats/classes/warrior.tres`) and edit
 the **Stats** group: max HP, dexterity (sets AP and speed), power (added to damage), armor, accuracy, evasion, and the **Skills** list
-(skill ids from `config/skills.json`: `move`, `strike`, `power_strike`, `bolt`, `disrupt`, `revive`). Each field has a tooltip. All values
+(pick skill resources from `game/content/skills`). Each field has a tooltip. All values
 are provisional. Godot only writes non-default values into the file, so a stat at its default (e.g. 0) will not appear in the text, but it is
 there in the Inspector.
 - **Which units a battle uses:** open `encounters/prototype.tres`. **Map** takes a painted map scene; **Classes** is the party: seat 0 uses the
@@ -99,14 +100,26 @@ there in the Inspector.
   encounter's **Enemies** list. To give it a look, add an entry with the same id in `units/unit_visuals.tres`.
 - **A new player class** also needs two lines of code, because the API and the sign-in screen keep their own list: add the id to `CLASSES` in
   `services/api/app/rules.py` and in `game/client/account_flow.gd`. Tests fail if these lists and `stats/classes` disagree.
-- **What is checked:** an unknown skill id, an empty name or a duplicate class are reported when a battle is built and by the tests.
+- **What is checked:** a skill missing from the skill set, an empty name or a duplicate class are reported when a battle is built and by the tests.
 - **Rebuild to see it in a real battle:** the server holds the stats, so `scripts/stack.sh up game` (the design preview, F6 on
   `game/client/board/board_preview.tscn`, uses them directly).
 
+## Skills (Inspector)
+Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tres`); `skills/skill_set.tres` is the list of all of them. Open one:
+- **Identity:** id (the file name), display name, **hint** (the tooltip and the line shown when you pick the skill), and **kind**
+  (move, attack, reaction, revive; the kind decides how the rules treat it).
+- **Targeting:** what the player clicks (character, tile, or nothing) and the reach in tiles. Hidden for moves and reactions.
+- **Timing:** speed (higher resolves first in a beat), frequency (once per turn or unlimited) and stability (interruption points that cancel it).
+- **Stages:** the steps of the skill, each with its own **AP**, **damage** and **interrupt** points. Power Strike has two: a wind-up (no damage) and a smash.
+- **Reaction:** range, duration and interrupt. Only shown when the kind is *reaction*.
+- **A new attack skill needs no code:** create a `SkillDef` resource (right-click `skills` > New Resource > SkillDef), save it as `<id>.tres`, set the
+  fields, add it to `skill_set.tres`, and add it to a unit's **Skills** list. The skill button, planning and AI pick it up from the data. A new
+  *kind* of skill (not move/attack/reaction/revive) is new game logic and is code.
+- Edits need `scripts/stack.sh up game web` to reach the running game (the server resolves skills; the web client lists them).
+
 ## Things that are still code (for now)
-How skills work (damage, AP cost, range, speed in `config/skills.json`) and the global tuning (`config/balance.json`: hit chance, AP table,
-rewards) are JSON files, not Inspector resources. Game rules, networking and the API stay in code. The dropdown choices for origin on the
-sign-in screen mirror the server's rules (`account_flow.gd`).
+The global tuning in `config/balance.json` (hit chance, the AP table, rewards) is a JSON file, not an Inspector resource. Game rules,
+networking and the API stay in code. The dropdown choices for origin on the sign-in screen mirror the server's rules (`account_flow.gd`).
 
 ## `tools/generate_content.gd`
 The one-time scaffold that created these files. It never overwrites existing files; `-- --force` regenerates everything and

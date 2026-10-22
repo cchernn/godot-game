@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SkillSet" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_set.gd" id="1_ba6hb"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="2_qw6bo"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="3_i1kfq"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="4_drtuy"]
+[ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="5_r8irq"]
+[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="6_xckuu"]
+[ext_resource type="Resource" path="res://game/content/skills/disrupt.tres" id="7_ucasc"]
+[ext_resource type="Resource" path="res://game/content/skills/revive.tres" id="8_7we32"]
+
+[resource]
+script = ExtResource("1_ba6hb")
+skills = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("4_drtuy"), ExtResource("5_r8irq"), ExtResource("6_xckuu"), ExtResource("7_ucasc"), ExtResource("8_7we32")])

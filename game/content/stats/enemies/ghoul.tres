@@ -1,6 +1,10 @@
 [gd_resource type="Resource" script_class="UnitTemplate" format=3]
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_quv02"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="s_move"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
+[ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="s_power_strike"]
 
 [resource]
 script = ExtResource("1_quv02")
@@ -9,4 +13,4 @@ display_name = "Ghoul"
 max_hp = 30
 power = 2
 armor = 1
-skills = Array[String](["move", "strike", "power_strike"])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_power_strike")])

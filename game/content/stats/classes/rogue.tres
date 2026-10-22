@@ -1,6 +1,10 @@
 [gd_resource type="Resource" script_class="UnitTemplate" format=3]
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_n2mn5"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="s_move"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
+[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
 
 [resource]
 script = ExtResource("1_n2mn5")
@@ -11,4 +15,4 @@ dexterity = 16
 power = 2
 accuracy = 3
 evasion = 3
-skills = Array[String](["move", "strike", "bolt"])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_bolt")])

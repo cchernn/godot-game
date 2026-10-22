@@ -4,14 +4,6 @@ extends Control
 ## The client only builds and previews plans; the server validates and resolves everything.
 ##   Optional command-line args (after `--`): --url=ws://host:9080 --name=Alice
 
-const SKILL_HINTS := {
-	"move": "Click a tile to queue a move",
-	"strike": "Click an enemy", "power_strike": "Click an enemy (2 stages)",
-	"bolt": "Click a tile (it hits whoever stands there)",
-	"disrupt": "Queued immediately: reacts to an enemy starting a multi-stage skill",
-	"revive": "Click a downed ally",
-}
-
 ## Skills are listed as buttons made from this scene (game/content/ui/skill_button.tscn).
 @export var skill_button_scene: PackedScene
 ## Turn off to always use the plain guest connect screen, even when client_env.json exists.
@@ -366,7 +358,7 @@ func _on_skill_pressed(id: String) -> void:
 		_push_plan()
 		return
 	mode = id
-	error_label.text = SKILL_HINTS.get(id, "")
+	error_label.text = sk.hint
 	_refresh()
 
 
@@ -476,7 +468,7 @@ func _rebuild_skill_buttons() -> void:
 		var sk := skills.get_skill(id)
 		var b := skill_button_scene.instantiate() as Button
 		b.text = "%s  (%d AP)" % [sk.display_name, sk.total_ap()] if sk.kind != Enums.SkillKind.MOVE else "Move  (1 AP per %d tile(s))" % me["tiles_per_ap"]
-		b.tooltip_text = SKILL_HINTS.get(id, "")
+		b.tooltip_text = sk.hint
 		b.pressed.connect(_on_skill_pressed.bind(id))
 		skill_box.add_child(b)
 		_skill_buttons[id] = b
