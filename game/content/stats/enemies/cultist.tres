@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_qbqtu"]
+
+[resource]
+script = ExtResource("1_qbqtu")
+id = "cultist"
+display_name = "Cultist"
+dexterity = 10
+power = 1
+accuracy = 1
+skills = Array[String](["move", "bolt", "strike"])

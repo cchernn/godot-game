@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q7u1k"]
+
+[resource]
+script = ExtResource("1_q7u1k")
+id = "ranger"
+display_name = "Ranger"
+max_hp = 28
+dexterity = 12
+power = 1
+accuracy = 2
+evasion = 1
+skills = Array[String](["move", "strike", "bolt", "disrupt"])

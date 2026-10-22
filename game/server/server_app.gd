@@ -289,7 +289,7 @@ func _on_hello(peer_id: int, display_name: String, token: String, world_id: Stri
 			var finished := room.battle.state.phase == Enums.RoundPhase.FINISHED
 			_drop(peer_id, "The previous battle is wrapping up. Try again in a moment." if finished else "A battle is already in progress")
 			return
-		if _members(room).size() >= Encounter.PLAYER_SLOTS.size():
+		if _members(room).size() >= Encounter.max_players():
 			_drop(peer_id, "The party is full")
 			return
 		rec = PlayerRec.new()

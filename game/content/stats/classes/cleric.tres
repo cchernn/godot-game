@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_rhuw4"]
+
+[resource]
+script = ExtResource("1_rhuw4")
+id = "cleric"
+display_name = "Cleric"
+max_hp = 30
+dexterity = 10
+power = 1
+armor = 1
+skills = Array[String](["move", "strike", "bolt", "revive"])

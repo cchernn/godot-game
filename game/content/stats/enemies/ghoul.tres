@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_quv02"]
+
+[resource]
+script = ExtResource("1_quv02")
+id = "ghoul"
+display_name = "Ghoul"
+max_hp = 30
+power = 2
+armor = 1
+skills = Array[String](["move", "strike", "power_strike"])

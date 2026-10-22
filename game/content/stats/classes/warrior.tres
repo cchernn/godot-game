@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q6e1f"]
+
+[resource]
+script = ExtResource("1_q6e1f")
+id = "warrior"
+display_name = "Warrior"
+max_hp = 40
+power = 3
+armor = 2
+skills = Array[String](["move", "strike", "power_strike", "disrupt"])

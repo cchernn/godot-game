@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="EncounterDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_a64oc"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/warrior.tres" id="2_l7fi6"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/ranger.tres" id="3_7l5xe"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/cleric.tres" id="4_ukqwb"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/rogue.tres" id="5_jnuc6"]
+[ext_resource type="Resource" path="res://game/content/stats/enemies/ghoul.tres" id="6_ciasf"]
+[ext_resource type="Resource" path="res://game/content/stats/enemies/cultist.tres" id="7_wsoml"]
+[ext_resource type="PackedScene" path="res://game/content/maps/prototype.tscn" id="8_o6c02"]
+[ext_resource type="Script" path="res://game/shared/domain/encounter_def.gd" id="9_ofuep"]
+
+[resource]
+script = ExtResource("9_ofuep")
+map = ExtResource("8_o6c02")
+classes = Array[ExtResource("1_a64oc")]([ExtResource("2_l7fi6"), ExtResource("3_7l5xe"), ExtResource("4_ukqwb"), ExtResource("5_jnuc6")])
+enemies = Array[ExtResource("1_a64oc")]([ExtResource("6_ciasf"), ExtResource("6_ciasf"), ExtResource("7_wsoml")])

@@ -73,3 +73,9 @@ Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `u
 - The battle server is not bound to a world. Each client names the world it is entering in `c_hello`; the server has the API confirm membership and the
   character in that world, then places the player in that world's room (own lobby, battle, clocks, result). Rooms never mix players.
   `--world-id` (or an activity instance's world) optionally restricts a server to one world. `scripts/e2e_worlds.py` runs two worlds at once on one server.
+
+## Stats and encounters as resources
+Unit stats are `UnitTemplate` resources (`game/content/stats`), and an `EncounterDef` resource (`game/content/encounters/prototype.tres`) names the map, the party
+classes and the enemy roster. `Encounter.build` validates them (unknown skills, duplicates) and creates the combatants; spawn tiles come from the map's
+markers. `tools/generate_stats.gd` produced the first files from the numbers that used to be in `encounter.gd`, and `tests/unit/test_stats.gd` pins them to
+those original numbers. Skills and balance remain JSON.
