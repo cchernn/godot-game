@@ -1,0 +1,54 @@
+{
+  "_note": "PROVISIONAL prototype values. Not confirmed design; all must stay configurable. See docs/provisional-values.md.",
+  "ap": {
+    "base_capacity": 3,
+    "max_capacity": 5,
+    "dexterity_thresholds": [
+      10,
+      16
+    ]
+  },
+  "movement": {
+    "tiles_per_ap": 1,
+    "max_dexterity_bonus": 2,
+    "dexterity_bonus_thresholds": [
+      12,
+      18
+    ],
+    "difficult_terrain_surcharge": 1
+  },
+  "combat": {
+    "beats_per_round": 8,
+    "planning_timeout_seconds": 90,
+    "revive_hp_fraction": 0.2,
+    "base_hit_chance": 0.9,
+    "crit_chance": 0.05,
+    "crit_multiplier": 1.5,
+    "side_multiplier": 1.25,
+    "rear_multiplier": 1.5,
+    "sight_range": 8,
+    "max_step_height": 1,
+    "accuracy_per_point": 0.02,
+    "beat_delay_ms": 700
+  },
+  "instance": {
+    "disconnect_grace_seconds": 300
+  },
+  "ai": {
+    "weights": {
+      "damage": 1.0,
+      "survival": 1.0,
+      "positioning": 0.5,
+      "objective": 1.5,
+      "ap_cost": 0.25
+    }
+  },
+  "lobby": {
+    "players_required": 2
+  },
+  "rewards": {
+    "_note": "PROVISIONAL XP: participation plus a victory bonus.",
+    "xp_participation": 20,
+    "xp_victory_bonus": 80
+  }
+}

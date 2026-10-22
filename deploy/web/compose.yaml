@@ -1,0 +1,28 @@
+# Web client on its own host (or build the image and publish the files to S3/CloudFront instead).
+# Holds only public values; no secrets.
+name: unnamed-web
+services:
+  webclient:
+    image: ${WEB_IMAGE:-unnamed-web}
+    build:
+      context: ../..
+      dockerfile: deploy/web.Dockerfile
+      args:
+        SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in deploy/web/.env}
+        SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in deploy/web/.env}
+        WORLD_ID: ${WORLD_ID:?set WORLD_ID in deploy/web/.env}
+        API_URL: ${API_URL:?set API_URL (public https address of the API) in deploy/web/.env}
+        SERVER_URL: ${SERVER_URL:?set SERVER_URL (public wss address of the game server) in deploy/web/.env}
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

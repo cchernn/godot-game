@@ -1,0 +1,16 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+export/
+
+deploy/.env
+deploy/api/.env
+deploy/game/.env
+deploy/web/.env
+render_out/

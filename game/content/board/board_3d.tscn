@@ -1,0 +1,63 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/board/board_3d.gd" id="1_ai3tb"]
+[ext_resource type="Resource" path="res://game/content/units/unit_visuals.tres" id="2_3vaeb"]
+[ext_resource type="MeshLibrary" path="res://game/content/tiles/tiles.tres" id="3_l25fk"]
+[ext_resource type="Material" path="res://game/content/board/materials/fog.tres" id="4_oltyc"]
+[ext_resource type="Material" path="res://game/content/board/materials/move.tres" id="5_4vc3f"]
+[ext_resource type="Material" path="res://game/content/board/materials/target.tres" id="6_ab661"]
+[ext_resource type="Material" path="res://game/content/board/materials/hover.tres" id="7_2scl0"]
+[ext_resource type="Script" path="res://game/client/board/camera_rig.gd" id="8_ctt67"]
+
+[sub_resource type="Environment" id="Environment_2kpgk"]
+background_mode = 1
+background_color = Color(0.09, 0.09, 0.11, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.58, 0.6, 0.68, 1)
+ambient_light_energy = 0.7
+
+[node name="Board3D" type="Node3D" unique_id=815592479 node_paths=PackedStringArray("camera_rig", "map_root", "units_root", "overlay_root")]
+script = ExtResource("1_ai3tb")
+unit_visuals = ExtResource("2_3vaeb")
+fallback_tiles = ExtResource("3_l25fk")
+fog_material = ExtResource("4_oltyc")
+move_material = ExtResource("5_4vc3f")
+target_material = ExtResource("6_ab661")
+hover_material = ExtResource("7_2scl0")
+camera_rig = NodePath("CameraRig")
+map_root = NodePath("Map")
+units_root = NodePath("Units")
+overlay_root = NodePath("Overlays")
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=306893795 node_paths=PackedStringArray("camera")]
+script = ExtResource("8_ctt67")
+camera = NodePath("Camera3D")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=1758554661]
+current = true
+fov = 40.0
+far = 250.0
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1080647204]
+transform = Transform3D(0.8660254, -0.40957603, 0.28678823, 0, 0.57357645, 0.81915206, -0.5, -0.7094065, 0.49673176, 0, 0, 0)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=177594857]
+environment = SubResource("Environment_2kpgk")
+
+[node name="Map" type="Node3D" parent="." unique_id=1785701991]
+
+[node name="Units" type="Node3D" parent="." unique_id=1513899997]
+
+[node name="Overlays" type="Node3D" parent="." unique_id=738449883]
+
+[node name="Hud" type="CanvasLayer" parent="." unique_id=1072755223]
+
+[node name="Hint" type="Label" parent="Hud" unique_id=794967417]
+modulate = Color(1, 1, 1, 0.6)
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 10.0
+offset_bottom = 8.0
+text = "Middle mouse: orbit  |  Shift + middle mouse: pan  |  Wheel: zoom  |  Q / E: turn  |  F: reset view"

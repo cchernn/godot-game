@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://game/content/tiles/materials/ground.tres" id="1_h528b"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/rough.tres" id="2_kce25"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/wall.tres" id="3_an7n5"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_4ppq8"]
+material = ExtResource("1_h528b")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_tw8af"]
+material = ExtResource("2_kce25")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_lydda"]
+material = ExtResource("3_an7n5")
+size = Vector3(1, 0.5, 1)
+
+[node name="TilesSource" type="Node3D" unique_id=1475895668]
+
+[node name="ground" type="MeshInstance3D" parent="." unique_id=1253106436]
+mesh = SubResource("BoxMesh_4ppq8")
+
+[node name="rough" type="MeshInstance3D" parent="." unique_id=1275554939]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0)
+mesh = SubResource("BoxMesh_tw8af")
+
+[node name="wall" type="MeshInstance3D" parent="." unique_id=943254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
+mesh = SubResource("BoxMesh_lydda")

@@ -1,0 +1,28 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/client/client_main.gd" id="1"]
+[ext_resource type="PackedScene" path="res://game/content/board/board_3d.tscn" id="2"]
+
+[node name="ClientMain" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="BoardHolder" type="SubViewportContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -360.0
+stretch = true
+
+[node name="Viewport" type="SubViewport" parent="BoardHolder"]
+own_world_3d = true
+handle_input_locally = true
+msaa_3d = 1
+size = Vector2i(900, 700)
+render_target_update_mode = 4
+
+[node name="Board3D" parent="BoardHolder/Viewport" instance=ExtResource("2")]

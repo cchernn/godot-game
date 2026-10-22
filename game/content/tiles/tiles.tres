@@ -1,0 +1,40 @@
+[gd_resource type="MeshLibrary" format=3]
+
+[ext_resource type="Material" path="res://game/content/tiles/materials/ground.tres" id="1_e4gag"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/rough.tres" id="2_4idc0"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/wall.tres" id="3_rhgty"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_whemw"]
+material = ExtResource("1_e4gag")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ye0bp"]
+material = ExtResource("2_4idc0")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_s1qdc"]
+material = ExtResource("3_rhgty")
+size = Vector3(1, 0.5, 1)
+
+[resource]
+item/0/name = "ground"
+item/0/mesh = SubResource("BoxMesh_whemw")
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
+item/1/name = "rough"
+item/1/mesh = SubResource("BoxMesh_ye0bp")
+item/1/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/1/mesh_cast_shadow = 1
+item/1/shapes = []
+item/1/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/1/navigation_layers = 1
+item/2/name = "wall"
+item/2/mesh = SubResource("BoxMesh_s1qdc")
+item/2/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/2/mesh_cast_shadow = 1
+item/2/shapes = []
+item/2/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/2/navigation_layers = 1

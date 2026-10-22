@@ -1,0 +1,30 @@
+{
+  "_note": "PLACEHOLDER content for the prototype world. Real map/narrative content is future design work.",
+  "id": "prototype",
+  "version": 1,
+  "start_node": "hollowmere",
+  "rules": {"discovery_scope": "character"},
+  "nodes": [
+    {"id": "hollowmere", "name": "Hollowmere", "kind": "settlement", "initially_visible": true},
+    {"id": "blackwood", "name": "The Blackwood", "kind": "wilderness", "initially_visible": true},
+    {"id": "ashen_keep", "name": "Ashen Keep", "kind": "dungeon", "initially_visible": false},
+    {"id": "old_shrine", "name": "Old Shrine", "kind": "landmark", "initially_visible": false},
+    {"id": "sunken_crypt", "name": "Sunken Crypt", "kind": "dungeon", "initially_visible": false}
+  ],
+  "routes": [
+    {"id": "road_hm_bw", "from": "hollowmere", "to": "blackwood", "travel_days": 2, "initially_visible": true},
+    {"id": "river_hm_bw", "from": "hollowmere", "to": "blackwood", "travel_days": 3, "initially_visible": false},
+    {"id": "trail_bw_ak", "from": "blackwood", "to": "ashen_keep", "travel_days": 3, "initially_visible": false},
+    {"id": "path_bw_shrine", "from": "blackwood", "to": "old_shrine", "travel_days": 1, "initially_visible": false},
+    {"id": "tunnel_ak_crypt", "from": "ashen_keep", "to": "sunken_crypt", "travel_days": 2, "initially_visible": false}
+  ],
+  "activities": [
+    {"id": "cellar_rats", "node": "hollowmere", "name": "Clear the cellar", "kind": "minor",
+     "one_time": false, "max_players": 4},
+    {"id": "wolf_hunt", "node": "blackwood", "name": "Thin the wolf pack", "kind": "minor",
+     "one_time": false, "max_players": 4},
+    {"id": "ashen_keep_siege", "node": "ashen_keep", "name": "Break the siege of Ashen Keep", "kind": "major",
+     "one_time": true, "max_players": 8,
+     "on_complete": {"reveal": [{"kind": "node", "id": "sunken_crypt"}, {"kind": "route", "id": "tunnel_ak_crypt"}]}}
+  ]
+}

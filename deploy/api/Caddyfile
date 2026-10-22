@@ -1,0 +1,7 @@
+# Public HTTPS front for the API. /internal/* stays off the public address.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+	@internal path /internal/*
+	respond @internal 404
+	reverse_proxy apisvc:8000
+}

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="UnitVisuals" format=3]
+
+[ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1_bvto6"]
+[ext_resource type="PackedScene" path="res://game/content/units/warrior.tscn" id="2_mdx8e"]
+[ext_resource type="PackedScene" path="res://game/content/units/ranger.tscn" id="3_i463w"]
+[ext_resource type="PackedScene" path="res://game/content/units/cleric.tscn" id="4_o0im5"]
+[ext_resource type="PackedScene" path="res://game/content/units/rogue.tscn" id="5_y4vqg"]
+[ext_resource type="PackedScene" path="res://game/content/units/ghoul.tscn" id="6_1xsx5"]
+[ext_resource type="PackedScene" path="res://game/content/units/cultist.tscn" id="7_33620"]
+[ext_resource type="Script" path="res://game/client/board/unit_visuals.gd" id="8_ekr3v"]
+
+[resource]
+script = ExtResource("8_ekr3v")
+default_scene = ExtResource("1_bvto6")
+scenes = Dictionary[String, PackedScene]({
+"cleric": ExtResource("4_o0im5"),
+"cultist": ExtResource("7_33620"),
+"ghoul": ExtResource("6_1xsx5"),
+"ranger": ExtResource("3_i463w"),
+"rogue": ExtResource("5_y4vqg"),
+"warrior": ExtResource("2_mdx8e")
+})

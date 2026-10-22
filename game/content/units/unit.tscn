@@ -1,0 +1,179 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/board/unit_3d.gd" id="1_jg08v"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n8iyn"]
+roughness = 0.7
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_n2rot"]
+radius = 0.28
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_88hat"]
+shading_mode = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_co2a1"]
+size = Vector3(0.12, 0.06, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f1ck2"]
+render_priority = 10
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0, 0, 0, 0.7)
+billboard_mode = 1
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_1brsp"]
+size = Vector2(0.8, 0.08)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_me5ij"]
+render_priority = 11
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.35, 0.85, 0.4, 1)
+billboard_mode = 1
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_sv57b"]
+size = Vector2(0.8, 0.08)
+
+[sub_resource type="Animation" id="Animation_7wx88"]
+length = 0.4
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Body:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.4),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0.5, 0), Vector3(0, 0.28, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Body:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.4),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-1.5707964, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_64l3n"]
+length = 1.2
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Body:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.6, 1.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0.5, 0), Vector3(0, 0.54, 0), Vector3(0, 0.5, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Body:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 1.2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_j2goh"]
+length = 0.4
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Body:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0.5, 0), Vector3(0, 0.62, 0), Vector3(0, 0.5, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Body:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.4),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_3cgmv"]
+_data = {
+&"downed": SubResource("Animation_7wx88"),
+&"idle": SubResource("Animation_64l3n"),
+&"walk": SubResource("Animation_j2goh")
+}
+
+[node name="Unit" type="Node3D" unique_id=1936796094 node_paths=PackedStringArray("body", "facing_pivot", "name_label", "status_label", "hp_fill", "animation_player")]
+script = ExtResource("1_jg08v")
+body = NodePath("Body")
+facing_pivot = NodePath("Facing")
+name_label = NodePath("NameLabel")
+status_label = NodePath("StatusLabel")
+hp_fill = NodePath("HealthBar/Fill")
+animation_player = NodePath("AnimationPlayer")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1272398236]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+material_override = SubResource("StandardMaterial3D_n8iyn")
+mesh = SubResource("CapsuleMesh_n2rot")
+
+[node name="Facing" type="Node3D" parent="." unique_id=2008728230]
+
+[node name="Arrow" type="MeshInstance3D" parent="Facing" unique_id=289492074]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.45)
+material_override = SubResource("StandardMaterial3D_88hat")
+mesh = SubResource("BoxMesh_co2a1")
+
+[node name="NameLabel" type="Label3D" parent="." unique_id=1526645706]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+pixel_size = 0.006
+billboard = 1
+render_priority = 10
+outline_render_priority = 9
+font_size = 44
+
+[node name="StatusLabel" type="Label3D" parent="." unique_id=2131520135]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.68, 0)
+pixel_size = 0.006
+billboard = 1
+render_priority = 10
+outline_render_priority = 9
+modulate = Color(1, 0.65, 0.25, 1)
+
+[node name="HealthBar" type="Node3D" parent="." unique_id=1174080430]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+
+[node name="Back" type="MeshInstance3D" parent="HealthBar" unique_id=1336624029]
+material_override = SubResource("StandardMaterial3D_f1ck2")
+mesh = SubResource("QuadMesh_1brsp")
+
+[node name="Fill" type="MeshInstance3D" parent="HealthBar" unique_id=1478750013]
+material_override = SubResource("StandardMaterial3D_me5ij")
+mesh = SubResource("QuadMesh_sv57b")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1508276586]
+libraries/ = SubResource("AnimationLibrary_3cgmv")

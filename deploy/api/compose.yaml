@@ -1,0 +1,33 @@
+# API on its own host. Needs only the API's settings; no game-server or web values.
+name: unnamed-api
+services:
+  apisvc:
+    image: ${API_IMAGE:-unnamed-api}
+    build:
+      context: ../../services/api
+      dockerfile: ../../deploy/api.Dockerfile
+    env_file: .env
+    # Private port for the game server (service-to-service calls). Bind it to this host's private
+    # IP and allow it in the security group only from the game server. Never open it to the internet.
+    ports:
+      - "${API_PRIVATE_BIND:-127.0.0.1}:${API_PRIVATE_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2.8-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - apisvc
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

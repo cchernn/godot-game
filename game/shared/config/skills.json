@@ -1,0 +1,17 @@
+{
+  "_note": "PROVISIONAL prototype skills. Speed: higher resolves first within a beat. Not confirmed design.",
+  "move": {"name": "Move", "kind": "move", "speed": 5, "frequency": "unlimited", "stability": 3,
+    "stages": [{"name": "step", "ap": 1}]},
+  "strike": {"name": "Strike", "kind": "attack", "targeting": "character", "range": 1, "speed": 6,
+    "stages": [{"name": "strike", "ap": 1, "damage": 6, "interrupt": 1}]},
+  "power_strike": {"name": "Power Strike", "kind": "attack", "targeting": "character", "range": 1, "speed": 4,
+    "stability": 2,
+    "stages": [{"name": "wind-up", "ap": 1}, {"name": "smash", "ap": 1, "damage": 12, "interrupt": 2}]},
+  "bolt": {"name": "Bolt", "kind": "attack", "targeting": "tile", "range": 5, "speed": 5,
+    "stages": [{"name": "bolt", "ap": 1, "damage": 5, "interrupt": 1}]},
+  "disrupt": {"name": "Disrupt", "kind": "reaction", "speed": 7,
+    "reaction": {"range": 3, "duration_beats": 6, "interrupt": 2},
+    "stages": [{"name": "ready", "ap": 1}]},
+  "revive": {"name": "Revive", "kind": "revive", "targeting": "character", "range": 1, "speed": 5,
+    "stages": [{"name": "revive", "ap": 2}]}
+}

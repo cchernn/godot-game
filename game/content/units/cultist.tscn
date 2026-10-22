@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1"]
+
+[node name="Cultist" instance=ExtResource("1")]
+body_scale = Vector3(0.94999998807907, 1.04999995231628, 0.94999998807907)

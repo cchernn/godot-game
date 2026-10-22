@@ -1,0 +1,235 @@
+import time
+import uuid
+from typing import Annotated, Literal
+
+import jwt
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from . import rules
+from .auth import AuthError, Identity, TokenVerifier, server_key_ok
+from .config import Settings, get_settings
+from .db import make_pool, migrate
+from .repo import Conflict, Forbidden, Invalid, NotFound, Repository, RepoError
+from .templates import TemplateStore
+
+
+class WorldIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    template_id: str = Field(default="prototype", max_length=64)
+
+
+class RevealIn(BaseModel):
+    kind: Literal["node", "route"]
+    target_id: str = Field(max_length=64)
+    scope: Literal["world", "character"]
+    character_id: uuid.UUID | None = None
+
+
+class CharacterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+    origin: str
+    cls: str = Field(alias="class")
+
+
+class SessionIn(BaseModel):
+    token: str = Field(max_length=4096)
+    world_id: uuid.UUID
+
+
+class ParticipantIn(BaseModel):
+    character_id: uuid.UUID
+    outcome: Literal["survived", "downed", "eliminated"]
+    xp: int = Field(ge=0, le=100_000)
+
+
+class CombatResultIn(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    world_id: uuid.UUID
+    outcome: Literal["players_win", "players_lose", "draw"]
+    rounds: int = Field(ge=1, le=10_000)
+    participants: list[ParticipantIn] = Field(max_length=16)
+
+
+def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerifier | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    app = FastAPI(title="Unnamed API")
+    app.state.settings = settings
+    if settings.cors_origins:
+        app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
+                           allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
+    app.state.verifier = verifier or TokenVerifier(settings)
+    if pool is None:
+        pool = make_pool(settings.database_url)
+        migrate(pool)
+    app.state.repo = Repository(pool, TemplateStore(settings.templates_dir))
+
+    def repo(request: Request) -> Repository:
+        return request.app.state.repo
+
+    def current_user(request: Request, authorization: Annotated[str | None, Header()] = None) -> Identity:
+        if not authorization or not authorization.lower().startswith("bearer "):
+            raise HTTPException(401, "Missing bearer token")
+        try:
+            return request.app.state.verifier.verify(authorization[7:].strip())
+        except AuthError as e:
+            raise HTTPException(401, str(e)) from e
+
+    def server_only(authorization: Annotated[str | None, Header()] = None) -> None:
+        presented = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else None
+        if not server_key_ok(settings, presented):
+            raise HTTPException(401, "Invalid service credentials")
+
+    @app.exception_handler(RepoError)
+    def repo_error(_: Request, e: RepoError):
+        from fastapi.responses import JSONResponse
+        code = {NotFound: 404, Forbidden: 403, Conflict: 409, Invalid: 422}.get(type(e), 400)
+        return JSONResponse({"detail": str(e)}, status_code=code)
+
+    @app.get("/health")
+    def health() -> dict:
+        return {"status": "ok", "environment": settings.environment, "guests_enabled": settings.guests_enabled}
+
+    @app.post("/dev/guest")
+    def dev_guest() -> dict:
+        """Local development only: mints a throwaway identity. 404 everywhere else."""
+        if not settings.guests_enabled or not settings.jwt_secret:
+            raise HTTPException(404)
+        uid = uuid.uuid4()
+        now = int(time.time())
+        claims = {"sub": str(uid), "aud": settings.jwt_audience, "iat": now, "exp": now + 86400, "guest": True}
+        if settings.jwt_issuer:
+            claims["iss"] = settings.jwt_issuer
+        token = jwt.encode(claims, settings.jwt_secret, algorithm="HS256")
+        return {"user_id": str(uid), "access_token": token}
+
+    # ---- player-facing (Supabase JWT) ----
+
+    @app.post("/worlds", status_code=201)
+    def create_world(body: WorldIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.create_world(user.user_id, body.name, body.template_id)
+
+    @app.get("/worlds")
+    def list_worlds(user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_worlds(user.user_id)
+
+    @app.post("/worlds/{world_id}/characters", status_code=201)
+    def create_character(world_id: uuid.UUID, body: CharacterIn, user: Identity = Depends(current_user),
+                         r: Repository = Depends(repo)) -> dict:
+        if body.cls not in rules.CLASSES or body.origin not in rules.ORIGINS:
+            raise HTTPException(422, "Unknown class or origin")
+        return r.create_character(world_id, user.user_id, body.name, body.origin, body.cls)
+
+    @app.get("/worlds/{world_id}/characters/me")
+    def my_character(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        if not r.is_member(world_id, user.user_id):
+            raise HTTPException(403, "Not a member of this world")
+        c = r.active_character(world_id, user.user_id)
+        if c is None:
+            raise HTTPException(404, "No active character")
+        return c
+
+    @app.post("/characters/{character_id}/retire")
+    def retire(character_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.retire_character(character_id, user.user_id)
+
+    # ---- service-to-service (Godot server) ----
+
+    @app.post("/internal/auth/session", dependencies=[Depends(server_only)])
+    def auth_session(body: SessionIn, request: Request, r: Repository = Depends(repo)) -> dict:
+        """Godot server forwards the client's access token; identity and world access are decided here."""
+        try:
+            ident = request.app.state.verifier.verify(body.token)
+        except AuthError as e:
+            raise HTTPException(401, str(e)) from e
+        if not r.is_member(body.world_id, ident.user_id):
+            raise HTTPException(403, "Not a member of this world")
+        return {"user_id": str(ident.user_id), "guest": ident.is_guest,
+                "character": r.active_character(body.world_id, ident.user_id)}
+
+    @app.post("/internal/combat-results", dependencies=[Depends(server_only)])
+    def combat_result(body: CombatResultIn, r: Repository = Depends(repo)) -> dict:
+        res, dup = r.commit_combat_result(
+            body.idempotency_key, body.world_id, body.outcome, body.rounds,
+            [p.model_dump() for p in body.participants])
+        return {"result": res, "duplicate": dup}
+
+    # ---- membership ----
+
+    @app.post("/worlds/{world_id}/requests", status_code=201)
+    def request_join(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.request_join(world_id, user.user_id)
+
+    @app.get("/worlds/{world_id}/requests")
+    def list_requests(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_requests(world_id, user.user_id)
+
+    @app.post("/worlds/{world_id}/requests/{request_id}/{decision}")
+    def decide(world_id: uuid.UUID, request_id: uuid.UUID, decision: Literal["approve", "reject"],
+               user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.decide_request(world_id, user.user_id, request_id, decision == "approve")
+
+    @app.post("/worlds/{world_id}/members/{member_id}/remove", status_code=204)
+    def remove_member(world_id: uuid.UUID, member_id: uuid.UUID, user: Identity = Depends(current_user),
+                      r: Repository = Depends(repo)) -> None:
+        r.remove_member(world_id, user.user_id, member_id)
+
+    # ---- world view & activities ----
+
+    @app.get("/worlds/{world_id}/overview")
+    def overview(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.overview(world_id, user.user_id)
+
+    @app.post("/worlds/{world_id}/activities/{activity_id}/instances", status_code=201)
+    def start_instance(world_id: uuid.UUID, activity_id: str, user: Identity = Depends(current_user),
+                       r: Repository = Depends(repo)) -> dict:
+        return r.start_instance(world_id, user.user_id, activity_id)
+
+    @app.post("/instances/{instance_id}/join")
+    def join_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.join_instance(instance_id, user.user_id)
+
+    @app.post("/instances/{instance_id}/leave", status_code=204)
+    def leave_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.leave_instance(instance_id, user.user_id)
+
+    @app.post("/instances/{instance_id}/start")
+    def lock_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.lock_and_start_instance(instance_id, user.user_id)
+
+    @app.post("/instances/{instance_id}/cancel")
+    def cancel_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.cancel_instance(instance_id, user.user_id)
+
+    # ---- service-to-service: world changes ----
+
+    @app.get("/internal/instances/{instance_id}", dependencies=[Depends(server_only)])
+    def internal_instance(instance_id: uuid.UUID, r: Repository = Depends(repo)) -> dict:
+        return r.get_instance(instance_id)
+
+    @app.post("/internal/instances/{instance_id}/complete", dependencies=[Depends(server_only)])
+    def internal_complete(instance_id: uuid.UUID, r: Repository = Depends(repo)) -> dict:
+        res, dup = r.complete_instance(instance_id)
+        return {**res, "duplicate": dup}
+
+    @app.post("/internal/instances/{instance_id}/cancel", dependencies=[Depends(server_only)])
+    def internal_cancel(instance_id: uuid.UUID, r: Repository = Depends(repo)) -> dict:
+        return r.cancel_instance(instance_id)
+
+    @app.post("/internal/worlds/{world_id}/reveal", dependencies=[Depends(server_only)])
+    def internal_reveal(world_id: uuid.UUID, body: RevealIn, r: Repository = Depends(repo)) -> dict:
+        return r.reveal(world_id, body.kind, body.target_id, body.scope, body.character_id)
+
+    return app
+
+
+def _default_app() -> FastAPI:
+    return create_app()
+
+
+# `uvicorn app.main:app` for deployments; tests use create_app() with explicit settings.
+def __getattr__(name: str):
+    if name == "app":
+        return _default_app()
+    raise AttributeError(name)

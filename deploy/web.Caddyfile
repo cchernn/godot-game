@@ -1,0 +1,7 @@
+# Static file server inside the web client image. Behind the all-in-one edge proxy it listens on :80;
+# hosted alone, set SITE_ADDRESS to a domain and Caddy obtains the HTTPS certificate itself.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+	root * /srv/www
+	file_server
+}
