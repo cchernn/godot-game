@@ -18,6 +18,7 @@ class AuthError(Exception):
 class Identity:
     user_id: uuid.UUID
     is_guest: bool = False
+    email: str | None = None  # display label only, never used for authorization
 
 
 class TokenVerifier:
@@ -49,7 +50,8 @@ class TokenVerifier:
         guest = bool(claims.get("guest"))
         if guest and not self.settings.guests_enabled:
             raise AuthError("Guest tokens are not accepted by this server")
-        return Identity(user_id=user_id, is_guest=guest)
+        email = claims.get("email")
+        return Identity(user_id=user_id, is_guest=guest, email=email[:120] if isinstance(email, str) else None)
 
 
 def server_key_ok(settings: Settings, presented: str | None) -> bool:

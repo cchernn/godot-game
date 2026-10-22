@@ -5,14 +5,12 @@ extends Persistence
 var host: Node
 var base_url: String
 var api_key: String
-var world_id: String
 
 
-func _init(p_host: Node, p_base_url: String, p_api_key: String, p_world_id: String) -> void:
+func _init(p_host: Node, p_base_url: String, p_api_key: String) -> void:
 	host = p_host
 	base_url = p_base_url.rstrip("/")
 	api_key = p_api_key
-	world_id = p_world_id
 
 
 func _post(path: String, body: Dictionary) -> Dictionary:
@@ -33,7 +31,7 @@ func _post(path: String, body: Dictionary) -> Dictionary:
 	return {"ok": status >= 200 and status < 300, "status": status, "body": data, "error": detail}
 
 
-func verify_session(token: String) -> Dictionary:
+func verify_session(token: String, world_id: String) -> Dictionary:
 	var r := await _post("/internal/auth/session", {"token": token, "world_id": world_id})
 	if not r["ok"]:
 		return {"ok": false, "error": "Sign-in failed: %s" % r["error"]}
@@ -41,7 +39,7 @@ func verify_session(token: String) -> Dictionary:
 	return {"ok": true, "user_id": b["user_id"], "character": b["character"]}
 
 
-func commit_result(key: String, outcome: String, rounds: int, participants: Array) -> Dictionary:
+func commit_result(world_id: String, key: String, outcome: String, rounds: int, participants: Array) -> Dictionary:
 	var r := await _post("/internal/combat-results", {"idempotency_key": key, "world_id": world_id,
 		"outcome": outcome, "rounds": rounds, "participants": participants})
 	return {"ok": r["ok"], "duplicate": (r["body"] as Dictionary).get("duplicate", false), "error": r["error"]}

@@ -1,5 +1,6 @@
 extends Control
-## Browser/desktop client: connection screen, 3D board (BoardHolder in client_main.tscn), planning UI and combat log.
+## Browser/desktop client: connection screen, 3D board, planning UI and combat log. All of the layout is in
+## client_main.tscn (and account_flow.tscn); this script only fills it in and reacts to it.
 ## The client only builds and previews plans; the server validates and resolves everything.
 ##   Optional command-line args (after `--`): --url=ws://host:9080 --name=Alice
 
@@ -10,6 +11,11 @@ const SKILL_HINTS := {
 	"disrupt": "Queued immediately: reacts to an enemy starting a multi-stage skill",
 	"revive": "Click a downed ally",
 }
+
+## Skills are listed as buttons made from this scene (game/content/ui/skill_button.tscn).
+@export var skill_button_scene: PackedScene
+## Turn off to always use the plain guest connect screen, even when client_env.json exists.
+@export var account_mode_enabled: bool = true
 
 var net: NetClient
 var skills: SkillDb
@@ -23,39 +29,53 @@ var _snap_time_ms: int = 0
 var _in_battle: bool = false
 var _selftest: bool = false
 var _selftest_round: int = -1
-
-@onready var board: Board3D = $BoardHolder/Viewport/Board3D
-var connect_panel: PanelContainer
-var account: AccountFlow
-var url_edit: LineEdit
-var name_edit: LineEdit
-var connect_status: Label
-var banner: Label
-var status_label: Label
-var ap_label: Label
-var skill_box: VBoxContainer
-var queue_list: ItemList
-var ready_btn: Button
-var error_label: Label
-var log_view: RichTextLabel
-var result_label: Label
 var _skill_buttons: Dictionary = {}
+var _state: String = "menu"
+
+# The layout lives in client_main.tscn; nodes are found by their unique names (%Name), so
+# you can move or restyle them in the editor as long as the names stay.
+@onready var board: Board3D = $BoardHolder/Viewport/Board3D
+@onready var account: AccountFlow = %AccountFlow
+@onready var url_edit: LineEdit = %UrlEdit
+@onready var name_edit: LineEdit = %NameEdit
+@onready var banner: Label = %Banner
+@onready var status_label: Label = %StatusLabel
+@onready var ap_label: Label = %ApLabel
+@onready var skill_box: VBoxContainer = %SkillBox
+@onready var queue_list: ItemList = %QueueList
+@onready var ready_btn: Button = %ReadyButton
+@onready var error_label: Label = %ErrorLabel
+@onready var log_view: RichTextLabel = %LogView
+@onready var board_holder: Control = %BoardHolder
+@onready var side_panel: Control = %SidePanel
+@onready var result_panel: Control = %ResultPanel
+@onready var result_title: Label = %ResultTitle
+@onready var result_detail: Label = %ResultDetail
+## The panel in the middle of the screen: the guest connect screen, or the account flow.
+var connect_panel: Control
+var connect_status: Label
 
 
 func _ready() -> void:
 	skills = SkillDb.load_file()
 	net = NetClient.new()
 	add_child(net)
+	connect_panel = %ConnectPanel
+	connect_status = %ConnectStatus
 	net.connection_changed.connect(_on_connection)
 	net.welcomed.connect(_on_welcome)
 	net.snapshot.connect(_on_snapshot)
 	net.events.connect(_on_events)
 	net.plan_result.connect(_on_plan_result)
 	net.notice.connect(func(t: String) -> void: connect_status.text = t)
+	net.lobby.connect(_on_lobby)
+	net.result.connect(_on_result)
 	net.rejected.connect(func(t: String) -> void:
+		_set_state("menu")
+		_set_battle_view(false)
 		connect_status.text = t
 		connect_panel.show())
-	_build_ui()
+	_wire_ui()
 	var url := _default_url()
 	var nm := "Guest%d" % (randi() % 900 + 100)
 	var auto := false
@@ -65,7 +85,7 @@ func _ready() -> void:
 			auto = true
 		elif arg.begins_with("--name="):
 			nm = arg.substr(7)
-		elif arg.begins_with("--token="): # Supabase access token (API mode); a sign-in UI comes with the web build
+		elif arg.begins_with("--token="): # Supabase access token (API mode), for scripted runs
 			net.access_token = arg.substr(8)
 		elif arg == "--selftest": # drives the planning UI programmatically (CI/headless check)
 			_selftest = true
@@ -80,7 +100,7 @@ func _ready() -> void:
 	if auto or net.access_token != "":
 		if auto:
 			_connect()
-	elif not env.is_empty():
+	elif account_mode_enabled and not env.is_empty():
 		_enter_account_mode(env)
 
 
@@ -92,119 +112,42 @@ func _default_url() -> String:
 	return "ws://127.0.0.1:9080"
 
 
-# ---------- UI construction ----------
-
-func _build_ui() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := ColorRect.new()
-	bg.color = Color(0.09, 0.09, 0.11)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-	move_child(bg, 0) # behind the board
-
+## Connects the scene's buttons to the game logic.
+func _wire_ui() -> void:
 	board.cell_clicked.connect(_on_cell_clicked)
-
-	var side := PanelContainer.new()
-	side.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
-	side.offset_left = -360
-	add_child(side)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
-	side.add_child(v)
-	status_label = Label.new()
-	v.add_child(status_label)
-	ap_label = Label.new()
-	v.add_child(ap_label)
-	skill_box = VBoxContainer.new()
-	v.add_child(skill_box)
-	var face := HBoxContainer.new()
-	v.add_child(face)
-	var fl := Label.new()
-	fl.text = "Facing after move:"
-	face.add_child(fl)
-	for f in [["N", Enums.Facing.NORTH], ["E", Enums.Facing.EAST], ["S", Enums.Facing.SOUTH], ["W", Enums.Facing.WEST]]:
-		var fb := Button.new()
-		fb.text = f[0]
-		fb.pressed.connect(_set_last_move_facing.bind(f[1]))
-		face.add_child(fb)
-	queue_list = ItemList.new()
-	queue_list.custom_minimum_size = Vector2(0, 110)
-	v.add_child(queue_list)
-	var row := HBoxContainer.new()
-	v.add_child(row)
-	var undo := Button.new()
-	undo.text = "Undo"
-	undo.pressed.connect(_undo)
-	row.add_child(undo)
-	var clear := Button.new()
-	clear.text = "Clear"
-	clear.pressed.connect(_clear_plan)
-	row.add_child(clear)
-	ready_btn = Button.new()
-	ready_btn.toggle_mode = true
-	ready_btn.text = "Ready"
+	%FaceNorth.pressed.connect(_set_last_move_facing.bind(Enums.Facing.NORTH))
+	%FaceEast.pressed.connect(_set_last_move_facing.bind(Enums.Facing.EAST))
+	%FaceSouth.pressed.connect(_set_last_move_facing.bind(Enums.Facing.SOUTH))
+	%FaceWest.pressed.connect(_set_last_move_facing.bind(Enums.Facing.WEST))
+	%UndoButton.pressed.connect(_undo)
+	%ClearButton.pressed.connect(_clear_plan)
 	ready_btn.toggled.connect(_on_ready_toggled)
-	row.add_child(ready_btn)
-	error_label = Label.new()
-	error_label.modulate = Color(1, 0.5, 0.4)
-	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(error_label)
-	log_view = RichTextLabel.new()
-	log_view.bbcode_enabled = true
-	log_view.scroll_following = true
-	log_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	log_view.custom_minimum_size = Vector2(0, 200)
-	v.add_child(log_view)
-
-	banner = Label.new()
-	banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	banner.modulate = Color(1, 0.7, 0.3)
-	add_child(banner)
-	result_label = Label.new()
-	result_label.add_theme_font_size_override("font_size", 48)
-	result_label.set_anchors_preset(Control.PRESET_CENTER)
-	result_label.offset_left = -500
-	result_label.offset_right = 0
-	add_child(result_label)
-
-	connect_panel = PanelContainer.new()
-	connect_panel.set_anchors_preset(Control.PRESET_CENTER)
-	connect_panel.custom_minimum_size = Vector2(420, 0)
-	connect_panel.offset_left = -210
-	connect_panel.offset_top = -110
-	add_child(connect_panel)
-	var cv := VBoxContainer.new()
-	connect_panel.add_child(cv)
-	var title := Label.new()
-	title.text = "Unnamed — connect to server"
-	cv.add_child(title)
-	url_edit = LineEdit.new()
-	cv.add_child(url_edit)
-	name_edit = LineEdit.new()
-	name_edit.placeholder_text = "Display name"
-	cv.add_child(name_edit)
-	var cb := Button.new()
-	cb.text = "Connect"
-	cb.pressed.connect(_connect)
-	cv.add_child(cb)
-	connect_status = Label.new()
-	connect_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	cv.add_child(connect_status)
+	%ConnectButton.pressed.connect(_connect)
+	%ContinueButton.pressed.connect(_on_continue_pressed)
+	_set_battle_view(false)
+	_set_state("menu")
+	banner.text = ""
+	status_label.text = ""
+	ap_label.text = ""
+	error_label.text = ""
+	connect_status.text = ""
 
 
 ## Replaces the guest connect screen with Supabase sign-in, world and character selection.
 func _enter_account_mode(env: Dictionary) -> void:
-	connect_panel.queue_free()
-	account = AccountFlow.new()
-	add_child(account)
+	connect_panel.hide()
+	account.show()
 	account.setup(env)
 	connect_panel = account
 	connect_status = account.status
-	account.entered.connect(func(server_url: String, token: String, display_name: String) -> void:
+	account.entered.connect(func(server_url: String, token: String, display_name: String, world_id: String) -> void:
 		net.access_token = token
+		net.world_id = world_id
 		net.start(server_url, display_name))
 	account.token_refreshed.connect(func(token: String) -> void: net.access_token = token)
-	account.backed_out.connect(func() -> void: net.stop())
+	account.backed_out.connect(func() -> void:
+		net.stop()
+		_set_state("menu"))
 
 
 func _connect() -> void:
@@ -232,6 +175,9 @@ func _on_snapshot(s: Dictionary) -> void:
 	snap = s
 	_snap_time_ms = Time.get_ticks_msec()
 	connect_panel.hide()
+	_set_battle_view(true)
+	if _state != "result":
+		_set_state("battle")
 	me = {}
 	for u: Dictionary in s["units"]:
 		if u["id"] == s["you"]:
@@ -262,6 +208,72 @@ func _on_events(list: Array) -> void:
 			"round_start", "resolution_start": col = "#7fb2ff"
 			"victory": col = "#ffffff"
 		log_view.append_text("[color=%s]%s[/color]\n" % [col, e["text"]])
+
+
+## The board and side panel only exist while a battle is on; before and after, the screen is the menu.
+func _set_battle_view(on: bool) -> void:
+	board_holder.visible = on
+	side_panel.visible = on
+	if not on:
+		result_panel.hide()
+
+
+## Publishes the screen the player is on ("menu", "lobby", "battle", "result") as window.unnamedState in the
+## browser, so automated tests can wait for it. Harmless elsewhere.
+func _set_state(state: String) -> void:
+	_state = state
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.unnamedState = '%s'" % state)
+
+
+func _on_lobby(info: Dictionary) -> void:
+	_set_state("lobby")
+	connect_panel.show()
+	if account != null and connect_panel == account:
+		account.status.text = ""
+		account.show_lobby(info)
+	else:
+		connect_status.text = "Waiting for players (%d/%d): %s" % [(info["players"] as Array).size(), info["needed"],
+			", ".join(PackedStringArray(info["players"]))]
+
+
+func _on_result(info: Dictionary) -> void:
+	_set_state("result")
+	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW"}
+	result_title.text = titles.get(info["outcome"], "BATTLE OVER")
+	var lines: Array[String] = ["Round %d" % info["rounds"]]
+	if info["xp"] > 0:
+		lines.append("+%d XP%s" % [info["xp"], "" if info["saved"] else " (saving…)"])
+	if info["you"] != "survived":
+		lines.append("You were %s." % info["you"])
+	result_detail.text = "\n".join(lines)
+	result_panel.show()
+
+
+## Leaves the finished battle and returns to the menu (the character screen when signed in).
+func _on_continue_pressed() -> void:
+	_set_state("menu")
+	net.stop()
+	snap = {}
+	me = {}
+	plan.clear()
+	_prev_plan.clear()
+	mode = ""
+	_plan_round = -1
+	_in_battle = false
+	_skill_buttons.clear()
+	for ch in skill_box.get_children():
+		ch.queue_free()
+	log_view.clear()
+	error_label.text = ""
+	banner.text = ""
+	board.reset()
+	_set_battle_view(false)
+	connect_panel.show()
+	if account != null and connect_panel == account:
+		account.return_to_menu()
+	else:
+		connect_status.text = ""
 
 
 func _on_plan_result(ok: bool, err: String) -> void:
@@ -451,9 +463,6 @@ func _refresh() -> void:
 	for id: String in _skill_buttons:
 		(_skill_buttons[id] as Button).disabled = not can
 		(_skill_buttons[id] as Button).set_pressed_no_signal(id == mode)
-	var outcome := {Enums.Outcome.PLAYERS_WIN: "VICTORY", Enums.Outcome.PLAYERS_LOSE: "DEFEAT",
-		Enums.Outcome.DRAW: "DRAW"}.get(snap["outcome"], "") as String
-	result_label.text = outcome
 
 
 func _rebuild_skill_buttons() -> void:
@@ -465,8 +474,7 @@ func _rebuild_skill_buttons() -> void:
 	_skill_buttons.clear()
 	for id: String in ids:
 		var sk := skills.get_skill(id)
-		var b := Button.new()
-		b.toggle_mode = true
+		var b := skill_button_scene.instantiate() as Button
 		b.text = "%s  (%d AP)" % [sk.display_name, sk.total_ap()] if sk.kind != Enums.SkillKind.MOVE else "Move  (1 AP per %d tile(s))" % me["tiles_per_ap"]
 		b.tooltip_text = SKILL_HINTS.get(id, "")
 		b.pressed.connect(_on_skill_pressed.bind(id))
@@ -481,7 +489,7 @@ func _process(_delta: float) -> void:
 
 func _run_selftest() -> void:
 	if snap["phase"] == Enums.RoundPhase.FINISHED:
-		print("[selftest] finished: %s" % result_label.text)
+		print("[selftest] finished: outcome %d" % snap["outcome"])
 		get_tree().quit(0)
 		return
 	if snap["phase"] != Enums.RoundPhase.PLANNING or _selftest_round == snap["round"] or not _can_edit():

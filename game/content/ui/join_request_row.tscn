@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/client/join_request_row.gd" id="1"]
+
+[node name="JoinRequestRow" type="HBoxContainer"]
+theme_override_constants/separation = 6
+script = ExtResource("1")
+
+[node name="NameLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "someone@example.com"
+text_overrun_behavior = 3
+
+[node name="ApproveButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Approve"
+
+[node name="RejectButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Reject"

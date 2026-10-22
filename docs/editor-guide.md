@@ -14,7 +14,12 @@ project from `project.godot`; the first open imports everything.
 | Which scene draws which unit | `game/content/units/unit_visuals.tres` | Inspector |
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
 | Fog / move / target / hover highlights | `game/content/board/materials/*.tres` | Inspector |
-| Window layout (board area) | `game/client/client_main.tscn` | the 2D editor |
+| Battle screen: side panel, log, result text, guest connect panel | `game/client/client_main.tscn` | the 2D editor |
+| Sign-in, join, character, host-approval and lobby screens | `game/client/account_flow.tscn` | the 2D editor |
+| One join request in the host's list | `game/content/ui/join_request_row.tscn` | the 2D editor |
+| Victory / defeat panel | `ResultPanel` in `game/client/client_main.tscn` | the 2D editor |
+| Skill button look | `game/content/ui/skill_button.tscn` | the 2D editor |
+| Fonts, colours, panel style (whole UI) | `game/content/ui/theme.tres` | the Theme editor |
 
 **See your changes without a server:** open `game/client/board/board_preview.tscn` and press **F6**. It shows the map
 with a sample battle. Orbit with the middle mouse; click a tile to print its coordinates. Its Inspector has
@@ -66,9 +71,22 @@ If they disagree, the client logs a warning and draws the server's layout, and t
 - Sun, shadows, ambient light and background colour: `Sun` and `WorldEnvironment` in `board_3d.tscn`.
 - The control hint at the top is the `Hud/Hint` label there.
 
+## The UI (2D editor)
+`client_main.tscn` holds the whole battle screen: `SidePanel` (status, AP, skill list, facing buttons, plan queue, Undo / Clear / Ready,
+error line, combat log), `Banner`, `ResultLabel`, the guest `ConnectPanel`, and the `AccountFlow` screens. `account_flow.tscn` has one
+container per step: `SignInStep`, `WorldsStep` (the world picker), `JoinStep`, `CharacterStep`, `HostStep`, `CreateCharacterStep`, `WaitStep` (the lobby).
+The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the code when a battle begins; `ResultPanel` appears when it ends.
+- **Move, resize, restyle anything**: containers, margins, fonts, colours, icons, extra decoration labels or images.
+- **Keep the node names that have a `%` marker** (shown as a green percent badge in the Scene tree). The code finds them by name.
+  Renaming or deleting one breaks that part of the screen; moving it elsewhere in the tree is fine.
+- **Skill buttons** are made from `ui/skill_button.tscn` (one per skill, filled in by the code). Restyle that scene.
+- **One look for everything:** `ui/theme.tres` is applied on the root; edit it in the Theme editor (default font size, panel style, button styles).
+- The 3D board area is the `BoardHolder` node; its width is set by `SidePanel`'s left offset (360 px), so resize both together.
+- To preview the screens without a server, press **F6** on `client_main.tscn` (guest connect panel). The battle panel fills in once connected.
+
 ## Things that are still code (for now)
-Class and enemy stats, which units appear in the encounter and the side panel/UI layout are in `game/combat/encounter.gd` and
-`game/client/client_main.gd`; they are next to move into resources and scenes. Game rules stay in code.
+Class and enemy stats and which units appear in the encounter (`game/combat/encounter.gd`) are next to move into resources. Game rules,
+networking and the API stay in code. The dropdown choices for origin and class mirror the server's rules (`account_flow.gd`).
 
 ## `tools/generate_content.gd`
 The one-time scaffold that created these files. It never overwrites existing files; `-- --force` regenerates everything and

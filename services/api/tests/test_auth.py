@@ -98,3 +98,21 @@ def test_cors_headers_only_for_configured_origins(pool):
     assert ok.headers.get("access-control-allow-origin") == "https://play.example"
     bad = c.options("/worlds", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"})
     assert "access-control-allow-origin" not in bad.headers
+
+
+def test_unexpected_errors_are_json_500_and_still_carry_cors_headers(pool):
+    app = create_app(make_settings(cors_origins=["https://play.example"]), pool)
+
+    @app.get("/boom")
+    def boom():
+        raise RuntimeError("db exploded")
+
+    c = TestClient(app, raise_server_exceptions=False)
+    r = c.get("/boom", headers={"Origin": "https://play.example"})
+    assert r.status_code == 500 and r.json() == {"detail": "Internal server error"}
+    assert r.headers.get("access-control-allow-origin") == "https://play.example", "the browser must be able to read the 500"
+
+
+def test_pool_does_not_use_server_side_prepared_statements(pool):
+    with pool.connection() as conn:
+        assert conn.prepare_threshold is None

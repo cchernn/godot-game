@@ -14,7 +14,7 @@ The battle starts once `lobby.players_required` players join. Design notes: `doc
 ## Playing with a Supabase account (local)
 
 1. Fill `services/api/.env` (see `.env.example`) and check `game/client/client_env.json`
-   (project URL, publishable key, `world_id` the battle server is bound to).
+   (project URL, publishable key).
 2. `scripts/stack.sh init && scripts/stack.sh up` starts the API, battle server and web client in Docker (`PLAYERS=n` for the party size).
 3. Open http://localhost:8080, or open the project in the Godot editor on Windows and press F5. Sign in, create a character once,
    then **Enter battle**. The client falls back to the guest connect screen if `client_env.json`
@@ -22,6 +22,14 @@ The battle starts once `lobby.players_required` players join. Design notes: `doc
 
 `tests/account_flow_check.gd` is a live check of the sign-in flow (needs `ACCT_EMAIL`/`ACCT_PASSWORD`
 and a running API); it is not part of `scripts/test.sh`.
+
+## The player flow
+Open the page -> sign in or create an account (Supabase; new accounts confirm by email) -> **choose a world** from the list (every
+world is listed with your standing in it, even when there is only one) -> if you are not in it yet, **Request to
+join** and wait for the host (the host sees **Join requests (n)** on their character screen and approves or rejects) -> create a
+character once -> **Enter battle** -> lobby (who is waiting, starts automatically when the party is full) -> plan and ready each
+round -> result screen (victory/defeat, XP) -> **Continue** back to the character screen. Screens: `docs/editor-guide.md`;
+a real-browser test of this flow: `tests/browser/README.md`. One battle server hosts every world, one room per world.
 
 ## Deployment
 

@@ -94,6 +94,21 @@ func _sync_units() -> void:
 			_disp.erase(id)
 
 
+## Clears the battle (units, highlights) when leaving it; the map stays loaded for the next one.
+func reset() -> void:
+	for node: Unit3D in _unit_nodes.values():
+		node.queue_free()
+	_unit_nodes.clear()
+	_disp.clear()
+	units.clear()
+	_seen.clear()
+	plan_cells = [] as Array[Vector2i]
+	plan_marks = [] as Array[Vector2i]
+	hover = Vector2i(-1, -1)
+	bf = null
+	_serial += 1
+
+
 # ---------- Map ----------
 
 func _valid_map_id(id: String) -> bool:

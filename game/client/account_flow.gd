@@ -1,10 +1,12 @@
 class_name AccountFlow
 extends PanelContainer
 ## Supabase sign-in and the steps before a battle: pick or create a world, create a character.
+## The screens are containers in account_flow.tscn (one per step, named below): restyle or rearrange
+## them in the editor, keep the node names. This script only fills them in and handles the buttons.
 ## client_env.json holds only public values (project URL, publishable key). Passwords are never
 ## stored; the rotating refresh token is kept in user:// so the next launch signs in silently.
 
-signal entered(server_url: String, access_token: String, display_name: String)
+signal entered(server_url: String, access_token: String, display_name: String, world_id: String)
 signal token_refreshed(access_token: String)
 signal backed_out
 
@@ -15,14 +17,42 @@ const REFRESH_MARGIN_S := 120
 const ORIGINS: Array[String] = ["outcast", "soldier", "scholar"]
 const CLASSES: Array[String] = ["warrior", "ranger", "cleric", "rogue"]
 
+## One row per pending join request on the host screen (game/content/ui/join_request_row.tscn).
+@export var join_request_row_scene: PackedScene
+
 var env: Dictionary = {}
 var access_token: String = ""
 var user_email: String = ""
-var status: Label
+
+@onready var status: Label = %StatusLabel
+@onready var _refresh_timer: Timer = %RefreshTimer
+@onready var _steps: Array[Control] = [%SignInStep, %WorldsStep, %JoinStep, %CharacterStep, %HostStep, %CreateCharacterStep, %WaitStep]
+@onready var _email: LineEdit = %EmailEdit
+@onready var _password: LineEdit = %PasswordEdit
+@onready var _signed_in_label: Label = %SignedInLabel
+@onready var _world_list: ItemList = %WorldList
+@onready var _new_world: LineEdit = %NewWorldEdit
+@onready var _world_label: Label = %WorldLabel
+@onready var _character_label: Label = %CharacterLabel
+@onready var _enter_button: Button = %EnterButton
+@onready var _character_name: LineEdit = %CharacterNameEdit
+@onready var _origin: OptionButton = %OriginOption
+@onready var _class: OptionButton = %ClassOption
+@onready var _join_label: Label = %JoinLabel
+@onready var _join_poll: Timer = %JoinPollTimer
+@onready var _request_join_button: Button = %RequestJoinButton
+@onready var _manage_requests: Button = %ManageRequestsButton
+@onready var _request_rows: VBoxContainer = %RequestRows
+@onready var _host_label: Label = %HostLabel
+@onready var _wait_label: Label = %WaitLabel
+@onready var _lobby_list: ItemList = %LobbyList
 
 var _refresh_token: String = ""
-var _body: VBoxContainer
-var _refresh_timer: Timer
+var _worlds: Array = []
+var _world: Dictionary = {}
+var _character: Dictionary = {}
+## The user's standing in the current world: {world: {id, name}, status, is_host}.
+var _membership: Dictionary = {}
 
 
 ## Empty when the file is missing or incomplete, which selects the guest/dev connect screen.
@@ -38,29 +68,46 @@ static func load_env() -> Dictionary:
 	return cfg
 
 
+func _ready() -> void:
+	for o in ORIGINS:
+		_origin.add_item(o.capitalize())
+	for c in CLASSES:
+		_class.add_item(c.capitalize())
+	_refresh_timer.timeout.connect(_on_refresh_due)
+	%SignInButton.pressed.connect(_on_sign_in_pressed.bind(false))
+	%CreateAccountButton.pressed.connect(_on_sign_in_pressed.bind(true))
+	_password.text_submitted.connect(func(_t: String) -> void: _on_sign_in_pressed(false))
+	%PlayButton.pressed.connect(_on_play_pressed)
+	_world_list.item_activated.connect(func(_i: int) -> void: _on_play_pressed())
+	%JoinBackButton.pressed.connect(_step_worlds)
+	%CreateWorldButton.pressed.connect(_on_create_world_pressed)
+	%RefreshWorldsButton.pressed.connect(_step_worlds)
+	%WorldsSignOutButton.pressed.connect(sign_out_and_show)
+	_enter_button.pressed.connect(func() -> void: _enter(str(_character.get("name", ""))))
+	%CharacterBackButton.pressed.connect(_on_back)
+	%CreateCharacterButton.pressed.connect(_on_create_character_pressed)
+	%CreateBackButton.pressed.connect(_on_back)
+	%CancelButton.pressed.connect(_on_cancel_pressed)
+	_request_join_button.pressed.connect(_on_request_join_pressed)
+	%JoinCheckButton.pressed.connect(_check_membership)
+	%JoinSignOutButton.pressed.connect(sign_out_and_show)
+	_manage_requests.pressed.connect(_step_host)
+	%HostBackButton.pressed.connect(func() -> void: _show_character())
+	_join_poll.timeout.connect(_check_membership)
+	_show_step(%SignInStep)
+
+
+## Starts the flow with the client config; call once after the scene is ready.
 func setup(p_env: Dictionary) -> void:
 	env = p_env
-	set_anchors_preset(Control.PRESET_CENTER)
-	custom_minimum_size = Vector2(420, 0)
-	offset_left = -210
-	offset_top = -170
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
-	add_child(v)
-	var title := Label.new()
-	title.text = "Unnamed"
-	v.add_child(title)
-	_body = VBoxContainer.new()
-	_body.add_theme_constant_override("separation", 6)
-	v.add_child(_body)
-	status = Label.new()
-	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(status)
-	_refresh_timer = Timer.new()
-	_refresh_timer.one_shot = true
-	_refresh_timer.timeout.connect(_on_refresh_due)
-	add_child(_refresh_timer)
 	_restore_session()
+
+
+func _show_step(step: Control) -> void:
+	for s in _steps:
+		s.visible = s == step
+	if step != %JoinStep:
+		_join_poll.stop()
 
 
 # ---------- HTTP ----------
@@ -211,101 +258,80 @@ func _on_refresh_due() -> void:
 
 # ---------- Steps ----------
 
-func _clear() -> void:
-	for c in _body.get_children():
-		c.queue_free()
-
-
-func _label(text: String) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_body.add_child(l)
-	return l
-
-
-func _edit(placeholder: String, secret: bool = false, text: String = "") -> LineEdit:
-	var e := LineEdit.new()
-	e.placeholder_text = placeholder
-	e.secret = secret
-	e.text = text
-	_body.add_child(e)
-	return e
-
-
-func _button(text: String, cb: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.pressed.connect(cb)
-	_body.add_child(b)
-	return b
-
-
 func _step_sign_in() -> void:
-	_clear()
-	_label("Sign in")
-	var email := _edit("Email", false, user_email)
-	var pw := _edit("Password", true)
-	var go := func(create: bool) -> void:
-		status.text = "Working…"
-		var err: String
-		if create:
-			err = await sign_up(email.text.strip_edges(), pw.text)
-		else:
-			err = await sign_in(email.text.strip_edges(), pw.text)
-		pw.text = ""
-		if err == "":
-			status.text = ""
-			_step_after_sign_in()
-		else:
-			status.text = err
-	pw.text_submitted.connect(func(_t: String) -> void: go.call(false))
-	_button("Sign in", go.bind(false))
-	_button("Create account", go.bind(true))
+	if _email.text == "":
+		_email.text = user_email
+	_password.text = ""
+	_show_step(%SignInStep)
+
+
+func _on_sign_in_pressed(create: bool) -> void:
+	status.text = "Working…"
+	var email := _email.text.strip_edges()
+	var err: String
+	if create:
+		err = await sign_up(email, _password.text)
+	else:
+		err = await sign_in(email, _password.text)
+	_password.text = ""
+	if err == "":
+		status.text = ""
+		_step_after_sign_in()
+	else:
+		status.text = err
 
 
 func _step_after_sign_in() -> void:
-	var fixed := str(env.get("world_id", ""))
-	if fixed != "":
-		_step_character({"id": fixed, "name": "Prototype world"})
-	else:
-		_step_worlds()
+	_step_worlds()
 
 
+const STANDING_TEXT := {"member": "joined", "pending": "request pending", "rejected": "request declined",
+	"removed": "removed", "none": "not joined"}
+
+
+## The world picker, shown after every sign-in (even with one world). Lists every world with your standing in it.
 func _step_worlds() -> void:
-	_clear()
-	_label("Signed in as %s" % user_email)
-	var r := await api(HTTPClient.METHOD_GET, "/worlds")
+	_show_step(%WorldsStep)
+	_signed_in_label.text = "Signed in as %s. Choose a world." % user_email
+	var r := await api(HTTPClient.METHOD_GET, "/worlds/available")
 	if r["status"] != 200:
 		status.text = r["error"]
-		_button("Retry", _step_worlds)
-		_button("Sign out", sign_out_and_show)
 		return
-	var worlds: Array = r["data"]
-	var list := ItemList.new()
-	list.custom_minimum_size = Vector2(0, 100)
-	for w: Dictionary in worlds:
-		list.add_item(w["name"])
-	_body.add_child(list)
-	_button("Play in selected world", func() -> void:
-		var sel := list.get_selected_items()
-		if sel.is_empty():
-			status.text = "Select a world first"
-		else:
-			status.text = ""
-			_step_character(worlds[sel[0]]))
-	var wname := _edit("New world name")
-	_button("Create world", func() -> void:
-		if wname.text.strip_edges() == "":
-			status.text = "Enter a world name"
-			return
-		var c := await api(HTTPClient.METHOD_POST, "/worlds", {"name": wname.text.strip_edges()})
-		if c["status"] == 201:
-			status.text = ""
-			_step_character(c["data"])
-		else:
-			status.text = c["error"])
-	_button("Sign out", sign_out_and_show)
+	status.text = ""
+	_show_worlds(r["data"])
+
+
+func _show_worlds(worlds: Array) -> void:
+	_worlds = worlds
+	_world_list.clear()
+	for w: Dictionary in _worlds:
+		var standing: String = "host" if w.get("is_host", false) else STANDING_TEXT.get(w["status"], w["status"])
+		_world_list.add_item("%s  -  %s  (%d player%s)" % [w["name"], standing, w["members"], "" if w["members"] == 1 else "s"])
+	if _worlds.is_empty():
+		_signed_in_label.text = "Signed in as %s. There are no worlds yet; create one below." % user_email
+
+
+func _on_play_pressed() -> void:
+	var sel := _world_list.get_selected_items()
+	if sel.is_empty():
+		status.text = "Select a world first"
+		return
+	status.text = ""
+	_step_character(_worlds[sel[0]])
+
+
+func _on_create_world_pressed() -> void:
+	var n := _new_world.text.strip_edges()
+	if n == "":
+		status.text = "Enter a world name"
+		return
+	var c := await api(HTTPClient.METHOD_POST, "/worlds", {"name": n})
+	if c["status"] == 201:
+		status.text = ""
+		_new_world.text = ""
+		_step_character(c["data"])
+	else:
+		status.text = c["error"]
 
 
 func sign_out_and_show() -> void:
@@ -314,61 +340,188 @@ func sign_out_and_show() -> void:
 	_step_sign_in()
 
 
+## Entering a world: first find out whether the user is a member, then show the character or the join screen.
 func _step_character(world: Dictionary) -> void:
-	_clear()
-	_label("World: %s" % world["name"])
-	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters/me" % world["id"])
+	_world = world
+	_character = {}
+	_show_step(%CharacterStep)
+	_world_label.text = "World: %s" % world["name"]
+	_character_label.text = "Checking your access…"
+	_enter_button.disabled = true
+	_manage_requests.hide()
+	var m := await api(HTTPClient.METHOD_GET, "/worlds/%s/membership" % world["id"])
+	if m["status"] != 200:
+		_character_label.text = ""
+		status.text = m["error"]
+		return
+	_membership = m["data"]
+	_world = _membership["world"]
+	if _membership["status"] == "member":
+		_show_character()
+	else:
+		_show_join()
+
+
+func _show_character() -> void:
+	_show_step(%CharacterStep)
+	_world_label.text = "World: %s" % _world["name"]
+	_character_label.text = "Loading your character…"
+	_enter_button.disabled = true
+	_manage_requests.visible = _membership.get("is_host", false)
+	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters/me" % _world["id"])
 	if r["status"] == 200:
-		var c: Dictionary = r["data"]
-		_label("%s — level %d %s (%s), %d XP" % [c["name"], c["level"], c["class"], c["origin"], c["xp"]])
-		_button("Enter battle", func() -> void: _enter(c["name"]))
+		_character = r["data"]
+		_character_label.text = "%s — level %d %s (%s), %d XP" % [_character["name"], _character["level"],
+			_character["class"], _character["origin"], _character["xp"]]
+		_enter_button.disabled = false
 	elif r["status"] == 404 or r["status"] == 403:
-		_step_create_character(world)
+		_step_create_character()
 		return
 	else:
+		_character_label.text = ""
 		status.text = r["error"]
-	_back_button(world)
+	if _manage_requests.visible:
+		var pending := await api(HTTPClient.METHOD_GET, "/worlds/%s/requests" % _world["id"])
+		if pending["status"] == 200:
+			_manage_requests.text = "Join requests (%d)" % (pending["data"] as Array).size()
 
 
-func _step_create_character(world: Dictionary) -> void:
-	_clear()
-	_label("Create your character")
-	var nm := _edit("Character name")
-	var origin := OptionButton.new()
-	for o in ORIGINS:
-		origin.add_item(o.capitalize())
-	_body.add_child(origin)
-	var cls := OptionButton.new()
-	for c in CLASSES:
-		cls.add_item(c.capitalize())
-	_body.add_child(cls)
-	_button("Create", func() -> void:
-		var n := nm.text.strip_edges()
-		if n == "":
-			status.text = "Enter a name"
-			return
-		var c := await api(HTTPClient.METHOD_POST, "/worlds/%s/characters" % world["id"],
-			{"name": n, "origin": ORIGINS[origin.selected], "class": CLASSES[cls.selected]})
-		if c["status"] == 201:
-			status.text = ""
-			_step_character(world)
-		else:
-			status.text = c["error"])
-	_back_button(world)
+# ---------- Joining a world ----------
+
+func _show_join() -> void:
+	_show_step(%JoinStep)
+	var wname: String = _world["name"]
+	var state: String = _membership["status"]
+	_join_poll.stop() # only a pending request is worth re-checking
+	match state:
+		"pending":
+			_join_label.text = "Your request to join \"%s\" is waiting for the host's approval. This page checks automatically." % wname
+			_join_poll.start()
+		"rejected":
+			_join_label.text = "The host declined your request to join \"%s\"." % wname
+		"removed":
+			_join_label.text = "You were removed from \"%s\". You can ask to join again." % wname
+		_:
+			_join_label.text = "You are not a member of \"%s\" yet. Ask the host to let you in." % wname
+	_request_join_button.visible = state != "pending"
+	_request_join_button.text = "Ask to join again" if state in ["rejected", "removed"] else "Request to join"
 
 
-func _back_button(world: Dictionary) -> void:
-	if str(env.get("world_id", "")) != "":
-		_button("Sign out", sign_out_and_show)
+func _on_request_join_pressed() -> void:
+	status.text = ""
+	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/requests" % _world["id"])
+	if r["status"] == 201 or r["status"] == 409: # 409: a request is already pending
+		_membership["status"] = "pending"
+		_show_join()
 	else:
-		_button("Back", _step_worlds)
+		status.text = r["error"]
+
+
+## Re-reads the user's standing (also called by the poll timer while a request is pending).
+func _check_membership() -> void:
+	var m := await api(HTTPClient.METHOD_GET, "/worlds/%s/membership" % _world["id"])
+	if m["status"] != 200 or not %JoinStep.visible:
+		return
+	_membership = m["data"]
+	if _membership["status"] == "member":
+		status.text = ""
+		_show_character()
+	else:
+		_show_join()
+
+
+# ---------- Host: approving requests ----------
+
+func _step_host() -> void:
+	_show_step(%HostStep)
+	for row in _request_rows.get_children():
+		row.queue_free()
+	_host_label.text = "Loading requests…"
+	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/requests" % _world["id"])
+	if r["status"] != 200:
+		_host_label.text = ""
+		status.text = r["error"]
+		return
+	var requests: Array = r["data"]
+	_host_label.text = "Join requests" if not requests.is_empty() else "No pending join requests."
+	for req: Dictionary in requests:
+		var row := join_request_row_scene.instantiate() as JoinRequestRow
+		_request_rows.add_child(row)
+		var label: Variant = req.get("requester_label")
+		row.setup(str(label) if label != null and str(label) != "" else "Player %s" % str(req["user_id"]).left(8))
+		row.approved.connect(_decide.bind(str(req["id"]), true, row))
+		row.rejected.connect(_decide.bind(str(req["id"]), false, row))
+
+
+func _decide(request_id: String, approve: bool, row: JoinRequestRow) -> void:
+	row.set_busy(true)
+	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/requests/%s/%s" % [_world["id"], request_id, "approve" if approve else "reject"])
+	if r["status"] == 200:
+		status.text = ""
+		row.queue_free()
+		await get_tree().process_frame
+		if _request_rows.get_child_count() == 0:
+			_host_label.text = "No pending join requests."
+	else:
+		status.text = r["error"]
+		row.set_busy(false)
+
+
+func _step_create_character() -> void:
+	_character_name.text = ""
+	_show_step(%CreateCharacterStep)
+
+
+func _on_create_character_pressed() -> void:
+	var n := _character_name.text.strip_edges()
+	if n == "":
+		status.text = "Enter a name"
+		return
+	var c := await api(HTTPClient.METHOD_POST, "/worlds/%s/characters" % _world["id"],
+		{"name": n, "origin": ORIGINS[_origin.selected], "class": CLASSES[_class.selected]})
+	if c["status"] == 201:
+		status.text = ""
+		_step_character(_world)
+	else:
+		status.text = c["error"]
+
+
+func _on_back() -> void:
+	status.text = ""
+	_step_worlds()
 
 
 func _enter(display_name: String) -> void:
-	_clear()
-	_label("Connecting to the battle server…")
-	_button("Cancel", func() -> void:
-		backed_out.emit()
-		status.text = ""
-		_step_after_sign_in())
-	entered.emit(_server_url(), access_token, display_name)
+	_wait_label.text = "Connecting to the battle server…"
+	_lobby_list.clear()
+	_show_step(%WaitStep)
+	entered.emit(_server_url(), access_token, display_name, str(_world["id"]))
+
+
+## The waiting room: who is here and how many the battle needs. Called when the server sends the lobby.
+func show_lobby(info: Dictionary) -> void:
+	_show_step(%WaitStep)
+	var names: Array = info["players"]
+	_wait_label.text = "Waiting for players (%d/%d). The battle starts when the party is full." % [names.size(), info["needed"]]
+	_lobby_list.clear()
+	for n in names:
+		_lobby_list.add_item(str(n))
+
+
+## After a battle: back to the character screen of the world just played (fresh XP).
+func return_to_menu() -> void:
+	status.text = ""
+	_back_to_world()
+
+
+func _back_to_world() -> void:
+	if _world.has("id"):
+		_step_character(_world)
+	else:
+		_step_worlds()
+
+
+func _on_cancel_pressed() -> void:
+	backed_out.emit()
+	status.text = ""
+	_back_to_world()

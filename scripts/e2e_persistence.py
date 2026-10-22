@@ -85,12 +85,12 @@ try:
           env={"GAME_API_SERVER_KEY": SERVER_KEY}, log="server")
     time.sleep(4)
     outsider = start(["scripts/godot.sh", "--headless", "--path", ".", "res://game/client/bot_main.tscn", "--",
-                      f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=outsider", f"--token={users[3]['access_token']}"], log="outsider")
+                      f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=outsider", f"--token={users[3]['access_token']}", f"--world-id={world['id']}"], log="outsider")
     bots = [start(["scripts/godot.sh", "--headless", "--path", ".", "res://game/client/bot_main.tscn", "--",
-                   f"--url=ws://127.0.0.1:{GAME_PORT}", f"--name=ignored{i}", f"--token={u['access_token']}"], log=f"bot{i}")
+                   f"--url=ws://127.0.0.1:{GAME_PORT}", f"--name=ignored{i}", f"--token={u['access_token']}", f"--world-id={world['id']}"], log=f"bot{i}")
             for i, u in enumerate(users[:3])]
     bad = start(["scripts/godot.sh", "--headless", "--path", ".", "res://game/client/bot_main.tscn", "--",
-                 f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=mallory", "--token=not.a.jwt"], log="bad")
+                 f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=mallory", "--token=not.a.jwt", f"--world-id={world['id']}"], log="bad")
 
     for b in bots:
         b.wait(timeout=150)

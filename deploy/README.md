@@ -52,5 +52,6 @@ Prebuilt images instead of building on each server: build and push `unnamed-api`
 (e.g. to ECR), set `API_IMAGE` / `GAME_IMAGE` / `WEB_IMAGE` in the matching env file, then
 `docker compose -f deploy/<svc>/compose.yaml pull && ... up -d`. Build the web image with the production `API_URL`/`SERVER_URL`.
 
-Recreating `game` ends any battle in progress, so deploy it between sessions. Secrets live only in the per-service
+Recreating `game` ends any battle in progress, so deploy it between sessions. **The game server and the web client
+share a message protocol (`game/shared/net/gateway.gd`): when it changes, rebuild and redeploy `game` and `web` together.** Secrets live only in the per-service
 `.env` files (gitignored, never copied into an image); on AWS they can later come from Secrets Manager / SSM instead.

@@ -58,3 +58,18 @@ Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `u
 - **Activities:** each node has a board (the overview lists activities at discovered nodes). Starting requires membership, a character, a discovered node and physical presence (`characters.node_id`). Duplicate instances and a second concurrent major instance are prevented by partial unique indexes (atomic reservation, tested under concurrency). Roster: leader-only start/cancel, capacity per activity, locked after start, no voluntary leaving after start.
 - **Completion:** `POST /internal/instances/{id}/complete` (service key) atomically marks the instance finished, claims the one-time activity (first completion wins), applies `on_complete` reveals and bumps the revision once. Replays return the stored outcome. The Godot server (`--instance-id=`) admits only rostered characters, completes the instance on victory and cancels it otherwise.
 - **Not built (needs presence/travel):** travel and the campaign clock, host succession/expiry (depends on who is connected, so it belongs to the Godot session layer), ending a removed member's live session immediately (the API only blocks the next verification), retirement blocking during travel/activities, template migrations.
+
+## Player flow and battle lifecycle (server)
+- The server keeps one party at a time. Players arriving in the lobby get `s_lobby` ({players, needed}); the battle starts when the party is full.
+- When a battle ends the server sends `s_result` ({outcome, rounds, xp, you, saved}) at once (saved=false) and again after the API stored the
+  result (saved=true). There is no automatic replay: players press Continue (disconnecting), and when the last one leaves the server resets to an
+  empty lobby. A player who reconnects to the result screen is sent the result again. After `RESULT_HOLD_MS` (120 s) any stragglers are removed.
+- Joining a world: `GET /worlds/{id}/membership` returns the user's standing (member / pending / rejected / removed / none) and whether they are the
+  host; non-members request access, the host approves or rejects. Requests carry the requester's email (display label only).
+
+## Worlds and rooms
+- After sign-in the client always shows a world picker (`GET /worlds/available`: every world, its player count and the caller's standing; no member identities).
+  Opening a world runs the membership flow (member -> character, otherwise request to join).
+- The battle server is not bound to a world. Each client names the world it is entering in `c_hello`; the server has the API confirm membership and the
+  character in that world, then places the player in that world's room (own lobby, battle, clocks, result). Rooms never mix players.
+  `--world-id` (or an activity instance's world) optionally restricts a server to one world. `scripts/e2e_worlds.py` runs two worlds at once on one server.

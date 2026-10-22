@@ -4,13 +4,14 @@ extends RefCounted
 ## the implementation talks to the FastAPI service, never to the database directly.
 
 
-## Returns {ok, user_id, character: Dictionary or null, error}. Identity is derived from the token.
-func verify_session(_token: String) -> Dictionary:
+## Returns {ok, user_id, character: Dictionary or null, error}. Identity is derived from the token; the
+## API checks the user is a member of `world_id` and returns their active character there.
+func verify_session(_token: String, _world_id: String) -> Dictionary:
 	return {"ok": false, "error": "Persistence is not configured"}
 
 
 ## participants: [{character_id, outcome, xp}]. Idempotent per key. Returns {ok, duplicate, error}.
-func commit_result(_key: String, _outcome: String, _rounds: int, _participants: Array) -> Dictionary:
+func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: int, _participants: Array) -> Dictionary:
 	return {"ok": true, "duplicate": false}
 
 

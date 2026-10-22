@@ -17,5 +17,5 @@ done
 wait "${PIDS[@]}"
 kill $SERVER 2>/dev/null; sleep 1
 echo "logs in $OUT"
-grep -h "FINISHED\|welcomed\|dropping\|rejected\|TIMEOUT" "$OUT"/bot*.log
-grep -q "FINISHED" "$OUT/bot1.log" && grep -q "welcomed #3" "$OUT/bot2.log" && grep -q "welcomed #3" "$OUT/bot3.log" && echo "SMOKE OK" || { echo "SMOKE FAILED"; exit 1; }
+grep -h "FINISHED\|RESULT\|lobby\|welcomed\|dropping\|rejected\|TIMEOUT" "$OUT"/bot*.log
+grep -q "FINISHED" "$OUT/bot1.log" && grep -q "RESULT" "$OUT/bot1.log" && grep -q "lobby:" "$OUT/bot1.log" && grep -q "welcomed #3" "$OUT/bot2.log" && grep -q "welcomed #3" "$OUT/bot3.log" && echo "SMOKE OK" || { echo "SMOKE FAILED"; exit 1; }

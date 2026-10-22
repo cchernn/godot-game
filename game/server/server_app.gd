@@ -1,21 +1,38 @@
 extends Node
-## Dedicated server application: WebSocket transport, identity, lobby, and the real-time pacing of
-## the authoritative Battle (planning timeout, beat cadence, disconnect grace period).
+## Dedicated server application: WebSocket transport, identity, lobbies, and the real-time pacing of the
+## authoritative Battle (planning timeout, beat cadence, disconnect grace period).
 ## It owns no gameplay rules; those live in Battle.
+##
+## One server hosts many rooms, one per world: every player says which world they are entering, the API
+## confirms they are a member of it, and they wait in that world's lobby. Rooms never see each other.
 
 const MAX_NAME := 24
 const MAX_TOKEN := 64
 const AUTH_TIMEOUT_MS := 10_000
-const RESTART_DELAY_MS := 10_000
+## How long a finished battle keeps its players on the result screen before the server resets for the next party.
+const RESULT_HOLD_MS := 120_000
 
 class PlayerRec:
 	var token: String
 	var player_id: String
 	var display_name: String
 	var peer_id: int = -1
+	var world_id: String = "" # the room this player is in ("" for guest play)
 	var combatant_id: String = ""
 	var sent_seq: int = 0
 	var character: Dictionary = {} # API mode: the persisted character this seat plays
+
+## One world's lobby and battle, with its own clocks.
+class Room:
+	var key: String
+	var battle: Battle = null
+	var battle_key: String = ""
+	var planning_deadline: int = 0
+	var beat_due: int = 0
+	var paused_since: int = 0
+	var grace_deadline: int = 0
+	var reset_at: int = 0
+	var result_info: Dictionary = {} # last battle's result, resent to a player who reconnects to the result screen
 
 var cfg: GameConfig
 var skills: SkillDb
@@ -27,20 +44,16 @@ var fixed_seed: int = -1
 ## Set when --api-url is given: identity comes from verified Supabase tokens and results are persisted.
 var persistence: Persistence = null
 var _verifying: Dictionary = {}
-var _battle_key: String = ""
 ## Optional: the activity instance this server runs. Only its roster may join.
 var _instance_id: String = ""
 var _roster: Dictionary = {} # character id -> true
+## Optional: serve only this world (set by --world-id, or by the instance's world). Empty = any world.
+var _world_filter: String = ""
 
 var _players: Dictionary = {} # token -> PlayerRec
 var _by_peer: Dictionary = {} # peer_id -> token
 var _pending: Dictionary = {} # peer_id -> connect time (ms)
-var _battle: Battle = null
-var _planning_deadline: int = 0
-var _beat_due: int = 0
-var _paused_since: int = 0
-var _grace_deadline: int = 0
-var _restart_at: int = 0
+var _rooms: Dictionary = {} # world id -> Room
 
 
 func _ready() -> void:
@@ -50,11 +63,11 @@ func _ready() -> void:
 	players_required = cfg.get_value("lobby", "players_required")
 	if _api_url != "":
 		var key := OS.get_environment("GAME_API_SERVER_KEY") # secrets come from the environment, not argv
-		if key == "" or _world_id == "":
-			push_error("--api-url requires GAME_API_SERVER_KEY and --world-id")
+		if key == "":
+			push_error("--api-url requires GAME_API_SERVER_KEY")
 			get_tree().quit(1)
 			return
-		persistence = HttpPersistence.new(self, _api_url, key, _world_id)
+		persistence = HttpPersistence.new(self, _api_url, key)
 		allow_guests = false # identity must come from the API
 		if _instance_id != "":
 			var inst := await persistence.get_instance(_instance_id)
@@ -64,6 +77,8 @@ func _ready() -> void:
 				return
 			for c: Dictionary in inst["instance"]["roster"]:
 				_roster[c["id"]] = true
+			if _world_filter == "":
+				_world_filter = str(inst["instance"].get("world_id", ""))
 	var peer := WebSocketMultiplayerPeer.new()
 	var tls: TLSOptions = null
 	if _tls_cert != "":
@@ -79,12 +94,12 @@ func _ready() -> void:
 	Gateway.hello_received.connect(_on_hello)
 	Gateway.plan_received.connect(_on_plan)
 	Gateway.ready_received.connect(_on_ready)
-	print("[server] listening on %s port %d (env=%s, guests=%s, persistence=%s, players_required=%d)" % [
-		"wss" if tls else "ws", port, env, allow_guests, "api" if persistence else "off", players_required])
+	print("[server] listening on %s port %d (env=%s, guests=%s, persistence=%s, players_required=%d, worlds=%s)" % [
+		"wss" if tls else "ws", port, env, allow_guests, "api" if persistence else "off", players_required,
+		_world_filter if _world_filter != "" else "any"])
 
 
 var _api_url: String = ""
-var _world_id: String = ""
 var _tls_cert: String = ""
 var _tls_key: String = ""
 
@@ -105,7 +120,7 @@ func _parse_args() -> void:
 		elif arg.begins_with("--instance-id="):
 			_instance_id = arg.substr(14)
 		elif arg.begins_with("--world-id="):
-			_world_id = arg.substr(11)
+			_world_filter = arg.substr(11)
 		elif arg.begins_with("--tls-cert="):
 			_tls_cert = arg.get_slice("=", 1)
 		elif arg.begins_with("--tls-key="):
@@ -122,6 +137,39 @@ func _parse_args() -> void:
 		allow_guests = false
 
 
+# ---------- Rooms ----------
+
+func _room(key: String) -> Room:
+	if not _rooms.has(key):
+		var r := Room.new()
+		r.key = key
+		_rooms[key] = r
+	return _rooms[key]
+
+
+func _members(room: Room) -> Array[PlayerRec]:
+	var out: Array[PlayerRec] = []
+	for rec: PlayerRec in _players.values():
+		if rec.world_id == room.key:
+			out.append(rec)
+	return out
+
+
+## Forgets a room nobody is in and no battle is running.
+func _drop_if_idle(room: Room) -> void:
+	if room.battle == null and _members(room).is_empty():
+		_rooms.erase(room.key)
+
+
+func _valid_world_id(id: String) -> bool:
+	if id.length() != 36:
+		return false
+	for ch in id:
+		if not (ch in "0123456789abcdefABCDEF-"):
+			return false
+	return true
+
+
 # ---------- Connections ----------
 
 func _process(_delta: float) -> void:
@@ -129,9 +177,9 @@ func _process(_delta: float) -> void:
 	for id: int in _pending.keys():
 		if now - (_pending[id] as int) > AUTH_TIMEOUT_MS:
 			_drop(id, "Authentication timeout")
-	if _battle == null:
-		return
-	_tick_battle(now)
+	for room: Room in _rooms.values():
+		if room.battle != null:
+			_tick_battle(room, now)
 
 
 func _drop(peer_id: int, why: String) -> void:
@@ -153,12 +201,20 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	var rec: PlayerRec = _players[token]
 	rec.peer_id = -1
 	print("[server] %s disconnected" % rec.display_name)
-	if _battle == null:
+	var room := _rooms.get(rec.world_id) as Room
+	if room == null:
+		return
+	if room.battle == null:
 		_players.erase(token) # lobby: free the seat
-		_broadcast_lobby()
+		_broadcast_lobby(room)
+		_drop_if_idle(room)
+	elif room.battle.state.phase == Enums.RoundPhase.FINISHED:
+		_players.erase(token) # left the result screen: free the seat; the last one out resets the room
+		if _members(room).is_empty():
+			_reset_room(room)
 
 
-func _on_hello(peer_id: int, display_name: String, token: String) -> void:
+func _on_hello(peer_id: int, display_name: String, token: String, world_id: String) -> void:
 	if _by_peer.has(peer_id) or _verifying.has(peer_id):
 		return
 	display_name = display_name.strip_edges().left(MAX_NAME)
@@ -167,13 +223,21 @@ func _on_hello(peer_id: int, display_name: String, token: String) -> void:
 	var key := token
 	var character := {}
 	var player_id := ""
+	var room_key := ""
 	if persistence != null:
 		# The token is a Supabase access token; the API verifies it. The client never supplies an id.
 		if token.length() > 4096:
 			_drop(peer_id, "Invalid token")
 			return
+		if not _valid_world_id(world_id):
+			_drop(peer_id, "Choose a world first")
+			return
+		if _world_filter != "" and world_id.to_lower() != _world_filter.to_lower():
+			_drop(peer_id, "This server does not run that world")
+			return
+		room_key = world_id.to_lower()
 		_verifying[peer_id] = true
-		var r := await persistence.verify_session(token)
+		var r := await persistence.verify_session(token, room_key)
 		_verifying.erase(peer_id)
 		if not _pending.has(peer_id) and not multiplayer.get_peers().has(peer_id):
 			return # the client left while we were verifying
@@ -193,6 +257,23 @@ func _on_hello(peer_id: int, display_name: String, token: String) -> void:
 	var rec: PlayerRec = null
 	if key != "" and key.length() <= 4096 and _players.has(key):
 		rec = _players[key]
+		if rec.world_id != room_key:
+			# Same identity entering a different world: allowed only if the old room is not mid-battle.
+			var old := _rooms.get(rec.world_id) as Room
+			if old != null and old.battle != null and old.battle.state.phase != Enums.RoundPhase.FINISHED:
+				_drop(peer_id, "You are in a battle in another world")
+				return
+			if rec.peer_id != -1:
+				_by_peer.erase(rec.peer_id)
+				Gateway.s_reject.rpc_id(rec.peer_id, "You entered another world")
+				(multiplayer.multiplayer_peer as WebSocketMultiplayerPeer).disconnect_peer(rec.peer_id)
+			_players.erase(key)
+			if old != null:
+				_broadcast_lobby(old)
+				_drop_if_idle(old)
+			rec = null
+	var room := _room(room_key)
+	if rec != null:
 		if rec.peer_id != -1 and rec.peer_id != peer_id: # same identity reconnecting: replace the old socket
 			_by_peer.erase(rec.peer_id)
 			Gateway.s_reject.rpc_id(rec.peer_id, "Signed in from another location")
@@ -202,14 +283,17 @@ func _on_hello(peer_id: int, display_name: String, token: String) -> void:
 		# New seat. Guests are only possible in local development with persistence off.
 		if persistence == null and not allow_guests:
 			_drop(peer_id, "Guest access is disabled on this server")
+			_drop_if_idle(room)
 			return
-		if _battle != null:
-			_drop(peer_id, "A battle is already in progress")
+		if room.battle != null:
+			var finished := room.battle.state.phase == Enums.RoundPhase.FINISHED
+			_drop(peer_id, "The previous battle is wrapping up. Try again in a moment." if finished else "A battle is already in progress")
 			return
-		if _players.size() >= Encounter.PLAYER_SLOTS.size():
+		if _members(room).size() >= Encounter.PLAYER_SLOTS.size():
 			_drop(peer_id, "The party is full")
 			return
 		rec = PlayerRec.new()
+		rec.world_id = room_key
 		if persistence != null:
 			rec.token = key
 			rec.player_id = player_id
@@ -218,37 +302,44 @@ func _on_hello(peer_id: int, display_name: String, token: String) -> void:
 			rec.token = Crypto.new().generate_random_bytes(16).hex_encode()
 			rec.player_id = "guest-" + Crypto.new().generate_random_bytes(4).hex_encode()
 		_players[rec.token] = rec
-		print("[server] new player %s (%s)" % [display_name, rec.player_id])
+		print("[server] new player %s (%s) in world %s" % [display_name, rec.player_id, room_key if room_key != "" else "-"])
 	if persistence != null and not rec.character.is_empty():
 		display_name = rec.character["name"]
 	rec.display_name = display_name
 	rec.peer_id = peer_id
 	rec.sent_seq = 0
 	_by_peer[peer_id] = rec.token
-	if _paused_since != 0: # first reconnect after everyone left: shift timers by the pause
-		var gap := Time.get_ticks_msec() - _paused_since
-		_planning_deadline += gap
-		_beat_due += gap
-		_paused_since = 0
-	_grace_deadline = 0
-	Gateway.s_welcome.rpc_id(peer_id, _welcome_info(rec))
-	if _battle == null:
-		_broadcast_lobby()
-		if _players.size() >= players_required:
-			_start_battle()
+	if room.paused_since != 0: # first reconnect after everyone left: shift timers by the pause
+		var gap := Time.get_ticks_msec() - room.paused_since
+		room.planning_deadline += gap
+		room.beat_due += gap
+		room.paused_since = 0
+	room.grace_deadline = 0
+	Gateway.s_welcome.rpc_id(peer_id, _welcome_info(rec, room))
+	if room.battle == null:
+		_broadcast_lobby(room)
+		if _members(room).size() >= players_required:
+			_start_battle(room)
 	else:
 		_push(rec)
+		if room.battle.state.phase == Enums.RoundPhase.FINISHED and not room.result_info.is_empty():
+			Gateway.s_result.rpc_id(peer_id, room.result_info)
 
 
-func _welcome_info(rec: PlayerRec) -> Dictionary:
+func _welcome_info(rec: PlayerRec, room: Room) -> Dictionary:
 	return {"token": "" if persistence != null else rec.token, "player_id": rec.player_id,
-		"combatant_id": rec.combatant_id, "players_required": players_required, "in_battle": _battle != null}
+		"combatant_id": rec.combatant_id, "players_required": players_required, "in_battle": room.battle != null}
 
 
-func _broadcast_lobby() -> void:
-	for rec: PlayerRec in _players.values():
+func _broadcast_lobby(room: Room) -> void:
+	var members := _members(room)
+	var names: Array = []
+	for rec in members:
+		names.append(rec.display_name)
+	var info := {"players": names, "needed": players_required}
+	for rec in members:
 		if rec.peer_id != -1:
-			Gateway.s_notice.rpc_id(rec.peer_id, "Waiting for players (%d/%d)" % [_players.size(), players_required])
+			Gateway.s_lobby.rpc_id(rec.peer_id, info)
 
 
 func _rec_for(peer_id: int) -> PlayerRec:
@@ -256,135 +347,192 @@ func _rec_for(peer_id: int) -> PlayerRec:
 	return _players.get(token) as PlayerRec
 
 
+func _room_of(rec: PlayerRec) -> Room:
+	return _rooms.get(rec.world_id) as Room
+
+
 # ---------- Battle lifecycle ----------
 
-func _start_battle() -> void:
+func _start_battle(room: Room) -> void:
 	var seed := fixed_seed if fixed_seed >= 0 else randi()
+	var members := _members(room)
 	var classes: Array = []
-	for rec: PlayerRec in _players.values():
+	for rec in members:
 		classes.append(rec.character.get("class", ""))
-	_battle = Encounter.build(cfg, skills, _players.size(), seed, classes)
-	_battle_key = "battle-" + Crypto.new().generate_random_bytes(12).hex_encode()
+	room.battle = Encounter.build(cfg, skills, members.size(), seed, classes)
+	room.battle_key = "battle-" + Crypto.new().generate_random_bytes(12).hex_encode()
 	var i := 0
-	for rec: PlayerRec in _players.values():
+	for rec in members:
 		rec.combatant_id = "pc%d" % i
 		rec.sent_seq = 0
-		var c := _battle.state.get_c(rec.combatant_id)
+		var c := room.battle.state.get_c(rec.combatant_id)
 		c.controller = rec.player_id
 		c.display_name = rec.display_name if persistence != null else "%s (%s)" % [c.display_name, rec.display_name]
 		i += 1
-	_planning_deadline = Time.get_ticks_msec() + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
-	_restart_at = 0
-	print("[server] battle started with %d players (seed %d)" % [_players.size(), seed])
-	for rec: PlayerRec in _players.values():
+	room.planning_deadline = Time.get_ticks_msec() + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
+	room.reset_at = 0
+	room.result_info = {}
+	print("[server] battle started with %d players (seed %d, world %s)" % [members.size(), seed, room.key if room.key != "" else "-"])
+	for rec in members:
 		if rec.peer_id != -1:
-			Gateway.s_welcome.rpc_id(rec.peer_id, _welcome_info(rec))
-	_push_all()
+			Gateway.s_welcome.rpc_id(rec.peer_id, _welcome_info(rec, room))
+	_push_all(room)
 
 
-func _tick_battle(now: int) -> void:
+func _tick_battle(room: Room, now: int) -> void:
+	var battle := room.battle
+	if battle.state.phase == Enums.RoundPhase.FINISHED:
+		# The result screen: no clock to run. Reset once everyone has left, or after a hold time.
+		if room.reset_at != 0 and now >= room.reset_at:
+			print("[server] result hold expired; resetting")
+			_reset_room(room, true)
+		return
+	var members := _members(room)
 	var connected := 0
-	for rec: PlayerRec in _players.values():
+	for rec in members:
 		if rec.peer_id != -1:
 			connected += 1
 	if connected == 0:
 		# Nobody is here: freeze the clock and run the grace period (monotonic).
-		if _grace_deadline == 0:
-			_grace_deadline = now + int(cfg.get_value("instance", "disconnect_grace_seconds")) * 1000
-			_paused_since = now
+		if room.grace_deadline == 0:
+			room.grace_deadline = now + int(cfg.get_value("instance", "disconnect_grace_seconds")) * 1000
+			room.paused_since = now
 			print("[server] all players left; grace period started")
-		elif now >= _grace_deadline:
+		elif now >= room.grace_deadline:
 			print("[server] grace period expired; instance destroyed")
-			_battle = null
-			_players.clear()
-			_by_peer.clear()
-			_grace_deadline = 0
-			_paused_since = 0
+			for rec in members:
+				_players.erase(rec.token)
+			room.battle = null
+			room.grace_deadline = 0
+			room.paused_since = 0
+			_drop_if_idle(room)
 		return
 	var delay: int = cfg.get_value("combat", "beat_delay_ms")
-	match _battle.state.phase:
+	match battle.state.phase:
 		Enums.RoundPhase.PLANNING:
-			if _battle.all_required_ready() or now >= _planning_deadline:
-				_battle.begin_resolution()
-				_beat_due = now + delay
-				_push_all()
+			if battle.all_required_ready() or now >= room.planning_deadline:
+				battle.begin_resolution()
+				room.beat_due = now + delay
+				_push_all(room)
 		Enums.RoundPhase.RESOLVING:
-			if now >= _beat_due:
-				_battle.resolve_next_beat()
-				_beat_due = now + delay
-				if _battle.state.phase == Enums.RoundPhase.PLANNING:
-					_planning_deadline = now + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
-				if _battle.state.phase == Enums.RoundPhase.FINISHED:
-					if _instance_id == "": # an activity instance is single-use; prototype lobbies replay
-						_restart_at = now + RESTART_DELAY_MS
-					print("[server] battle finished: outcome %d" % _battle.outcome)
-					_commit_results(_battle, _battle_key)
-				_push_all()
-		Enums.RoundPhase.FINISHED:
-			if _restart_at != 0 and now >= _restart_at:
-				_start_battle()
+			if now >= room.beat_due:
+				battle.resolve_next_beat()
+				room.beat_due = now + delay
+				if battle.state.phase == Enums.RoundPhase.PLANNING:
+					room.planning_deadline = now + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
+				_push_all(room)
+				if battle.state.phase == Enums.RoundPhase.FINISHED:
+					room.reset_at = now + RESULT_HOLD_MS
+					print("[server] battle finished: outcome %d (world %s)" % [battle.outcome, room.key if room.key != "" else "-"])
+					_finish_battle(room, battle, room.battle_key)
+
+
+## Back to an empty lobby for the next party; `kick` disconnects anyone still on the result screen.
+func _reset_room(room: Room, kick: bool = false) -> void:
+	for rec in _members(room):
+		if kick and rec.peer_id != -1:
+			_drop(rec.peer_id, "The battle has ended")
+		_by_peer.erase(rec.peer_id)
+		_players.erase(rec.token)
+	room.battle = null
+	room.reset_at = 0
+	room.result_info = {}
+	room.grace_deadline = 0
+	room.paused_since = 0
+	print("[server] room reset to lobby (world %s)" % (room.key if room.key != "" else "-"))
+	_drop_if_idle(room)
 
 
 # ---------- Player commands ----------
 
 func _on_plan(peer_id: int, actions: Variant) -> void:
 	var rec := _rec_for(peer_id)
-	if rec == null or _battle == null:
+	var room := _room_of(rec) if rec != null else null
+	if room == null or room.battle == null:
 		return
-	var r := _battle.submit_plan(rec.combatant_id, actions)
+	var r := room.battle.submit_plan(rec.combatant_id, actions)
 	Gateway.s_plan_result.rpc_id(peer_id, r["ok"], r["error"])
 	_push(rec)
 
 
 func _on_ready(peer_id: int, flag: bool) -> void:
 	var rec := _rec_for(peer_id)
-	if rec == null or _battle == null:
+	var room := _room_of(rec) if rec != null else null
+	if room == null or room.battle == null:
 		return
-	var r := _battle.set_ready(rec.combatant_id, flag)
+	var r := room.battle.set_ready(rec.combatant_id, flag)
 	if not r["ok"]:
 		Gateway.s_plan_result.rpc_id(peer_id, false, r["error"])
-	_push_all()
+	_push_all(room)
 
 
 # ---------- Outbound state ----------
 
-func _push_all() -> void:
-	for rec: PlayerRec in _players.values():
+func _push_all(room: Room) -> void:
+	for rec in _members(room):
 		_push(rec)
 
 
 func _push(rec: PlayerRec) -> void:
-	if rec.peer_id == -1 or _battle == null:
+	var room := _room_of(rec)
+	if rec.peer_id == -1 or room == null or room.battle == null:
 		return
-	var snap := _battle.snapshot_for(rec.combatant_id)
-	snap["timer_ms"] = maxi(0, _planning_deadline - Time.get_ticks_msec()) \
-		if _battle.state.phase == Enums.RoundPhase.PLANNING else -1
+	var battle := room.battle
+	var snap := battle.snapshot_for(rec.combatant_id)
+	snap["timer_ms"] = maxi(0, room.planning_deadline - Time.get_ticks_msec()) \
+		if battle.state.phase == Enums.RoundPhase.PLANNING else -1
 	var online := {}
-	for r: PlayerRec in _players.values():
+	for r in _members(room):
 		online[r.combatant_id] = r.peer_id != -1
 	for u: Dictionary in snap["units"]:
 		if online.has(u["id"]):
 			u["online"] = online[u["id"]]
 	Gateway.s_snapshot.rpc_id(rec.peer_id, snap)
-	var evs := _battle.public_events_since(rec.sent_seq)
-	rec.sent_seq = _battle.last_seq()
+	var evs := battle.public_events_since(rec.sent_seq)
+	rec.sent_seq = battle.last_seq()
 	if not evs.is_empty():
 		Gateway.s_events.rpc_id(rec.peer_id, evs)
 
 
 # ---------- Persistence ----------
 
-## Commits the finished encounter once. Retried with the same idempotency key, so a retry after a
-## lost response can never apply rewards twice.
-func _commit_results(battle: Battle, key: String) -> void:
+## Tells the players how it ended, stores the result, then tells them it is saved.
+func _finish_battle(room: Room, battle: Battle, key: String) -> void:
+	var win := battle.outcome == Enums.Outcome.PLAYERS_WIN
+	var xp: int = cfg.get_value("rewards", "xp_participation") + (cfg.get_value("rewards", "xp_victory_bonus") as int if win else 0)
+	var names := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
+		Enums.Outcome.DRAW: "draw"}
+	room.result_info = {"outcome": names[battle.outcome], "rounds": battle.state.round_number,
+		"xp": xp if persistence != null else 0, "saved": persistence == null}
+	_send_results(room, battle)
 	if persistence == null:
 		return
+	await _commit_results(room, battle, key)
+	if room.battle == battle: # the room may have reset while we were storing
+		room.result_info["saved"] = true
+		_send_results(room, battle)
+
+
+func _send_results(room: Room, battle: Battle) -> void:
+	for rec in _members(room):
+		if rec.peer_id == -1:
+			continue
+		var info := room.result_info.duplicate()
+		var c := battle.state.get_c(rec.combatant_id)
+		info["you"] = "downed" if c.life_state == Enums.LifeState.DOWNED else \
+			("eliminated" if c.life_state == Enums.LifeState.ELIMINATED else "survived")
+		Gateway.s_result.rpc_id(rec.peer_id, info)
+
+
+## Commits the finished encounter once. Retried with the same idempotency key, so a retry after a
+## lost response can never apply rewards twice.
+func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	if _instance_id != "":
 		_finish_instance(battle.outcome == Enums.Outcome.PLAYERS_WIN)
 	var win := battle.outcome == Enums.Outcome.PLAYERS_WIN
 	var xp: int = cfg.get_value("rewards", "xp_participation") + (cfg.get_value("rewards", "xp_victory_bonus") as int if win else 0)
 	var participants: Array = []
-	for rec: PlayerRec in _players.values():
+	for rec in _members(room):
 		var c := battle.state.get_c(rec.combatant_id)
 		var outcome := "survived"
 		if c.life_state == Enums.LifeState.DOWNED:
@@ -395,7 +543,7 @@ func _commit_results(battle: Battle, key: String) -> void:
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw"}[battle.outcome] as String
 	for attempt in 5:
-		var r := await persistence.commit_result(key, outcome_name, battle.state.round_number, participants)
+		var r := await persistence.commit_result(room.key, key, outcome_name, battle.state.round_number, participants)
 		if r["ok"]:
 			print("[server] result committed (%s%s)" % [key, ", duplicate" if r["duplicate"] else ""])
 			return

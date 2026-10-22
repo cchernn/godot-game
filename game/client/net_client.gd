@@ -9,6 +9,8 @@ signal snapshot(snap: Dictionary)
 signal events(list: Array)
 signal plan_result(ok: bool, error: String)
 signal notice(text: String)
+signal lobby(info: Dictionary)
+signal result(info: Dictionary)
 signal rejected(text: String)
 
 const RETRY_MS := 2000
@@ -18,6 +20,8 @@ var display_name: String = "Guest"
 var token: String = ""
 ## Supabase access token (API mode). When set it is sent instead of the guest session token.
 var access_token: String = ""
+## The world being entered (API mode); the server asks the API whether this player is a member of it.
+var world_id: String = ""
 var persist_token: bool = true
 var connected: bool = false
 var _connecting: bool = false
@@ -39,9 +43,12 @@ func _ready() -> void:
 	Gateway.events_received.connect(func(e: Array) -> void: events.emit(e))
 	Gateway.plan_result_received.connect(func(ok: bool, err: String) -> void: plan_result.emit(ok, err))
 	Gateway.notice_received.connect(func(t: String) -> void: notice.emit(t))
+	Gateway.lobby_received.connect(func(i: Dictionary) -> void: lobby.emit(i))
+	Gateway.result_received.connect(func(i: Dictionary) -> void: result.emit(i))
 	Gateway.rejected.connect(func(t: String) -> void:
 		_fatal = t.begins_with("Guest access") or t.begins_with("A battle") or t.begins_with("The party") \
-			or t.begins_with("Sign-in failed") or t.begins_with("Create a character")
+			or t.begins_with("Sign-in failed") or t.begins_with("Create a character") or t.begins_with("Choose a world") \
+			or t.begins_with("This server does not") or t.begins_with("You are in a battle") or t.begins_with("The previous battle")
 		rejected.emit(t))
 
 
@@ -94,7 +101,7 @@ func _on_connected() -> void:
 	_connecting = false
 	connected = true
 	connection_changed.emit(true)
-	Gateway.c_hello.rpc_id(1, display_name, access_token if access_token != "" else token)
+	Gateway.c_hello.rpc_id(1, display_name, access_token if access_token != "" else token, world_id)
 
 
 func _on_lost() -> void:

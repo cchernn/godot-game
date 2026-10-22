@@ -53,12 +53,11 @@ write("game", [
     "API_URL=http://host.docker.internal:8000",
     f"GAME_API_SERVER_KEY={api['GAME_API_SERVER_API_KEY']}",
     f"GAME_ENV={environment}",
-    f"WORLD_ID={client['world_id']}", f"PLAYERS={os.environ.get('PLAYERS', '1')}",
+    f"PLAYERS={os.environ.get('PLAYERS', '1')}",
 ])
 write("web", [
     "SITE_ADDRESS=:80", f"HTTP_PORT={WEB}", f"HTTPS_PORT={WEB + 362}",
     f"SUPABASE_URL={client['supabase_url']}", f"SUPABASE_PUBLISHABLE_KEY={client['supabase_publishable_key']}",
-    f"WORLD_ID={client['world_id']}",
     f"API_URL=http://{host}:{API}", f"SERVER_URL=ws://{host}:{GAME}",
 ])
 if public:

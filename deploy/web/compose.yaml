@@ -10,7 +10,6 @@ services:
       args:
         SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in deploy/web/.env}
         SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in deploy/web/.env}
-        WORLD_ID: ${WORLD_ID:?set WORLD_ID in deploy/web/.env}
         API_URL: ${API_URL:?set API_URL (public https address of the API) in deploy/web/.env}
         SERVER_URL: ${SERVER_URL:?set SERVER_URL (public wss address of the game server) in deploy/web/.env}
     environment:

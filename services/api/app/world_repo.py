@@ -36,7 +36,52 @@ class WorldMixin:
             return conn.execute("select 1 from world_members where world_id=%s and user_id=%s and role='host' and status='active'",
                                 (world_id, user_id)).fetchone() is not None
 
-    def request_join(self, world_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+    @staticmethod
+    def _standing(member_status: str | None, role: str | None, request_status: str | None) -> tuple[str, bool]:
+        """(status, is_host) from a user's membership row and latest join request."""
+        if member_status == "active":
+            return "member", role == "host"
+        if request_status == "pending":
+            return "pending", False
+        if member_status is not None:  # removed by the host
+            return "removed", False
+        if request_status == "rejected":
+            return "rejected", False
+        return "none", False
+
+    def browse_worlds(self, user_id: uuid.UUID, limit: int = 100) -> list[dict]:
+        """Every world, with the caller's standing in each, so a player can pick one to enter or ask to join.
+        Reveals only a world's name and size, never its members."""
+        with self.pool.connection() as conn:
+            rows = conn.execute(
+                "select w.id, w.name, w.created_at, "
+                "  (select count(*) from world_members x where x.world_id = w.id and x.status = 'active') as members, "
+                "  m.status as member_status, m.role as member_role, "
+                "  (select r.status from world_join_requests r where r.world_id = w.id and r.user_id = %s "
+                "     order by r.created_at desc limit 1) as request_status "
+                "from worlds w left join world_members m on m.world_id = w.id and m.user_id = %s "
+                "order by (m.status = 'active') desc nulls last, w.created_at desc limit %s",
+                (user_id, user_id, limit)).fetchall()
+        out = []
+        for r in rows:
+            status, is_host = self._standing(r["member_status"], r["member_role"], r["request_status"])
+            out.append({"id": _s(r["id"]), "name": r["name"], "members": r["members"], "status": status, "is_host": is_host})
+        return out
+
+    def membership(self, world_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        """What this user may do in a world, for the join screen. Works for non-members, and reveals only
+        the world's name. status: member | pending | rejected | removed | none."""
+        with self.pool.connection() as conn:
+            w = conn.execute("select id, name from worlds where id=%s", (world_id,)).fetchone()
+            if w is None:
+                raise NotFound("World not found")
+            m = conn.execute("select status, role from world_members where world_id=%s and user_id=%s", (world_id, user_id)).fetchone()
+            req = conn.execute("select status from world_join_requests where world_id=%s and user_id=%s order by created_at desc limit 1",
+                               (world_id, user_id)).fetchone()
+        status, is_host = self._standing(m["status"] if m else None, m["role"] if m else None, req["status"] if req else None)
+        return {"world": _row(w), "status": status, "is_host": is_host}
+
+    def request_join(self, world_id: uuid.UUID, user_id: uuid.UUID, label: str | None = None) -> dict:
         with self.pool.connection() as conn:
             if conn.execute("select 1 from worlds where id=%s", (world_id,)).fetchone() is None:
                 raise NotFound("World not found")
@@ -44,7 +89,8 @@ class WorldMixin:
             raise Conflict("Already a member")
         try:
             with self.pool.connection() as conn:
-                r = conn.execute("insert into world_join_requests (world_id, user_id) values (%s,%s) returning *", (world_id, user_id)).fetchone()
+                r = conn.execute("insert into world_join_requests (world_id, user_id, requester_label) values (%s,%s,%s) returning *",
+                    (world_id, user_id, label)).fetchone()
         except psycopg.errors.UniqueViolation as e:
             raise Conflict("A request is already pending") from e
         return _row(r)

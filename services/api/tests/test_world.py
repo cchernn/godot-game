@@ -290,3 +290,85 @@ def test_cancelled_instance_frees_the_reservation(client, pool):
     assert client.post(f"/instances/{iid}/cancel", headers=auth(t2)).status_code == 403
     assert client.post(f"/instances/{iid}/cancel", headers=auth(t1)).json()["status"] == "cancelled"
     assert client.post(url, headers=auth(t2)).status_code == 201
+
+
+def test_membership_status_follows_the_join_flow(client):
+    w, host_tok, _ = make_world(client, "Joinable")
+    wid = w["id"]
+    tok, _ = new_user()
+
+    def status(t):
+        r = client.get(f"/worlds/{wid}/membership", headers=auth(t))
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    s = status(tok)
+    assert s["status"] == "none" and s["world"]["name"] == "Joinable" and s["is_host"] is False
+    assert status(host_tok)["status"] == "member" and status(host_tok)["is_host"] is True
+
+    req = client.post(f"/worlds/{wid}/requests", headers=auth(tok)).json()
+    assert status(tok)["status"] == "pending"
+    assert client.post(f"/worlds/{wid}/requests/{req['id']}/reject", headers=auth(host_tok)).status_code == 200
+    assert status(tok)["status"] == "rejected"
+
+    req2 = client.post(f"/worlds/{wid}/requests", headers=auth(tok))
+    assert req2.status_code == 201, "a rejected user can ask again"
+    assert client.post(f"/worlds/{wid}/requests/{req2.json()['id']}/approve", headers=auth(host_tok)).status_code == 200
+    assert status(tok)["status"] == "member" and status(tok)["is_host"] is False
+
+    me = client.get(f"/worlds/{wid}/characters/me", headers=auth(tok))
+    assert me.status_code == 404, "approved but no character yet"
+
+
+def test_membership_of_an_unknown_world_is_404_and_needs_login(client):
+    tok, _ = new_user()
+    assert client.get(f"/worlds/{uuid.uuid4()}/membership", headers=auth(tok)).status_code == 404
+    assert client.get(f"/worlds/{uuid.uuid4()}/membership").status_code == 401
+
+
+def test_removed_member_sees_removed_and_can_request_again(client):
+    w, host_tok, _ = make_world(client, "Removal")
+    tok, uid = join(client, w["id"], host_tok)
+    assert client.post(f"/worlds/{w['id']}/members/{uid}/remove", headers=auth(host_tok)).status_code == 204
+    assert client.get(f"/worlds/{w['id']}/membership", headers=auth(tok)).json()["status"] == "removed"
+    assert client.post(f"/worlds/{w['id']}/requests", headers=auth(tok)).status_code == 201
+
+
+def test_join_request_carries_the_email_label_from_the_token(client):
+    w, host_tok, _ = make_world(client, "Labels")
+    tok, _ = token_for(email="tester@example.com")
+    assert client.post(f"/worlds/{w['id']}/requests", headers=auth(tok)).status_code == 201
+    reqs = client.get(f"/worlds/{w['id']}/requests", headers=auth(host_tok)).json()
+    assert reqs[0]["requester_label"] == "tester@example.com"
+    anon, _ = new_user()
+    client.post(f"/worlds/{w['id']}/requests", headers=auth(anon))
+    labels = {r["requester_label"] for r in client.get(f"/worlds/{w['id']}/requests", headers=auth(host_tok)).json()}
+    assert None in labels and "tester@example.com" in labels
+
+
+def test_available_worlds_lists_every_world_with_my_standing(client):
+    a, host_a, _ = make_world(client, "Alpha")
+    b, host_b, _ = make_world(client, "Bravo")
+    tok, _ = new_user()
+
+    def listing():
+        r = client.get("/worlds/available", headers=auth(tok))
+        assert r.status_code == 200, r.text
+        return {w["name"]: w for w in r.json()}
+
+    w = listing()
+    assert w["Alpha"]["status"] == "none" and w["Bravo"]["status"] == "none", "worlds are visible before joining"
+    assert w["Alpha"]["members"] == 1 and w["Alpha"]["is_host"] is False
+    assert set(w["Alpha"]) == {"id", "name", "members", "status", "is_host"}, "no member identities leak"
+
+    req = client.post(f"/worlds/{a['id']}/requests", headers=auth(tok)).json()
+    assert listing()["Alpha"]["status"] == "pending"
+    client.post(f"/worlds/{a['id']}/requests/{req['id']}/approve", headers=auth(host_a))
+    w = listing()
+    assert w["Alpha"]["status"] == "member" and w["Alpha"]["members"] == 2 and w["Bravo"]["status"] == "none"
+    assert list(listing())[0] == "Alpha", "my worlds come first"
+
+    mine = client.get("/worlds/available", headers=auth(host_b)).json()
+    assert [x["is_host"] for x in mine if x["name"] == "Bravo"] == [True]
+    assert client.get("/worlds/available").status_code == 401
+    assert client.get("/worlds", headers=auth(tok)).json()[0]["name"] == "Alpha", "/worlds still lists only my worlds"

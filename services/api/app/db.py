@@ -7,7 +7,10 @@ MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
 
 
 def make_pool(url: str) -> ConnectionPool:
-    return ConnectionPool(url, min_size=1, max_size=10, kwargs={"row_factory": dict_row}, open=True)
+    # prepare_threshold=None: no server-side prepared statements. Supabase's poolers (transaction mode, port 6543,
+    # and Supavisor generally) hand out connections that do not keep them, which otherwise fails with
+    # "prepared statement already exists" after a few repeats of a query.
+    return ConnectionPool(url, min_size=1, max_size=10, kwargs={"row_factory": dict_row, "prepare_threshold": None}, open=True)
 
 
 def migrate(pool: ConnectionPool) -> list[str]:

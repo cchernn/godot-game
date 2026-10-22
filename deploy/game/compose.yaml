@@ -10,7 +10,7 @@ services:
       GAME_API_SERVER_KEY: ${GAME_API_SERVER_KEY:?set GAME_API_SERVER_KEY in deploy/game/.env}
       API_URL: ${API_URL:?set API_URL (the API's private address) in deploy/game/.env}
       GAME_ENV: ${GAME_ENV:-production}
-      WORLD_ID: ${WORLD_ID:?set WORLD_ID in deploy/game/.env}
+      WORLD_ID: ${WORLD_ID:-}
       PLAYERS: ${PLAYERS:-3}
       INSTANCE_ID: ${INSTANCE_ID:-}
       ALLOW_GUESTS: "false"

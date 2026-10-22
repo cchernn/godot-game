@@ -3,7 +3,6 @@ FROM debian:12-slim AS web
 ARG GODOT_VERSION=4.7.2-stable
 ARG SUPABASE_URL
 ARG SUPABASE_PUBLISHABLE_KEY
-ARG WORLD_ID
 # "same-origin" = the page's own address (all-in-one stack). Use absolute URLs when the services are on different hosts.
 ARG API_URL=same-origin
 ARG SERVER_URL=same-origin
@@ -27,8 +26,8 @@ COPY project.godot icon.svg export_presets.cfg ./
 COPY game ./game
 # Only public values go into the browser build; "same-origin" resolves URLs from the page address.
 RUN test -n "$SUPABASE_URL" && test -n "$SUPABASE_PUBLISHABLE_KEY" \
-    && printf '{"supabase_url":"%s","supabase_publishable_key":"%s","api_url":"%s","server_url":"%s","world_id":"%s"}\n' \
-        "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" "$API_URL" "$SERVER_URL" "$WORLD_ID" > game/client/client_env.json
+    && printf '{"supabase_url":"%s","supabase_publishable_key":"%s","api_url":"%s","server_url":"%s"}\n' \
+        "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" "$API_URL" "$SERVER_URL" > game/client/client_env.json
 RUN godot --headless --path . --import --quit >/dev/null 2>&1; \
     mkdir -p /out && godot --headless --path . --export-release Web /out/index.html && test -f /out/index.html
 

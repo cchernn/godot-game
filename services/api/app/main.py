@@ -1,3 +1,4 @@
+import logging
 import time
 import uuid
 from typing import Annotated, Literal
@@ -56,6 +57,18 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     settings = settings or get_settings()
     app = FastAPI(title="Unnamed API")
     app.state.settings = settings
+
+    @app.middleware("http")
+    async def keep_errors_inside_cors(request: Request, call_next):
+        """Turns an unexpected exception into a JSON 500 *inside* the CORS layer, so a browser sees the real
+        status instead of a blocked cross-origin request. (Added before CORS so CORS wraps it.)"""
+        try:
+            return await call_next(request)
+        except Exception:
+            logging.getLogger("uvicorn.error").exception("Unhandled error on %s %s", request.method, request.url.path)
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Internal server error"}, status_code=500)
+
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                            allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
@@ -105,6 +118,10 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
         return {"user_id": str(uid), "access_token": token}
 
     # ---- player-facing (Supabase JWT) ----
+
+    @app.get("/worlds/available")
+    def available_worlds(user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.browse_worlds(user.user_id)
 
     @app.post("/worlds", status_code=201)
     def create_world(body: WorldIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
@@ -157,9 +174,13 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
 
     # ---- membership ----
 
+    @app.get("/worlds/{world_id}/membership")
+    def membership(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.membership(world_id, user.user_id)
+
     @app.post("/worlds/{world_id}/requests", status_code=201)
     def request_join(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.request_join(world_id, user.user_id)
+        return r.request_join(world_id, user.user_id, user.email)
 
     @app.get("/worlds/{world_id}/requests")
     def list_requests(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
