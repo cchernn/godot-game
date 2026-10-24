@@ -27,7 +27,7 @@ and a running API); it is not part of `scripts/test.sh`.
 ## The player flow
 Open the page -> sign in or create an account (Supabase; new accounts confirm by email) -> **choose a world** from the list (every
 world is listed with your standing in it, even when there is only one) -> if you are not in it yet, **Request to
-join** and wait for the host (the host sees **Join requests (n)** on their character screen and approves or rejects) -> create a
+join** and wait for the host (the host sees a pending count on **World management** in the hub and approves or rejects) -> create a
 character once -> you land on the **world hub** (Parties, Character, World management for the host, Settings) -> **Parties**: start a party for an
 activity (you lead it) or ask a leader to let you into one -> **party lobby** (the leader approves requests and presses **Start battle**) -> the battle server
 gathers the party -> plan and ready each round -> result screen (victory/defeat, XP) -> **Continue** back to the hub. A closed tab can come back to a battle in
@@ -71,8 +71,8 @@ Nobody else can connect to `localhost`.
    `http://<public IP>:8080` from outside your network (phone on mobile data).
 5. If your IP changes, repeat steps 1-2. To go back to localhost, run `init` without `PUBLIC_HOST` and `up` again.
 
-Everything is plain http/ws on bare ports, so use throwaway test accounts. Players must be members of the world to
-create a character (the join/approval screens are not built yet).
+Everything is plain http/ws on bare ports, so use throwaway test accounts. Players must be members of the world (host-approved)
+to create a character.
 
 ### Real servers (AWS etc.)
 Each service goes on its own host with its own `deploy/<svc>/.env` (copy `.env.example`), a domain for HTTPS,
