@@ -74,7 +74,7 @@ func test_class_ids_match_the_account_screen_and_every_unit_has_a_look() -> void
 	var ids: Array[String] = []
 	for t in def.classes:
 		ids.append(t.id)
-	assert_eq(ids, AccountFlow.CLASSES, "class list shared with the sign-in screen and the API rules")
+	assert_eq(ids, CharacterCreator.CLASSES, "class list shared with the creator screen and the API rules")
 	var visuals := load("res://game/content/units/unit_visuals.tres") as UnitVisuals
 	for t in _all_templates():
 		assert_true(visuals.scenes.has(t.id), "%s has an entry in unit_visuals.tres" % t.id)

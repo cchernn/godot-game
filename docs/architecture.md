@@ -85,3 +85,11 @@ Each skill is a `SkillDef` resource (`game/content/skills`, with `SkillStage` su
 `SkillDef` still exposes `stages` (array of dictionaries), `reaction` and `total_ap()`, so the battle rules did not change. `SkillDb.load_file()` returns deep copies
 (tests mutate speed/stability). `tools/generate_skills.gd` converted the former `skills.json`; `tests/unit/test_skills.gd` pins every value to it.
 Only `config/balance.json` remains a JSON tuning file.
+
+## Client screens: signals up, calls down
+Before a battle the client shows one screen at a time. Each screen (`game/client/screens/*.tscn`, e.g. `SignInScreen`, `WorldPickerScreen`,
+`CharacterCreator`) is a self-contained scene that only displays things and announces what the player did through signals; it never touches the network.
+`AccountFlow` (`game/client/account_flow.gd`) is the coordinator: it owns the Supabase session, every call to the API and the routing, listens to the
+screens' signals, and calls methods on the screens to tell them what to show. `ClientMain` owns the connection to the battle server and the battle UI,
+and talks to `AccountFlow` through its signals (`entered`, `backed_out`, `token_refreshed`) and `show_lobby` / `return_to_menu`. Adding a screen means a new
+scene + script, one instance in `account_flow.tscn`, one entry in `_screens`, and the signal connections (worked example in docs/guide/01-login-screen.md).

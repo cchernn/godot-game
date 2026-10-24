@@ -117,24 +117,63 @@ func test_guest_lobby_message_lists_the_party() -> void:
 	c.free()
 
 
-func test_account_flow_shows_exactly_one_step_at_a_time() -> void:
+func _screen(path: String) -> Control:
 	var root := (Engine.get_main_loop() as SceneTree).root
-	var f := (load(ACCOUNT) as PackedScene).instantiate() as AccountFlow
-	root.add_child(f)
-	var steps := ["SignInStep", "WorldsStep", "JoinStep", "CharacterStep", "HostStep", "CreateCharacterStep", "WaitStep"]
-	for pick in steps:
-		f._show_step(f.get_node("%" + pick))
-		for n in steps:
-			assert_eq((f.get_node("%" + n) as Control).visible, n == pick, "%s while showing %s" % [n, pick])
-	assert_eq((f.get_node("%OriginOption") as OptionButton).item_count, AccountFlow.ORIGINS.size())
-	assert_eq((f.get_node("%ClassOption") as OptionButton).item_count, AccountFlow.CLASSES.size())
+	var n := (load(path) as PackedScene).instantiate() as Control
+	root.add_child(n)
+	return n
+
+
+func _press(screen: Node, node_name: String) -> void:
+	(screen.get_node("%" + node_name) as Button).pressed.emit()
+
+
+func _flow() -> AccountFlow:
+	return _screen(ACCOUNT) as AccountFlow
+
+
+# ---------- the coordinator ----------
+
+func test_the_coordinator_shows_exactly_one_screen_at_a_time() -> void:
+	var f := _flow()
+	assert_eq(f._screens.size(), 7)
+	for pick: Control in f._screens:
+		f._show(pick)
+		for other: Control in f._screens:
+			assert_eq(other.visible, other == pick, "%s while showing %s" % [other.name, pick.name])
 	f.free()
 
 
-func test_account_flow_turns_error_bodies_into_messages_and_resolves_addresses() -> void:
-	var root := (Engine.get_main_loop() as SceneTree).root
-	var f := (load(ACCOUNT) as PackedScene).instantiate() as AccountFlow
-	root.add_child(f)
+func test_the_coordinator_starts_on_the_sign_in_screen() -> void:
+	var f := _flow()
+	assert_true((f.get_node("%SignInScreen") as Control).visible)
+	assert_true(not (f.get_node("%WorldPickerScreen") as Control).visible)
+	f.free()
+
+
+func test_the_lobby_message_shows_the_lobby_screen_with_the_party() -> void:
+	var f := _flow()
+	f.show_lobby({"players": ["Aldric", "Brea"], "needed": 3})
+	assert_true((f.get_node("%LobbyScreen") as Control).visible)
+	var lobby := f.get_node("%LobbyScreen") # a %Name only sees inside its own scene: go through the instance
+	assert_true((lobby.get_node("%WaitLabel") as Label).text.contains("2/3"))
+	var list := lobby.get_node("%LobbyList") as ItemList
+	assert_eq(list.item_count, 2)
+	assert_eq(list.get_item_text(0), "Aldric")
+	f.show_lobby({"players": ["Aldric"], "needed": 3})
+	assert_eq(list.item_count, 1, "the list is replaced, not appended")
+	f.free()
+
+
+func test_screens_can_put_a_message_in_the_flows_status_line() -> void:
+	var f := _flow()
+	_press(f.get_node("%WorldPickerScreen"), "PlayButton") # nothing selected
+	assert_eq((f.get_node("%StatusLabel") as Label).text, "Select a world first")
+	f.free()
+
+
+func test_the_coordinator_turns_error_bodies_into_messages_and_resolves_addresses() -> void:
+	var f := _flow()
 	assert_eq(f._error_text({"status": 400, "data": {"msg": "Invalid login credentials"}}), "Invalid login credentials")
 	assert_eq(f._error_text({"status": 403, "data": {"detail": "Not a member of this world"}}), "Not a member of this world")
 	assert_eq(f._error_text({"status": 422, "data": {"detail": [{"loc": ["body"]}]}}), "Invalid input")
@@ -145,97 +184,201 @@ func test_account_flow_turns_error_bodies_into_messages_and_resolves_addresses()
 	f.free()
 
 
-func _account() -> AccountFlow:
-	var root := (Engine.get_main_loop() as SceneTree).root
-	var f := (load(ACCOUNT) as PackedScene).instantiate() as AccountFlow
-	root.add_child(f)
-	return f
+# ---------- the screens (each one on its own) ----------
 
-
-func test_join_screen_explains_each_membership_state() -> void:
-	var f := _account()
-	f._world = {"id": "w1", "name": "Hollow"}
-	var request := f.get_node("%RequestJoinButton") as Button
-	var label := f.get_node("%JoinLabel") as Label
-	f._membership = {"status": "none"}
-	f._show_join()
-	assert_true((f.get_node("%JoinStep") as Control).visible)
-	assert_true(request.visible and request.text == "Request to join" and label.text.contains("Hollow"))
-	assert_true(f._join_poll.is_stopped(), "no polling until a request is sent")
-	f._membership = {"status": "pending"}
-	f._show_join()
-	assert_true(not request.visible, "cannot ask twice")
-	assert_true(label.text.contains("waiting"))
-	assert_true(not f._join_poll.is_stopped(), "pending requests are checked automatically")
-	f._membership = {"status": "rejected"}
-	f._show_join()
-	assert_true(request.visible and request.text == "Ask to join again" and label.text.contains("declined"))
-	assert_true(f._join_poll.is_stopped())
-	f._membership = {"status": "removed"}
-	f._show_join()
-	assert_true(label.text.contains("removed"))
-	f._show_step(f.get_node("%CharacterStep"))
-	assert_true(f._join_poll.is_stopped(), "polling stops when leaving the join screen")
-	f.free()
-
-
-func test_lobby_screen_lists_who_is_waiting() -> void:
-	var f := _account()
-	f.show_lobby({"players": ["Aldric", "Brea"], "needed": 3})
-	assert_true((f.get_node("%WaitStep") as Control).visible)
-	assert_true((f.get_node("%WaitLabel") as Label).text.contains("2/3"))
-	var list := f.get_node("%LobbyList") as ItemList
-	assert_eq(list.item_count, 2)
-	assert_eq(list.get_item_text(0), "Aldric")
-	f.show_lobby({"players": ["Aldric"], "needed": 3})
-	assert_eq(list.item_count, 1, "the list is replaced, not appended")
-	f.free()
-
-
-func test_join_request_row_reports_approve_and_reject() -> void:
-	var root := (Engine.get_main_loop() as SceneTree).root
-	var row := (load("res://game/content/ui/join_request_row.tscn") as PackedScene).instantiate() as JoinRequestRow
-	root.add_child(row)
-	row.setup("tester@example.com")
-	assert_eq((row.get_node("%NameLabel") as Label).text, "tester@example.com")
-	var events: Array[String] = []
-	row.approved.connect(func() -> void: events.append("approved"))
-	row.rejected.connect(func() -> void: events.append("rejected"))
-	(row.get_node("%ApproveButton") as Button).pressed.emit()
-	(row.get_node("%RejectButton") as Button).pressed.emit()
-	assert_eq(events, ["approved", "rejected"] as Array[String])
-	row.set_busy(true)
-	assert_true((row.get_node("%ApproveButton") as Button).disabled and (row.get_node("%RejectButton") as Button).disabled)
-	row.free()
+func test_sign_in_screen_announces_what_was_typed() -> void:
+	var s := _screen("res://game/client/screens/sign_in_screen.tscn") as SignInScreen
+	var got: Array = []
+	s.sign_in_pressed.connect(func(e: String, p: String) -> void: got.append(["in", e, p]))
+	s.create_account_pressed.connect(func(e: String, p: String) -> void: got.append(["new", e, p]))
+	(s.get_node("%EmailEdit") as LineEdit).text = "  me@example.com "
+	(s.get_node("%PasswordEdit") as LineEdit).text = "secret"
+	_press(s, "SignInButton")
+	_press(s, "CreateAccountButton")
+	(s.get_node("%PasswordEdit") as LineEdit).text_submitted.emit("secret")
+	assert_eq(got, [["in", "me@example.com", "secret"], ["new", "me@example.com", "secret"], ["in", "me@example.com", "secret"]],
+		"email is trimmed; Enter in the password box signs in")
+	s.prefill_email("other@example.com")
+	assert_eq((s.get_node("%EmailEdit") as LineEdit).text, "  me@example.com ", "never overwrites what was typed")
+	s.clear_password()
+	assert_eq((s.get_node("%PasswordEdit") as LineEdit).text, "")
+	assert_true((s.get_node("%PasswordEdit") as LineEdit).secret)
+	s.free()
 
 
 func test_world_picker_lists_every_world_with_your_standing() -> void:
-	var f := _account()
-	f.user_email = "me@example.com"
-	f._show_worlds([
+	var s := _screen("res://game/client/screens/world_picker_screen.tscn") as WorldPickerScreen
+	s.show_worlds([
 		{"id": "a", "name": "Alpha", "members": 3, "status": "member", "is_host": false},
 		{"id": "b", "name": "Bravo", "members": 1, "status": "member", "is_host": true},
 		{"id": "c", "name": "Charlie", "members": 5, "status": "none", "is_host": false},
-		{"id": "d", "name": "Delta", "members": 2, "status": "pending", "is_host": false}])
-	var list := f.get_node("%WorldList") as ItemList
+		{"id": "d", "name": "Delta", "members": 2, "status": "pending", "is_host": false}], "me@example.com")
+	var list := s.get_node("%WorldList") as ItemList
 	assert_eq(list.item_count, 4)
 	assert_eq(list.get_item_text(0), "Alpha  -  joined  (3 players)")
 	assert_eq(list.get_item_text(1), "Bravo  -  host  (1 player)")
 	assert_eq(list.get_item_text(2), "Charlie  -  not joined  (5 players)")
 	assert_eq(list.get_item_text(3), "Delta  -  request pending  (2 players)")
-	f._show_worlds([{"id": "a", "name": "Only", "members": 1, "status": "member", "is_host": false}])
+	s.show_worlds([{"id": "a", "name": "Only", "members": 1, "status": "member", "is_host": false}], "me@example.com")
 	assert_eq(list.item_count, 1, "a single world is still listed, never auto-entered")
-	f._show_worlds([])
-	assert_true((f.get_node("%SignedInLabel") as Label).text.contains("no worlds yet"))
-	f.free()
+	s.show_worlds([], "me@example.com")
+	assert_true((s.get_node("%SignedInLabel") as Label).text.contains("no worlds yet"))
+	s.free()
 
 
-func test_opening_a_world_needs_a_selection_and_every_screen_can_go_back_to_the_list() -> void:
-	var f := _account()
-	f._show_step(f.get_node("%WorldsStep"))
-	f._show_worlds([{"id": "a", "name": "Alpha", "members": 1, "status": "member", "is_host": false}])
-	f._on_play_pressed()
-	assert_eq((f.get_node("%StatusLabel") as Label).text, "Select a world first")
-	for back in ["JoinBackButton", "CharacterBackButton", "CreateBackButton"]:
-		assert_true(f.get_node("%" + back) != null, back)
-	f.free()
+func test_world_picker_opens_the_selected_world_and_reports_problems() -> void:
+	var s := _screen("res://game/client/screens/world_picker_screen.tscn") as WorldPickerScreen
+	var opened: Array = []
+	var messages: Array[String] = []
+	var created: Array[String] = []
+	s.open_world_requested.connect(func(w: Dictionary) -> void: opened.append(w["id"]))
+	s.message.connect(func(t: String) -> void: messages.append(t))
+	s.create_world_requested.connect(func(n: String) -> void: created.append(n))
+	s.show_worlds([{"id": "a", "name": "Alpha", "members": 1, "status": "member", "is_host": false},
+		{"id": "b", "name": "Bravo", "members": 1, "status": "none", "is_host": false}], "me")
+	_press(s, "PlayButton")
+	assert_eq(messages.back(), "Select a world first")
+	assert_eq(opened, [])
+	(s.get_node("%WorldList") as ItemList).select(1)
+	_press(s, "PlayButton")
+	assert_eq(opened, ["b"])
+	(s.get_node("%WorldList") as ItemList).item_activated.emit(0)
+	assert_eq(opened, ["b", "a"], "double-click opens too")
+	_press(s, "CreateWorldButton")
+	assert_eq(messages.back(), "Enter a world name")
+	(s.get_node("%NewWorldEdit") as LineEdit).text = "  Fresh "
+	_press(s, "CreateWorldButton")
+	assert_eq(created, ["Fresh"])
+	s.free()
+
+
+func test_join_screen_explains_each_membership_state() -> void:
+	var s := _screen("res://game/client/screens/join_screen.tscn") as JoinScreen
+	var request := s.get_node("%RequestJoinButton") as Button
+	var label := s.get_node("%JoinLabel") as Label
+	s.show_state("Hollow", "none")
+	assert_true(request.visible and request.text == "Request to join" and label.text.contains("Hollow"))
+	assert_true(not s.is_polling(), "no polling until a request is sent")
+	s.show_state("Hollow", "pending")
+	assert_true(not request.visible, "cannot ask twice")
+	assert_true(label.text.contains("waiting"))
+	assert_true(s.is_polling(), "pending requests are checked automatically")
+	s.show_state("Hollow", "rejected")
+	assert_true(request.visible and request.text == "Ask to join again" and label.text.contains("declined"))
+	assert_true(not s.is_polling())
+	s.show_state("Hollow", "removed")
+	assert_true(label.text.contains("removed"))
+	s.show_state("Hollow", "pending")
+	s.hide()
+	assert_true(not s.is_polling(), "polling stops when the screen is hidden")
+	s.free()
+
+
+func test_join_screen_announces_its_buttons_and_the_poll() -> void:
+	var s := _screen("res://game/client/screens/join_screen.tscn") as JoinScreen
+	var got: Array[String] = []
+	s.request_join_pressed.connect(func() -> void: got.append("request"))
+	s.check_pressed.connect(func() -> void: got.append("check"))
+	s.back_pressed.connect(func() -> void: got.append("back"))
+	s.sign_out_pressed.connect(func() -> void: got.append("out"))
+	_press(s, "RequestJoinButton")
+	_press(s, "JoinCheckButton")
+	_press(s, "JoinBackButton")
+	_press(s, "JoinSignOutButton")
+	(s.get_node("%PollTimer") as Timer).timeout.emit()
+	assert_eq(got, ["request", "check", "back", "out", "check"] as Array[String])
+	s.free()
+
+
+func test_character_screen_shows_the_character_and_host_controls() -> void:
+	var s := _screen("res://game/client/screens/character_screen.tscn") as CharacterScreen
+	var got: Array[String] = []
+	s.enter_pressed.connect(func() -> void: got.append("enter"))
+	s.manage_requests_pressed.connect(func() -> void: got.append("manage"))
+	s.back_pressed.connect(func() -> void: got.append("back"))
+	var enter := s.get_node("%EnterButton") as Button
+	s.show_checking("Hollow")
+	assert_true(enter.disabled and not (s.get_node("%ManageRequestsButton") as Control).visible)
+	assert_eq((s.get_node("%WorldLabel") as Label).text, "World: Hollow")
+	s.show_character({"name": "Aldric", "level": 1, "class": "warrior", "origin": "soldier", "xp": 40})
+	assert_true(not enter.disabled)
+	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric — level 1 warrior (soldier), 40 XP")
+	s.set_host(true)
+	s.set_pending_count(3)
+	assert_eq((s.get_node("%ManageRequestsButton") as Button).text, "Join requests (3)")
+	_press(s, "EnterButton")
+	_press(s, "ManageRequestsButton")
+	_press(s, "CharacterBackButton")
+	assert_eq(got, ["enter", "manage", "back"] as Array[String])
+	s.show_unavailable()
+	assert_true(enter.disabled)
+	s.free()
+
+
+func test_character_creator_announces_the_choice() -> void:
+	var s := _screen("res://game/client/screens/character_creator.tscn") as CharacterCreator
+	assert_eq((s.get_node("%OriginOption") as OptionButton).item_count, CharacterCreator.ORIGINS.size())
+	assert_eq((s.get_node("%ClassOption") as OptionButton).item_count, CharacterCreator.CLASSES.size())
+	var made: Array = []
+	var messages: Array[String] = []
+	s.create_requested.connect(func(n: String, o: String, c: String) -> void: made.append([n, o, c]))
+	s.message.connect(func(t: String) -> void: messages.append(t))
+	_press(s, "CreateCharacterButton")
+	assert_eq(messages, ["Enter a name"] as Array[String])
+	assert_eq(made, [])
+	(s.get_node("%CharacterNameEdit") as LineEdit).text = " Tessa "
+	(s.get_node("%OriginOption") as OptionButton).select(1)
+	(s.get_node("%ClassOption") as OptionButton).select(2)
+	_press(s, "CreateCharacterButton")
+	assert_eq(made, [["Tessa", "soldier", "cleric"]])
+	s.reset()
+	assert_eq((s.get_node("%CharacterNameEdit") as LineEdit).text, "")
+	assert_eq((s.get_node("%ClassOption") as OptionButton).selected, 0)
+	s.free()
+
+
+func test_host_requests_screen_lists_rows_and_reports_decisions() -> void:
+	var s := _screen("res://game/client/screens/host_requests_screen.tscn") as HostRequestsScreen
+	var got: Array = []
+	s.decision_made.connect(func(id: String, ok: bool, _row: JoinRequestRow) -> void: got.append([id, ok]))
+	s.show_requests([{"id": "r1", "user_id": "11111111-aaaa", "requester_label": "tester@example.com"},
+		{"id": "r2", "user_id": "22222222-bbbb", "requester_label": null}])
+	var rows := s.get_node("%RequestRows") as VBoxContainer
+	assert_eq(rows.get_child_count(), 2)
+	assert_eq(((rows.get_child(0) as JoinRequestRow).get_node("%NameLabel") as Label).text, "tester@example.com")
+	assert_eq(((rows.get_child(1) as JoinRequestRow).get_node("%NameLabel") as Label).text, "Player 22222222", "no label: a short id")
+	((rows.get_child(0) as JoinRequestRow).get_node("%ApproveButton") as Button).pressed.emit()
+	((rows.get_child(1) as JoinRequestRow).get_node("%RejectButton") as Button).pressed.emit()
+	assert_eq(got, [["r1", true], ["r2", false]])
+	s.show_requests([])
+	assert_eq((s.get_node("%HostLabel") as Label).text, "No pending join requests.")
+	s.free()
+
+
+func test_lobby_screen_lists_the_party_and_can_be_left() -> void:
+	var s := _screen("res://game/client/screens/lobby_screen.tscn") as LobbyScreen
+	var left: Array[bool] = []
+	s.leave_pressed.connect(func() -> void: left.append(true))
+	s.show_lobby({"players": ["Aldric", "Brea"], "needed": 3})
+	assert_true((s.get_node("%WaitLabel") as Label).text.contains("2/3"))
+	assert_eq((s.get_node("%LobbyList") as ItemList).item_count, 2)
+	s.show_connecting()
+	assert_eq((s.get_node("%LobbyList") as ItemList).item_count, 0)
+	_press(s, "CancelButton")
+	assert_eq(left.size(), 1)
+	s.free()
+
+
+func test_join_request_row_reports_approve_and_reject() -> void:
+	var row := _screen("res://game/content/ui/join_request_row.tscn") as JoinRequestRow
+	row.setup("tester@example.com")
+	assert_eq((row.get_node("%NameLabel") as Label).text, "tester@example.com")
+	var events: Array[String] = []
+	row.approved.connect(func() -> void: events.append("approved"))
+	row.rejected.connect(func() -> void: events.append("rejected"))
+	_press(row, "ApproveButton")
+	_press(row, "RejectButton")
+	assert_eq(events, ["approved", "rejected"] as Array[String])
+	row.set_busy(true)
+	assert_true((row.get_node("%ApproveButton") as Button).disabled and (row.get_node("%RejectButton") as Button).disabled)
+	row.free()

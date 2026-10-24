@@ -60,7 +60,9 @@ def main() -> None:
         b = p.chromium.launch(args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
                                     "--enable-webgl", "--no-sandbox"])
         try:
-            if STAGE == "duo":
+            if STAGE == "pending":
+                pending_flow(b)
+            elif STAGE == "duo":
                 duo_flow(b)
             elif STAGE == "char":
                 char_flow(b)
@@ -100,6 +102,18 @@ def join_flow(b):
     tester.type(os.environ.get("TESTER_CHARACTER", "Tessa"))
     tester.click(640, 418, wait=5)            # Create (Outcast warrior: the defaults)
     tester.shot("05_character")
+
+
+def pending_flow(b):
+    """The tester opens a world where their join request is still pending: the join screen polls and can go back."""
+    tester = Player(b, "tester")
+    tester.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
+    tester.shot("01_picker")
+    tester.click(640, 282, wait=1)            # second row: the world with the pending request
+    tester.click(640, 368, wait=4)            # Open selected world
+    tester.shot("02_pending")
+    tester.click(640, 391, wait=3)            # Choose another world
+    tester.shot("03_back_on_picker")
 
 
 def char_flow(b):

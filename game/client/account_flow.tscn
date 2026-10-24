@@ -1,9 +1,15 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://b6gcm3m8lfhpe"]
 
-[ext_resource type="Script" path="res://game/client/account_flow.gd" id="1"]
-[ext_resource type="PackedScene" path="res://game/content/ui/join_request_row.tscn" id="2"]
+[ext_resource type="Script" uid="uid://c7n5b34l2ov8w" path="res://game/client/account_flow.gd" id="1"]
+[ext_resource type="PackedScene" path="res://game/client/screens/sign_in_screen.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://game/client/screens/world_picker_screen.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://game/client/screens/join_screen.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://game/client/screens/character_screen.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://game/client/screens/host_requests_screen.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://game/client/screens/character_creator.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://game/client/screens/lobby_screen.tscn" id="8"]
 
-[node name="AccountFlow" type="PanelContainer"]
+[node name="AccountFlow" type="PanelContainer" unique_id=106401834]
 custom_minimum_size = Vector2(420, 0)
 anchors_preset = 8
 anchor_left = 0.5
@@ -17,230 +23,48 @@ offset_bottom = 10.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
-join_request_row_scene = ExtResource("2")
 
-[node name="RefreshTimer" type="Timer" parent="."]
+[node name="RefreshTimer" type="Timer" parent="." unique_id=696617564]
 unique_name_in_owner = true
 one_shot = true
 
-[node name="JoinPollTimer" type="Timer" parent="."]
-unique_name_in_owner = true
-wait_time = 4.0
-
-[node name="Layout" type="VBoxContainer" parent="."]
+[node name="Layout" type="VBoxContainer" parent="." unique_id=336665553]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="TitleLabel" type="Label" parent="Layout"]
+[node name="TitleLabel" type="Label" parent="Layout" unique_id=303141141]
 layout_mode = 2
 text = "Unnamed"
 
-[node name="SignInStep" type="VBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SignInLabel" type="Label" parent="Layout/SignInStep"]
-layout_mode = 2
-text = "Sign in"
-
-[node name="EmailEdit" type="LineEdit" parent="Layout/SignInStep"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "Email"
-
-[node name="PasswordEdit" type="LineEdit" parent="Layout/SignInStep"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "Password"
-secret = true
-
-[node name="SignInButton" type="Button" parent="Layout/SignInStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Sign in"
-
-[node name="CreateAccountButton" type="Button" parent="Layout/SignInStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Create account"
-
-[node name="WorldsStep" type="VBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="SignedInLabel" type="Label" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="WorldList" type="ItemList" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(0, 100)
-
-[node name="PlayButton" type="Button" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Open selected world"
-
-[node name="NewWorldEdit" type="LineEdit" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "New world name"
-
-[node name="CreateWorldButton" type="Button" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Create world"
-
-[node name="RefreshWorldsButton" type="Button" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Refresh list"
-
-[node name="WorldsSignOutButton" type="Button" parent="Layout/WorldsStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Sign out"
-
-[node name="JoinStep" type="VBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="JoinLabel" type="Label" parent="Layout/JoinStep"]
-unique_name_in_owner = true
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="RequestJoinButton" type="Button" parent="Layout/JoinStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Request to join"
-
-[node name="JoinCheckButton" type="Button" parent="Layout/JoinStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Check again"
-
-[node name="JoinBackButton" type="Button" parent="Layout/JoinStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Choose another world"
-
-[node name="JoinSignOutButton" type="Button" parent="Layout/JoinStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Sign out"
-
-[node name="CharacterStep" type="VBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="WorldLabel" type="Label" parent="Layout/CharacterStep"]
-unique_name_in_owner = true
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="CharacterLabel" type="Label" parent="Layout/CharacterStep"]
-unique_name_in_owner = true
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="EnterButton" type="Button" parent="Layout/CharacterStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Enter battle"
-
-[node name="ManageRequestsButton" type="Button" parent="Layout/CharacterStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Join requests"
-visible = false
-
-[node name="CharacterBackButton" type="Button" parent="Layout/CharacterStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Choose another world"
-
-[node name="HostStep" type="VBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="HostLabel" type="Label" parent="Layout/HostStep"]
-unique_name_in_owner = true
-layout_mode = 2
-autowrap_mode = 3
-text = "Join requests"
-
-[node name="RequestRows" type="VBoxContainer" parent="Layout/HostStep"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="HostBackButton" type="Button" parent="Layout/HostStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Back"
-
-[node name="CreateCharacterStep" type="VBoxContainer" parent="Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="CreateLabel" type="Label" parent="Layout/CreateCharacterStep"]
-layout_mode = 2
-text = "Create your character"
-
-[node name="CharacterNameEdit" type="LineEdit" parent="Layout/CreateCharacterStep"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "Character name"
-
-[node name="OriginOption" type="OptionButton" parent="Layout/CreateCharacterStep"]
+[node name="SignInScreen" parent="Layout" unique_id=817504179 instance=ExtResource("2")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="ClassOption" type="OptionButton" parent="Layout/CreateCharacterStep"]
+[node name="WorldPickerScreen" parent="Layout" unique_id=968285012 instance=ExtResource("3")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="CreateCharacterButton" type="Button" parent="Layout/CreateCharacterStep"]
+[node name="JoinScreen" parent="Layout" unique_id=736647549 instance=ExtResource("4")]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Create"
 
-[node name="CreateBackButton" type="Button" parent="Layout/CreateCharacterStep"]
+[node name="CharacterScreen" parent="Layout" unique_id=788184297 instance=ExtResource("5")]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Choose another world"
 
-[node name="WaitStep" type="VBoxContainer" parent="Layout"]
+[node name="HostRequestsScreen" parent="Layout" unique_id=1078941933 instance=ExtResource("6")]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 6
 
-[node name="WaitLabel" type="Label" parent="Layout/WaitStep"]
+[node name="CharacterCreator" parent="Layout" unique_id=871956445 instance=ExtResource("7")]
 unique_name_in_owner = true
 layout_mode = 2
-autowrap_mode = 3
-text = "Connecting to the battle server…"
 
-[node name="LobbyList" type="ItemList" parent="Layout/WaitStep"]
+[node name="LobbyScreen" parent="Layout" unique_id=369376578 instance=ExtResource("8")]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(0, 90)
 
-[node name="CancelButton" type="Button" parent="Layout/WaitStep"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Leave"
-
-[node name="StatusLabel" type="Label" parent="Layout"]
+[node name="StatusLabel" type="Label" parent="Layout" unique_id=254502628]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3

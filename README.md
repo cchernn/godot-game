@@ -1,6 +1,7 @@
 # Unnamed — multiplayer tactical RPG prototype (Godot 4.7.2)
 
-Designing layouts, tiles, units, animations or the camera in the Godot editor: see `docs/editor-guide.md`.
+Designing layouts, tiles, units, animations or the camera in the Godot editor: see `docs/editor-guide.md`. A guided tour of how this game's screens
+are built (for someone past the Godot basics): `docs/guide/01-login-screen.md`.
 
 ```
 scripts/test.sh                      # Godot unit tests + FastAPI tests

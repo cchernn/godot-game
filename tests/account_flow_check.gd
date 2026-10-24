@@ -16,7 +16,7 @@ func _initialize() -> void:
 	_check(not env.is_empty(), "client_env.json loads")
 	var flow := (load("res://game/client/account_flow.tscn") as PackedScene).instantiate() as AccountFlow
 	root.add_child(flow)
-	flow.setup(env)
+	flow.env = env # no setup(): that would restore a saved session from this machine
 	await process_frame
 	var email := OS.get_environment("ACCT_EMAIL")
 	var password := OS.get_environment("ACCT_PASSWORD")

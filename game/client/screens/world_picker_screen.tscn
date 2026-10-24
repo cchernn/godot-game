@@ -1,0 +1,42 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/client/screens/world_picker_screen.gd" id="1"]
+
+[node name="WorldPickerScreen" type="VBoxContainer"]
+theme_override_constants/separation = 6
+script = ExtResource("1")
+
+[node name="SignedInLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="WorldList" type="ItemList" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+
+[node name="PlayButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Open selected world"
+
+[node name="NewWorldEdit" type="LineEdit" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "New world name"
+
+[node name="CreateWorldButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Create world"
+
+[node name="RefreshWorldsButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Refresh list"
+
+[node name="WorldsSignOutButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Sign out"
