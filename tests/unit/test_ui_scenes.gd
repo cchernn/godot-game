@@ -299,16 +299,39 @@ func test_join_screen_announces_its_buttons_and_the_poll() -> void:
 	s.free()
 
 
-func test_character_screen_shows_the_character_and_goes_back() -> void:
+func test_character_screen_shows_stats_skills_battles_and_everyones_characters() -> void:
 	var s := _screen("res://game/client/screens/character_screen.tscn") as CharacterScreen
 	var got: Array[String] = []
 	s.back_pressed.connect(func() -> void: got.append("back"))
+	s.retire_requested.connect(func() -> void: got.append("retire"))
 	s.show_checking("Hollow")
 	assert_eq((s.get_node("%WorldLabel") as Label).text, "World: Hollow")
-	s.show_character({"name": "Aldric", "level": 1, "class": "warrior", "origin": "soldier", "xp": 40})
-	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nLevel 1 warrior (soldier)\n40 XP")
+	s.show_character({"name": "Aldric", "level": 1, "class": "warrior", "origin": "soldier", "xp": 0})
+	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nLevel 1 Warrior (soldier)")
+	assert_eq((s.get_node("%XpLabel") as Label).text, "0 XP")
+	assert_true((s.get_node("%StatsLabel") as Label).text.begins_with("HP "), "stats come from the class resource")
+	assert_true((s.get_node("%SkillsList") as ItemList).item_count >= 2, "and so do the skills")
+	s.show_battles([{"created_at": "2026-10-25T12:00:00+00:00", "result": "players_win", "outcome": "survived", "xp_awarded": 100}])
+	assert_eq((s.get_node("%BattlesList") as ItemList).get_item_text(0), "2026-10-25  Victory - survived, +100 XP")
+	s.show_battles([])
+	assert_eq((s.get_node("%BattlesLabel") as Label).text, "No battles yet.")
+	s.show_world_characters([
+		{"name": "Aldric", "class": "warrior", "owner": "Host", "mine": true, "status": "active"},
+		{"name": "Tessa", "class": "rogue", "owner": "tess@example.com", "mine": false, "status": "retired"}])
+	assert_eq((s.get_node("%RosterList") as ItemList).get_item_text(0), "Aldric - Warrior, Host (you)")
+	assert_eq((s.get_node("%FallenList") as ItemList).get_item_text(0), "Tessa - Rogue, tess@example.com")
+	var retire := s.get_node("%RetireButton") as Button
+	var edit := s.get_node("%RetireConfirmEdit") as LineEdit
+	assert_true(retire.disabled)
+	edit.text = "aldric"
+	edit.text_changed.emit("aldric")
+	assert_true(retire.disabled, "the name must match exactly")
+	edit.text = "Aldric"
+	edit.text_changed.emit("Aldric")
+	assert_true(not retire.disabled)
+	retire.pressed.emit()
 	_press(s, "CharacterBackButton")
-	assert_eq(got, ["back"] as Array[String])
+	assert_eq(got, ["retire", "back"] as Array[String])
 	s.show_unavailable()
 	assert_eq((s.get_node("%CharacterLabel") as Label).text, "")
 	s.free()
@@ -351,6 +374,48 @@ func test_world_management_screen_lists_rows_and_reports_decisions() -> void:
 	assert_eq(got, [["r1", true], ["r2", false]])
 	s.show_requests([])
 	assert_eq((s.get_node("%ManagementLabel") as Label).text, "No pending join requests.")
+	s.show_info({"template_id": "prototype", "definition_version": 1, "created_at": "2026-10-20T08:00:00+00:00",
+		"members": 3, "characters": 2, "live_parties": 1, "battles": 7})
+	assert_eq((s.get_node("%WorldInfoLabel") as Label).text,
+		"Template prototype v1, created 2026-10-20\n3 members, 2 characters, 1 live parties, 7 battles fought")
+	s.free()
+
+
+func test_world_management_renames_removes_members_and_guards_delete() -> void:
+	var s := _screen("res://game/client/screens/world_management_screen.tscn") as WorldManagementScreen
+	var got: Array = []
+	s.rename_requested.connect(func(n: String) -> void: got.append(["rename", n]))
+	s.remove_member_requested.connect(func(u: String) -> void: got.append(["remove", u]))
+	s.delete_requested.connect(func(n: String) -> void: got.append(["delete", n]))
+	s.show_world("Hollow")
+	s.show_members([{"user_id": "h-1", "role": "host", "character_name": "Aldric", "label": null},
+		{"user_id": "m-2", "role": "member", "character_name": null, "label": "tess@example.com"}])
+	var list := s.get_node("%MembersList") as ItemList
+	var remove := s.get_node("%RemoveMemberButton") as Button
+	var del := s.get_node("%DeleteButton") as Button
+	var edit := s.get_node("%DeleteConfirmEdit") as LineEdit
+	var name_edit := s.get_node("%WorldNameEdit") as LineEdit
+	assert_eq(list.get_item_text(0), "Aldric  (host)")
+	assert_eq(list.get_item_text(1), "tess@example.com")
+	assert_true(not list.is_item_selectable(0), "the host cannot be picked for removal")
+	assert_true(remove.disabled and del.disabled)
+	remove.pressed.emit()
+	list.select(1)
+	list.item_selected.emit(1)
+	assert_true(not remove.disabled)
+	remove.pressed.emit()
+	(s.get_node("%RenameButton") as Button).pressed.emit()
+	assert_eq(got, [["remove", "m-2"]], "an unchanged name is not a rename")
+	name_edit.text = "Hollowmere"
+	(s.get_node("%RenameButton") as Button).pressed.emit()
+	edit.text = "hollow"
+	edit.text_changed.emit("hollow")
+	assert_true(del.disabled, "the name must match exactly")
+	edit.text = "Hollow"
+	edit.text_changed.emit("Hollow")
+	assert_true(not del.disabled)
+	del.pressed.emit()
+	assert_eq(got, [["remove", "m-2"], ["rename", "Hollowmere"], ["delete", "Hollow"]])
 	s.free()
 
 
@@ -358,7 +423,7 @@ func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
 	var s := _screen("res://game/client/screens/world_hub_screen.tscn") as WorldHubScreen
 	var got: Array[String] = []
 	for sig in ["parties_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
-			"switch_world_pressed", "sign_out_pressed"]:
+			"switch_world_pressed"]:
 		s.connect(sig, func() -> void: got.append(sig))
 	s.show_loading("Hollow")
 	assert_eq((s.get_node("%HubWorldLabel") as Label).text, "Hollow")
@@ -383,19 +448,28 @@ func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management (1 request)")
 	s.set_pending_count(0)
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management")
-	for b in ["PartiesButton", "CharacterButton", "ManagementButton", "SettingsButton", "ResumeButton", "SwitchWorldButton", "HubSignOutButton"]:
+	for b in ["PartiesButton", "CharacterButton", "ManagementButton", "SettingsButton", "ResumeButton", "SwitchWorldButton"]:
 		_press(s, b)
 	assert_eq(got, ["parties_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
-		"switch_world_pressed", "sign_out_pressed"] as Array[String])
+		"switch_world_pressed"] as Array[String])
 	s.free()
 
 
-func test_settings_screen_is_a_placeholder_with_a_way_back() -> void:
+func test_settings_screen_shows_the_account_and_announces_its_actions() -> void:
 	var s := _screen("res://game/client/screens/settings_screen.tscn") as SettingsScreen
-	var back: Array[bool] = []
-	s.back_pressed.connect(func() -> void: back.append(true))
+	var got: Array = []
+	s.back_pressed.connect(func() -> void: got.append("back"))
+	s.sign_out_pressed.connect(func() -> void: got.append("out"))
+	s.change_password_requested.connect(func(p: String) -> void: got.append(p))
+	s.show_account("a@example.com")
+	assert_eq((s.get_node("%AccountEmailLabel") as Label).text, "Signed in as a@example.com")
+	(s.get_node("%NewPasswordEdit") as LineEdit).text = "hunter22"
+	_press(s, "ChangePasswordButton")
+	_press(s, "SettingsSignOutButton")
 	_press(s, "SettingsBackButton")
-	assert_eq(back.size(), 1)
+	assert_eq(got, ["hunter22", "out", "back"])
+	s.show_account("a@example.com")
+	assert_eq((s.get_node("%NewPasswordEdit") as LineEdit).text, "", "the typed password is cleared")
 	s.free()
 
 
@@ -512,6 +586,26 @@ func test_party_lobby_shows_the_roster_and_only_the_leader_gets_controls() -> vo
 	assert_true(start.disabled)
 	s.show_party(_party("a", "member")) # leadership handed over to someone else: the controls go away
 	assert_true(not start.visible)
+	s.free()
+
+
+func test_party_lobby_leader_can_hand_over_and_the_pick_survives_a_refresh() -> void:
+	var s := _screen("res://game/client/screens/party_lobby_screen.tscn") as PartyLobbyScreen
+	var got: Array[String] = []
+	s.make_leader_requested.connect(func(id: String) -> void: got.append(id))
+	var btn := s.get_node("%MakeLeaderButton") as Button
+	var roster := s.get_node("%RosterList") as ItemList
+	s.show_party(_party("a", "member"))
+	assert_true(not btn.visible, "members cannot hand over")
+	s.show_party(_party("a", "leader"))
+	assert_true(btn.visible and btn.disabled, "nothing picked yet")
+	roster.select(1)
+	roster.item_selected.emit(1)
+	assert_true(not btn.disabled)
+	s.show_party(_party("a", "leader")) # the 3-second refresh rebuilds the list
+	assert_eq(roster.get_selected_items(), PackedInt32Array([1]))
+	btn.pressed.emit()
+	assert_eq(got, ["c1"] as Array[String])
 	s.free()
 
 

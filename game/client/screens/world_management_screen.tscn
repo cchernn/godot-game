@@ -12,6 +12,26 @@ row_scene = ExtResource("2")
 layout_mode = 2
 text = "World management"
 
+[node name="WorldInfoLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="RenameRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="WorldNameEdit" type="LineEdit" parent="RenameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "World name"
+max_length = 64
+
+[node name="RenameButton" type="Button" parent="RenameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Rename"
+
 [node name="ManagementLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
@@ -22,6 +42,41 @@ text = "Join requests"
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
+
+[node name="MembersLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Members"
+
+[node name="MembersList" type="ItemList" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+
+[node name="RemoveMemberButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Remove selected member"
+
+[node name="DeleteLabel" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 3
+text = "Delete this world for good, with its characters, parties and history. Type its name to confirm."
+
+[node name="DeleteRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="DeleteConfirmEdit" type="LineEdit" parent="DeleteRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Type the world's name"
+
+[node name="DeleteButton" type="Button" parent="DeleteRow"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Delete world"
 
 [node name="ManagementBackButton" type="Button" parent="."]
 unique_name_in_owner = true

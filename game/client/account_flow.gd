@@ -80,12 +80,15 @@ func _ready() -> void:
 	_hub.parties_pressed.connect(_step_parties)
 	_hub.character_pressed.connect(_step_character_view)
 	_hub.management_pressed.connect(_step_management)
-	_hub.settings_pressed.connect(func() -> void: _show(_settings))
+	_hub.settings_pressed.connect(_step_settings)
 	_hub.resume_pressed.connect(_resume_party)
 	_hub.switch_world_pressed.connect(_step_worlds)
-	_hub.sign_out_pressed.connect(sign_out_and_show)
 	_character_screen.back_pressed.connect(_step_hub)
 	_settings.back_pressed.connect(_step_hub)
+	_settings.sign_out_pressed.connect(sign_out_and_show)
+	_settings.change_password_requested.connect(_on_change_password_requested)
+	_character_screen.retire_requested.connect(_on_retire_requested)
+	_party_lobby.make_leader_requested.connect(_on_make_leader_requested)
 	_creator.create_requested.connect(_on_create_character_requested)
 	_creator.back_pressed.connect(_step_worlds)
 	_creator.message.connect(_say)
@@ -104,6 +107,9 @@ func _ready() -> void:
 	_party_lobby.refresh_requested.connect(_refresh_party)
 	_party_lobby.decision_made.connect(_decide_party_request)
 	_management.decision_made.connect(_decide)
+	_management.rename_requested.connect(_on_rename_requested)
+	_management.remove_member_requested.connect(_on_remove_member_requested)
+	_management.delete_requested.connect(_on_delete_world_requested)
 	_management.back_pressed.connect(_step_hub)
 	_lobby.leave_pressed.connect(_on_leave_pressed)
 	_show(_sign_in)
@@ -382,6 +388,45 @@ func _step_character_view() -> void:
 	_show(_character_screen)
 	_character_screen.show_checking(_world["name"])
 	_character_screen.show_character(_character)
+	var b := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters/me/battles" % _world["id"])
+	if b["status"] == 200 and _character_screen.is_visible_in_tree():
+		_character_screen.show_battles(b["data"])
+	var c := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters" % _world["id"])
+	if c["status"] == 200 and _character_screen.is_visible_in_tree():
+		_character_screen.show_world_characters(c["data"])
+
+
+func _on_retire_requested() -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/characters/%s/retire" % _character["id"])
+	if r["status"] != 200:
+		status.text = r["error"]
+		return
+	_character = {}
+	await _step_hub()  # no active character: the hub sends the player to the creator
+	status.text = "Character retired. Create a new one."
+
+
+# ---------- Settings ----------
+
+func _step_settings() -> void:
+	status.text = ""
+	_settings.show_account(user_email)
+	_show(_settings)
+
+
+func _on_change_password_requested(new_password: String) -> void:
+	if new_password.length() < 6:
+		status.text = "Enter a new password of at least 6 characters"
+		return
+	var base := str(env["supabase_url"]).trim_suffix("/")
+	var r := await _request(HTTPClient.METHOD_PUT, "%s/auth/v1/user" % base,
+		["apikey: %s" % env["supabase_publishable_key"], "Authorization: Bearer %s" % access_token,
+		"Content-Type: application/json"], {"password": new_password})
+	if r["status"] == 200:
+		_settings.show_account(user_email)
+		status.text = "Password changed."
+	else:
+		status.text = r["error"]
 
 
 func _step_create_character() -> void:
@@ -439,6 +484,48 @@ func _step_management() -> void:
 		status.text = r["error"]
 		return
 	_management.show_requests(r["data"])
+	_management.show_world(_world["name"])
+	var info := await api(HTTPClient.METHOD_GET, "/worlds/%s/info" % _world["id"])
+	if info["status"] == 200:
+		_management.show_info(info["data"])
+	_refresh_members()
+
+
+func _refresh_members() -> void:
+	var m := await api(HTTPClient.METHOD_GET, "/worlds/%s/members" % _world["id"])
+	if m["status"] == 200:
+		_management.show_members(m["data"])
+	else:
+		status.text = m["error"]
+
+
+func _on_rename_requested(new_name: String) -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/rename" % _world["id"], {"name": new_name})
+	if r["status"] != 200:
+		status.text = r["error"]
+		return
+	_world["name"] = r["data"]["name"]
+	status.text = "Renamed."
+	_management.show_world(_world["name"])
+
+
+func _on_remove_member_requested(user_id: String) -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/members/%s/remove" % [_world["id"], user_id])
+	if r["status"] != 204:
+		status.text = r["error"]
+		return
+	status.text = "Member removed."
+	_refresh_members()
+
+
+func _on_delete_world_requested(confirm_name: String) -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/delete" % _world["id"], {"confirm_name": confirm_name})
+	if r["status"] != 204:
+		status.text = r["error"]
+		return
+	_world = {}
+	await _step_worlds()
+	status.text = "World deleted."
 
 
 func _decide(request_id: String, approve: bool, row: JoinRequestRow) -> void:
@@ -569,6 +656,8 @@ func _refresh_party() -> void:
 		_step_parties()
 		return
 	_party_lobby.show_party(party)
+	if party["relation"] != "leader":
+		_shown_requests = []
 	if party["relation"] == "leader":
 		var q := await api(HTTPClient.METHOD_GET, "/instances/%s/requests" % _party_id)
 		if q["status"] == 200 and _party_lobby.is_visible_in_tree():
@@ -588,6 +677,16 @@ func _decide_party_request(request_id: String, approve: bool, row: JoinRequestRo
 	else:
 		status.text = r["error"]
 		_party_lobby.row_failed(row)
+	_refresh_party()
+
+
+func _on_make_leader_requested(character_id: String) -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/leader" % _party_id, {"character_id": character_id})
+	if r["status"] == 204:
+		status.text = ""
+		_shown_requests = []
+	else:
+		status.text = r["error"]
 	_refresh_party()
 
 

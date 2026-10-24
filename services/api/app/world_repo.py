@@ -130,6 +130,58 @@ class WorldMixin:
                 raise Forbidden("The host cannot be removed")
             conn.execute("update world_members set status='removed' where world_id=%s and user_id=%s", (world_id, user_id))
 
+    def list_members(self, world_id: uuid.UUID, host_id: uuid.UUID) -> list[dict]:
+        """Active members for the host's management screen: who they are (their join label, else their character) and their role."""
+        if not self.is_host(world_id, host_id):
+            raise Forbidden("Only the host can see members")
+        with self.pool.connection() as conn:
+            rows = conn.execute(
+                "select m.user_id, m.role, "
+                "  (select c.name from characters c where c.world_id = m.world_id and c.user_id = m.user_id and c.status = 'active') as character_name, "
+                "  (select r.requester_label from world_join_requests r where r.world_id = m.world_id and r.user_id = m.user_id "
+                "     and r.requester_label is not null order by r.created_at desc limit 1) as label "
+                "from world_members m where m.world_id = %s and m.status = 'active' order by (m.role = 'host') desc, m.joined_at",
+                (world_id,)).fetchall()
+        return [_row(r) for r in rows]
+
+    def world_info(self, world_id: uuid.UUID, host_id: uuid.UUID) -> dict:
+        if not self.is_host(world_id, host_id):
+            raise Forbidden("Only the host can see this")
+        with self.pool.connection() as conn:
+            return _row(conn.execute(
+                "select w.name, w.template_id, w.definition_version, w.created_at, "
+                "  (select count(*) from world_members where world_id = w.id and status = 'active') as members, "
+                "  (select count(*) from characters where world_id = w.id and status = 'active') as characters, "
+                "  (select count(*) from activity_instances where world_id = w.id and status in ('forming','active')) as live_parties, "
+                "  (select count(*) from combat_results where world_id = w.id) as battles "
+                "from worlds w where w.id = %s", (world_id,)).fetchone())
+
+    def rename_world(self, world_id: uuid.UUID, host_id: uuid.UUID, name: str) -> dict:
+        if not self.is_host(world_id, host_id):
+            raise Forbidden("Only the host can rename the world")
+        with self.pool.connection() as conn:
+            return _row(conn.execute("update worlds set name=%s where id=%s returning *", (name, world_id)).fetchone())
+
+    def delete_world(self, world_id: uuid.UUID, host_id: uuid.UUID, confirm_name: str) -> None:
+        """Permanent: removes the world with its members, characters, parties, discoveries and combat history."""
+        if not self.is_host(world_id, host_id):
+            raise Forbidden("Only the host can delete the world")
+        with self.pool.connection() as conn:
+            w = conn.execute("select name from worlds where id=%s for update", (world_id,)).fetchone()
+            if w is None:
+                raise NotFound("World not found")
+            if confirm_name != w["name"]:
+                raise Invalid("Type the world's name exactly to delete it")
+            if conn.execute("select 1 from activity_instances where world_id=%s and status in ('forming','active') limit 1",
+                            (world_id,)).fetchone():
+                raise Conflict("Finish or cancel the live parties first")
+            # Tables that point at characters or the world without cascading go first.
+            conn.execute("delete from combat_results where world_id=%s", (world_id,))
+            conn.execute("delete from activity_instances where world_id=%s", (world_id,))
+            conn.execute("delete from world_discoveries where world_id=%s", (world_id,))
+            conn.execute("delete from characters where world_id=%s", (world_id,))
+            conn.execute("delete from worlds where id=%s", (world_id,))
+
     # ---- discovery ----
 
     @staticmethod
@@ -329,6 +381,16 @@ class WorldMixin:
         if inst["leader_user"] != user_id:  # the server validates every leader decision
             raise Forbidden("Only the party leader can do that")
         return inst
+
+    def set_party_leader(self, instance_id: uuid.UUID, user_id: uuid.UUID, character_id: uuid.UUID) -> None:
+        """The leader hands the party to another member of its roster, before it starts."""
+        with self.pool.connection() as conn:
+            inst = self._leader_instance(conn, instance_id, user_id)
+            if inst["status"] != "forming":
+                raise Conflict("The party has already started")
+            if conn.execute("select 1 from activity_roster where instance_id=%s and character_id=%s", (instance_id, character_id)).fetchone() is None:
+                raise NotFound("That character is not in this party")
+            conn.execute("update activity_instances set leader_character_id=%s where id=%s", (character_id, instance_id))
 
     def lock_and_start_instance(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         with self.pool.connection() as conn:

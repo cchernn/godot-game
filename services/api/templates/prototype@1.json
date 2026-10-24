@@ -3,7 +3,7 @@
   "id": "prototype",
   "version": 1,
   "start_node": "hollowmere",
-  "rules": {"discovery_scope": "character", "require_location": false},
+  "rules": {"discovery_scope": "character", "require_location": false, "reset_xp_after_battle": true},
   "nodes": [
     {"id": "hollowmere", "name": "Hollowmere", "kind": "settlement", "initially_visible": true},
     {"id": "blackwood", "name": "The Blackwood", "kind": "wilderness", "initially_visible": true},

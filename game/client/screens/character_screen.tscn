@@ -11,10 +11,100 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="CharacterLabel" type="Label" parent="."]
+[node name="CharacterTabs" type="TabContainer" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 2
+current_tab = 0
+
+[node name="Overview" type="VBoxContainer" parent="CharacterTabs"]
+layout_mode = 2
+theme_override_constants/separation = 6
+metadata/_tab_index = 0
+
+[node name="CharacterLabel" type="Label" parent="CharacterTabs/Overview"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
+
+[node name="XpLabel" type="Label" parent="CharacterTabs/Overview"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="StatsLabel" type="Label" parent="CharacterTabs/Overview"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="SkillsTitle" type="Label" parent="CharacterTabs/Overview"]
+layout_mode = 2
+text = "Skills"
+
+[node name="SkillsList" type="ItemList" parent="CharacterTabs/Overview"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 130)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RetireLabel" type="Label" parent="CharacterTabs/Overview"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Retire this character for good. Type its name to confirm; you can then create a new one."
+
+[node name="RetireRow" type="HBoxContainer" parent="CharacterTabs/Overview"]
+layout_mode = 2
+
+[node name="RetireConfirmEdit" type="LineEdit" parent="CharacterTabs/Overview/RetireRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Type the character's name"
+
+[node name="RetireButton" type="Button" parent="CharacterTabs/Overview/RetireRow"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Retire"
+
+[node name="Battles" type="VBoxContainer" parent="CharacterTabs"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+metadata/_tab_index = 1
+
+[node name="BattlesLabel" type="Label" parent="CharacterTabs/Battles"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Recent battles"
+
+[node name="BattlesList" type="ItemList" parent="CharacterTabs/Battles"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Characters" type="VBoxContainer" parent="CharacterTabs"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+metadata/_tab_index = 2
+
+[node name="RosterTitle" type="Label" parent="CharacterTabs/Characters"]
+layout_mode = 2
+text = "Characters in this world"
+
+[node name="RosterList" type="ItemList" parent="CharacterTabs/Characters"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FallenTitle" type="Label" parent="CharacterTabs/Characters"]
+layout_mode = 2
+text = "Fallen characters"
+
+[node name="FallenList" type="ItemList" parent="CharacterTabs/Characters"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
 
 [node name="CharacterBackButton" type="Button" parent="."]
 unique_name_in_owner = true

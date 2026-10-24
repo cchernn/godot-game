@@ -1,7 +1,7 @@
 """Drives the deployed web client in headless Chromium (one browser per player) and saves screenshots to /out.
 The UI is drawn on a canvas, so interaction is by coordinates; screenshots show each screen.
 Env: HOST_EMAIL/HOST_PASSWORD (existing host account), TESTER_EMAIL/TESTER_PASSWORD (signs up in the page),
-STAGE (party | pending), URL."""
+STAGE (party | pending | tour), URL, CLICKS (tour: "x,y,label;x,y,label")."""
 import os, time
 from playwright.sync_api import sync_playwright
 
@@ -59,13 +59,27 @@ def main() -> None:
                 party_flow(b)
             elif STAGE == "pending":
                 pending_flow(b)
+            elif STAGE == "tour":
+                tour(b)
             else:
-                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending)")
+                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | tour)")
         finally:
             with open(f"{OUT}/console.log", "w") as f:
                 f.write("\n".join(LOGS))
             print("\n".join(l for l in LOGS if "pageerror" in l)[:1500])
             b.close()
+
+
+def tour(b):
+    """The host signs in, opens Test World and clicks through CLICKS ("x,y,label;..."), with a screenshot after each.
+    For looking at screens without a scripted flow; the first two clicks should pick the world."""
+    host = Player(b, "host")
+    host.sign_in(os.environ["HOST_EMAIL"], os.environ["HOST_PASSWORD"])
+    host.shot("00_worlds")
+    for i, step in enumerate(filter(None, os.environ.get("CLICKS", "").split(";")), 1):
+        x, y, label = step.split(",")
+        host.click(int(x), int(y), wait=3)
+        host.shot(f"{i:02d}_{label}")
 
 
 def party_flow(b):

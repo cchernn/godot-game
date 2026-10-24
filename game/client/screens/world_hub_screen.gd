@@ -10,7 +10,6 @@ signal settings_pressed
 ## Open your party's lobby, or rejoin its battle if it has started.
 signal resume_pressed
 signal switch_world_pressed
-signal sign_out_pressed
 
 @onready var _world: Label = %HubWorldLabel
 @onready var _character: Label = %HubCharacterLabel
@@ -26,7 +25,6 @@ func _ready() -> void:
 	%SettingsButton.pressed.connect(func() -> void: settings_pressed.emit())
 	_resume.pressed.connect(func() -> void: resume_pressed.emit())
 	%SwitchWorldButton.pressed.connect(func() -> void: switch_world_pressed.emit())
-	%HubSignOutButton.pressed.connect(func() -> void: sign_out_pressed.emit())
 
 
 ## Resets the hub while its details load.

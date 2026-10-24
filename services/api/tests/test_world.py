@@ -500,3 +500,114 @@ def test_available_worlds_lists_every_world_with_my_standing(client):
     assert [x["is_host"] for x in mine if x["name"] == "Bravo"] == [True]
     assert client.get("/worlds/available").status_code == 401
     assert client.get("/worlds", headers=auth(tok)).json()[0]["name"] == "Alpha", "/worlds still lists only my worlds"
+
+
+# ---------- world management: members, rename, delete ----------
+
+def test_host_lists_members_and_renames_the_world(client):
+    w, host, _ = make_world(client, "Old")
+    tok, uid = join(client, w["id"], host)
+    char(client, w["id"], tok, name="Tessa")
+    m = client.get(f"/worlds/{w['id']}/members", headers=auth(host)).json()
+    assert [x["role"] for x in m] == ["host", "member"]
+    assert m[1]["user_id"] == uid and m[1]["character_name"] == "Tessa"
+    assert client.get(f"/worlds/{w['id']}/members", headers=auth(tok)).status_code == 403
+    assert client.post(f"/worlds/{w['id']}/rename", json={"name": "New"}, headers=auth(tok)).status_code == 403
+    assert client.post(f"/worlds/{w['id']}/rename", json={"name": ""}, headers=auth(host)).status_code == 422
+    assert client.post(f"/worlds/{w['id']}/rename", json={"name": "New"}, headers=auth(host)).json()["name"] == "New"
+    assert client.get("/worlds", headers=auth(host)).json()[0]["name"] == "New"
+    client.post(f"/worlds/{w['id']}/members/{uid}/remove", headers=auth(host))
+    assert len(client.get(f"/worlds/{w['id']}/members", headers=auth(host)).json()) == 1
+
+
+def test_deleting_a_world_is_permanent_and_guarded(client, pool):
+    w, host, _ = make_world(client, "Doomed")
+    tok, _uid = join(client, w["id"], host)
+    char(client, w["id"], host, name="Aldric")
+    char(client, w["id"], tok, name="Tessa")
+    wid = w["id"]
+    body = lambda n: {"confirm_name": n}
+    assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(tok)).status_code == 403
+    assert client.post(f"/worlds/{wid}/delete", json=body("doomed"), headers=auth(host)).status_code == 422
+    p = new_party(client, wid, host, "training_skirmish")
+    assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(host)).status_code == 409, "live party blocks it"
+    client.post(f"/instances/{p}/leave", headers=auth(host))
+    assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(host)).status_code == 204
+    assert client.get("/worlds", headers=auth(host)).json() == []
+    assert client.get(f"/worlds/{wid}/membership", headers=auth(tok)).status_code == 404
+    with pool.connection() as c:
+        for t in ("characters", "activity_instances", "world_members", "combat_results"):
+            assert c.execute(f"select count(*) as n from {t} where world_id=%s", (wid,)).fetchone()["n"] == 0
+
+
+# ---------- character page: roster, history, retirement, XP reset, party leadership ----------
+
+def result(wid, cid, key, outcome="players_win", xp=100):
+    return {"idempotency_key": key, "world_id": wid, "outcome": outcome, "rounds": 3,
+            "participants": [{"character_id": cid, "outcome": "survived", "xp": xp}]}
+
+
+def test_world_characters_show_owners_and_fallen_ones(client):
+    w, host, _ = make_world(client)
+    tok, _uid = join(client, w["id"], host)
+    char(client, w["id"], host, "Aldric")
+    old = char(client, w["id"], tok, "Tessa")
+    client.post(f"/characters/{old['id']}/retire", headers=auth(tok))
+    char(client, w["id"], tok, "Tessa II", "rogue")
+    rows = client.get(f"/worlds/{w['id']}/characters", headers=auth(tok)).json()
+    assert [(r["name"], r["status"], r["mine"]) for r in rows] == [
+        ("Aldric", "active", False), ("Tessa II", "active", True), ("Tessa", "retired", True)]
+    assert rows[0]["owner"] == "Host" and rows[1]["owner"].startswith("Player ")
+    mail_tok, _ = token_for(email="mira.k@example.com")  # the join label is the email; only the part before @ is shown
+    rid = client.post(f"/worlds/{w['id']}/requests", headers=auth(mail_tok)).json()["id"]
+    client.post(f"/worlds/{w['id']}/requests/{rid}/approve", headers=auth(host))
+    char(client, w["id"], mail_tok, "Mira")
+    owners = {r["name"]: r["owner"] for r in client.get(f"/worlds/{w['id']}/characters", headers=auth(host)).json()}
+    assert owners["Mira"] == "mira.k"
+    assert client.get(f"/worlds/{w['id']}/characters", headers=auth(new_user()[0])).status_code == 403
+
+
+def test_battle_history_and_the_xp_reset_rule(client):
+    w, host, _ = make_world(client)
+    c = char(client, w["id"], host)
+    for i in range(7):
+        assert client.post("/internal/combat-results", json=result(w["id"], c["id"], f"battle-{i}"), headers=SERVER).status_code == 200
+    me = client.get(f"/worlds/{w['id']}/characters/me", headers=auth(host)).json()
+    assert me["xp"] == 0 and me["level"] == 1, "the prototype template resets XP after every battle"
+    h = client.get(f"/worlds/{w['id']}/characters/me/battles", headers=auth(host)).json()
+    assert len(h) == 5 and h[0]["xp_awarded"] == 100 and h[0]["result"] == "players_win" and h[0]["outcome"] == "survived"
+    assert client.get(f"/worlds/{w['id']}/characters/me/battles", headers=auth(new_user()[0])).status_code in (403, 404)
+
+
+def test_a_character_in_a_live_party_cannot_retire(client):
+    w, host, _ = make_world(client)
+    c = char(client, w["id"], host)
+    p = new_party(client, w["id"], host, "training_skirmish")
+    assert client.post(f"/characters/{c['id']}/retire", headers=auth(host)).status_code == 409
+    client.post(f"/instances/{p}/leave", headers=auth(host))
+    assert client.post(f"/characters/{c['id']}/retire", headers=auth(host)).status_code == 200
+
+
+def test_world_info_is_for_the_host(client):
+    w, host, _ = make_world(client, "Info")
+    tok, _uid = join(client, w["id"], host)
+    char(client, w["id"], host)
+    new_party(client, w["id"], host, "training_skirmish")
+    i = client.get(f"/worlds/{w['id']}/info", headers=auth(host)).json()
+    assert (i["name"], i["template_id"], i["definition_version"], i["members"], i["characters"], i["live_parties"], i["battles"]) \
+        == ("Info", "prototype", 1, 2, 1, 1, 0)
+    assert client.get(f"/worlds/{w['id']}/info", headers=auth(tok)).status_code == 403
+
+
+def test_leader_hands_the_party_to_a_member(client, pool):
+    w, [t1, t2, t3], [c1, c2, c3] = party(client, pool, 3)
+    iid = new_party(client, w["id"], t1, "training_skirmish")
+    join_party(client, iid, t1, t2)
+    body = lambda c: {"character_id": c["id"]}
+    assert client.post(f"/instances/{iid}/leader", json=body(c2), headers=auth(t2)).status_code == 403, "only the leader"
+    assert client.post(f"/instances/{iid}/leader", json=body(c3), headers=auth(t1)).status_code == 404, "must be on the roster"
+    assert client.post(f"/instances/{iid}/leader", json=body(c2), headers=auth(t1)).status_code == 204
+    assert client.get(f"/instances/{iid}", headers=auth(t1)).json()["leader"]["id"] == c2["id"]
+    assert client.post(f"/instances/{iid}/leader", json=body(c1), headers=auth(t1)).status_code == 403, "no longer the leader"
+    client.post(f"/instances/{iid}/start", headers=auth(t2))
+    assert client.post(f"/instances/{iid}/leader", json=body(c1), headers=auth(t2)).status_code == 409, "not after the start"

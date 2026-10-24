@@ -52,8 +52,3 @@ text = "Settings"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Choose another world"
-
-[node name="HubSignOutButton" type="Button" parent="."]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Sign out"

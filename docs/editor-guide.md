@@ -129,3 +129,6 @@ networking and the API stay in code. The dropdown choices for origin and class o
 ## `tools/generate_content.gd`
 The one-time scaffold that created these files. It never overwrites existing files; `-- --force` regenerates everything and
 **discards your edits**. You should not need it again.
+
+The Character page lists the stats and skills of the character's class from the `.tres` files in `game/content/stats/classes`; change them in the Inspector and the page follows.
+Settings (`settings_screen.tscn`) holds the account block only (email, change password, sign out); add other options there when the features exist.

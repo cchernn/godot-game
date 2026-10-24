@@ -54,7 +54,7 @@ Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `u
 - **Templates** (`services/api/templates/<id>@<version>.json`, validated by `app/templates.py`): immutable versioned blueprints (nodes, routes, activities, rules). A world pins `(template_id, definition_version)` at creation and is initialized exactly once: initial visibility and one-time-activity state are copied into rows. Editing/adding a template version never touches existing worlds; moving a world to a new version would need an explicit migration (not built). Content is placeholder.
 - **Graph & discovery:** routes are first-class with stable ids; several routes may join the same nodes. Discovery has two scopes, `character` and `world`, chosen per discovery event; a character sees default-visible ∪ world-scope ∪ their own discoveries.
 - **Revision:** `worlds.state_revision` increases by exactly 1 in each successful transaction that changes shared world state (world-scope reveal that was new, completion of a one-time activity or a completion that reveals something new). Character-scope discoveries, no-op reveals, replays and failed transactions do not advance it.
-- **Membership:** request → host approve/reject; approval grants access only (no character). Host may remove members (never the host); removal sets `status='removed'`, keeping all data; reapproval restores the same row and character.
+- **Membership:** request → host approve/reject; approval grants access only (no character). Host may remove members (never the host); removal sets `status='removed'`, keeping all data; reapproval restores the same row and character. The host can also list members (`GET /worlds/{id}/members`), rename the world (`POST .../rename`) and delete it for good (`POST .../delete` with `confirm_name` equal to the world's name; refused with 409 while a party is forming or active). Deletion removes members, characters, parties, discoveries and combat history, and cannot be undone. The World management screen has all of these. `GET /worlds/{id}/info` gives the host read-only facts (template and version, created date, member, character, live-party and battle counts).
 - **Activities:** each node has a board (the overview lists activities at discovered nodes). Starting requires membership, a character and a discovered node; physical presence (`characters.node_id`) is required only when the template sets `rules.require_location`. A second concurrent major instance is prevented by a partial unique index (atomic reservation, tested under concurrency); minor activities may run in several parties at once. Roster: join requests decided by the leader, leader-only start/cancel, capacity per activity, locked after start, no voluntary leaving after start, leader handover (see Parties below).
 - **Completion:** `POST /internal/instances/{id}/complete` (service key) atomically marks the instance finished, claims the one-time activity (first completion wins), applies `on_complete` reveals and bumps the revision once. Replays return the stored outcome. The Godot server admits only rostered characters of an active party, completes the instance on victory and cancels it otherwise.
 - **Not built (needs presence/travel):** travel and the campaign clock, host succession/expiry (depends on who is connected, so it belongs to the Godot session layer), ending a removed member's live session immediately (the API only blocks the next verification), retirement blocking during travel/activities, template migrations.
@@ -86,6 +86,17 @@ A **party** is an activity instance (a session of an activity) with a leader and
   `tests/unit/test_stats.gd` checks every activity's encounter exists and has enough seats.
 - Joining a world: `GET /worlds/{id}/membership` returns the user's standing (member / pending / rejected / removed / none) and whether they are the
   host; non-members request access, the host approves or rejects. Requests carry the requester's email (display label only).
+
+## Characters
+
+- One active character per player per world. `GET /worlds/{id}/characters` lists every character in the world (active, then retired) with its
+  owner, which is the owner's join label (their email) or `Host` / a short id; `GET /worlds/{id}/characters/me/battles` is the caller's last 5 battles.
+- The Character page (`character_screen.tscn`, tabs: Overview, Battles, Characters) reads stats and skills from the class resource in
+  `game/content/stats/classes`, so editing the resource changes the page. Retiring needs the character's name typed and is refused (409) while the
+  character is on a forming or active party; the retired character stays in the world's "Fallen" list and the player can create a new one.
+- Levels do not move yet (all level 1). The prototype template sets the world rule `reset_xp_after_battle` (PROVISIONAL, testing aid): the award is
+  recorded in the battle history, then the character's XP goes back to 0. Remove the rule from the template to keep XP.
+- A party leader can hand the party to another roster member before it starts (`POST /instances/{id}/leader`).
 
 ## Worlds and rooms
 - After sign-in the client always shows a world picker (`GET /worlds/available`: every world, its player count and the caller's standing; no member identities).

@@ -10,9 +10,30 @@ script = ExtResource("1")
 layout_mode = 2
 text = "Settings"
 
-[node name="SettingsNote" type="Label" parent="."]
+[node name="AccountTitle" type="Label" parent="."]
 layout_mode = 2
-text = "Coming soon."
+text = "Account"
+
+[node name="AccountEmailLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="NewPasswordEdit" type="LineEdit" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "New password (at least 6 characters)"
+secret = true
+
+[node name="ChangePasswordButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Change password"
+
+[node name="SettingsSignOutButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Sign out"
 
 [node name="SettingsBackButton" type="Button" parent="."]
 unique_name_in_owner = true

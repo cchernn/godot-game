@@ -85,9 +85,41 @@ class Repository(WorldMixin):
                 raise NotFound("Character not found")
             if r["status"] == "retired":
                 return _row(r)
-            # TODO(phase 6): refuse while committed to travel or an active activity.
+            if self._live_party_of(conn, r["id"]):
+                raise Conflict("Leave your party before retiring this character")
+            # TODO(phase 6): refuse while committed to travel.
             r = conn.execute("update characters set status='retired', retired_at=now() where id=%s returning *", (character_id,)).fetchone()
         return _row(r)
+
+    def list_characters(self, world_id: uuid.UUID, user_id: uuid.UUID) -> list[dict]:
+        """Every character in the world, active first, with the account that owns it (the join label, else a short id)."""
+        if not self.is_member(world_id, user_id):
+            raise Forbidden("Not a member of this world")
+        with self.pool.connection() as conn:
+            rows = conn.execute(
+                "select c.id, c.user_id, c.name, c.class, c.origin, c.level, c.status, c.retired_at, m.role, "
+                "  (select r.requester_label from world_join_requests r where r.world_id = c.world_id and r.user_id = c.user_id "
+                "     and r.requester_label is not null order by r.created_at desc limit 1) as label "
+                "from characters c join world_members m on m.world_id = c.world_id and m.user_id = c.user_id "
+                "where c.world_id = %s order by (c.status = 'active') desc, c.created_at", (world_id,)).fetchall()
+        out = []
+        for r in rows:
+            owner = r["label"].split("@")[0] if r["label"] else ("Host" if r["role"] == "host" else "Player %s" % str(r["user_id"])[:8])
+            out.append({"id": str(r["id"]), "name": r["name"], "class": r["class"], "origin": r["origin"], "level": r["level"],
+                        "status": r["status"], "owner": owner, "mine": r["user_id"] == user_id})
+        return out
+
+    def recent_battles(self, world_id: uuid.UUID, user_id: uuid.UUID, limit: int = 5) -> list[dict]:
+        """The caller's active character's latest battles, newest first."""
+        c = self.active_character(world_id, user_id)
+        if c is None:
+            raise NotFound("No active character")
+        with self.pool.connection() as conn:
+            rows = conn.execute(
+                "select r.created_at, r.outcome as result, r.rounds, p.outcome, p.xp_awarded "
+                "from combat_result_participants p join combat_results r on r.id = p.result_id "
+                "where p.character_id = %s order by r.created_at desc limit %s", (c["id"], limit)).fetchall()
+        return [_row(r) for r in rows]
 
     # ---- combat results ----
 
@@ -101,6 +133,7 @@ class Repository(WorldMixin):
         ids = [p["character_id"] for p in participants]
         if len(set(ids)) != len(ids):
             raise Invalid("Duplicate participant")
+        reset_xp = self.definition(world_id).rules.get("reset_xp_after_battle", False)
         with self.pool.connection() as conn:
             res = conn.execute(
                 "insert into combat_results (idempotency_key, payload_hash, world_id, outcome, rounds) "
@@ -119,4 +152,6 @@ class Repository(WorldMixin):
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
                 conn.execute("insert into combat_result_participants (result_id, character_id, outcome, xp_awarded) values (%s,%s,%s,%s)",
                              (res["id"], p["character_id"], p["outcome"], p["xp"]))
+                if reset_xp:  # testing aid: the award stays in the history, the character starts the next battle at 0
+                    conn.execute("update characters set xp = 0 where id=%s", (p["character_id"],))
         return _row(res), False

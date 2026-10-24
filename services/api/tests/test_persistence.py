@@ -66,7 +66,8 @@ def xp_of(client, world_id, tok):
     return client.get(f"/worlds/{world_id}/characters/me", headers=auth(tok)).json()["xp"]
 
 
-def test_combat_result_commit_is_atomic_and_idempotent(client, pool):
+def test_combat_result_commit_is_atomic_and_idempotent(keep_xp_client, pool):
+    client = keep_xp_client
     w, [(a, _), (b, b_id)] = setup_world(client)
     add_member(pool, w["id"], b_id)
     ca = make_char(client, w["id"], a).json()["id"]
@@ -102,7 +103,8 @@ def test_retired_characters_cannot_receive_results(client):
     assert client.post("/internal/combat-results", json=result_body(w["id"], [ca]), headers=SERVER).status_code == 422
 
 
-def test_restart_recovery_data_survives_new_connection_pool(client, pool, pg):
+def test_restart_recovery_data_survives_new_connection_pool(keep_xp_client, pool, pg):
+    client = keep_xp_client
     from app.db import make_pool
     w, [(a, _), _] = setup_world(client)
     ca = make_char(client, w["id"], a).json()["id"]

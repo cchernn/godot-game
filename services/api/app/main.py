@@ -21,6 +21,18 @@ class WorldIn(BaseModel):
     template_id: str = Field(default="prototype", max_length=64)
 
 
+class LeaderIn(BaseModel):
+    character_id: uuid.UUID
+
+
+class WorldRenameIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+
+
+class WorldDeleteIn(BaseModel):
+    confirm_name: str
+
+
 class RevealIn(BaseModel):
     kind: Literal["node", "route"]
     target_id: str = Field(max_length=64)
@@ -148,6 +160,14 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
             raise HTTPException(404, "No active character")
         return c
 
+    @app.get("/worlds/{world_id}/characters")
+    def world_characters(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_characters(world_id, user.user_id)
+
+    @app.get("/worlds/{world_id}/characters/me/battles")
+    def my_battles(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.recent_battles(world_id, user.user_id)
+
     @app.post("/characters/{character_id}/retire")
     def retire(character_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
         return r.retire_character(character_id, user.user_id)
@@ -203,6 +223,24 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
                       r: Repository = Depends(repo)) -> None:
         r.remove_member(world_id, user.user_id, member_id)
 
+    @app.get("/worlds/{world_id}/members")
+    def members(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_members(world_id, user.user_id)
+
+    @app.get("/worlds/{world_id}/info")
+    def world_info(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.world_info(world_id, user.user_id)
+
+    @app.post("/worlds/{world_id}/rename")
+    def rename_world(world_id: uuid.UUID, body: WorldRenameIn, user: Identity = Depends(current_user),
+                     r: Repository = Depends(repo)) -> dict:
+        return r.rename_world(world_id, user.user_id, body.name)
+
+    @app.post("/worlds/{world_id}/delete", status_code=204)
+    def delete_world(world_id: uuid.UUID, body: WorldDeleteIn, user: Identity = Depends(current_user),
+                     r: Repository = Depends(repo)) -> None:
+        r.delete_world(world_id, user.user_id, body.confirm_name)
+
     # ---- world view & activities ----
 
     @app.get("/worlds/{world_id}/overview")
@@ -238,6 +276,10 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def decide_party_request(instance_id: uuid.UUID, request_id: uuid.UUID, decision: Literal["approve", "reject"],
                              user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
         return r.decide_party_request(instance_id, user.user_id, request_id, decision == "approve")
+
+    @app.post("/instances/{instance_id}/leader", status_code=204)
+    def set_leader(instance_id: uuid.UUID, body: LeaderIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.set_party_leader(instance_id, user.user_id, body.character_id)
 
     @app.post("/instances/{instance_id}/leave", status_code=204)
     def leave_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:

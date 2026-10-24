@@ -102,10 +102,13 @@ try:
     time.sleep(2)  # a duplicate commit would show up by now
     with pool.connection() as c:
         res = c.execute("select * from combat_results").fetchone()
-        xps = {r["name"]: r["xp"] for r in c.execute("select name, xp from characters where name <> 'Outsider'").fetchall()}
+        xps = {r["name"]: r["xp_awarded"] for r in c.execute(
+            "select ch.name, p.xp_awarded from combat_result_participants p join characters ch on ch.id = p.character_id").fetchall()}
+        kept = c.execute("select count(*) n from characters where xp <> 0").fetchone()["n"]
         n_part = c.execute("select count(*) n from combat_result_participants").fetchone()["n"]
     expected = 20 + (80 if res["outcome"] == "players_win" else 0)
-    if n_part != 3 or set(xps.values()) != {expected}:
+    # The prototype template resets XP after every battle, so the award lives in the history and the characters sit at 0.
+    if n_part != 3 or set(xps.values()) != {expected} or kept != 0:
         fail(f"unexpected persistence state: outcome={res['outcome']} participants={n_part} xp={xps}")
     bad_log = (tmp / "bad.log").read_text()
     if "rejected: Sign-in failed" not in bad_log:
