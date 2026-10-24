@@ -58,8 +58,6 @@ try:
     users = [httpx.post(api + "/dev/guest").json() for _ in range(4)]  # 3 raid members + 1 outsider
     h = lambda u: {"Authorization": "Bearer " + u["access_token"]}  # noqa: E731
     world = httpx.post(api + "/worlds", json={"name": "E2E"}, headers=h(users[0])).json()
-    with pool.connection() as c:  # membership approval flow arrives in Phase 6
-        pass
     for u in users[1:]:  # join through the real request/approval flow
         rid = httpx.post(f"{api}/worlds/{world['id']}/requests", headers=h(u)).json()["id"]
         assert httpx.post(f"{api}/worlds/{world['id']}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
@@ -73,24 +71,23 @@ try:
     svc = {"Authorization": "Bearer " + SERVER_KEY}
     assert httpx.post(f"{api}/internal/worlds/{world['id']}/reveal", headers=svc,
                       json={"kind": "node", "target_id": "ashen_keep", "scope": "world"}).json()["revision"] == 1
-    with pool.connection() as c:
-        c.execute("update characters set node_id='ashen_keep' where world_id=%s", (world["id"],))
     inst = httpx.post(f"{api}/worlds/{world['id']}/activities/ashen_keep_siege/instances", headers=h(users[0])).json()
-    for u in users[1:3]:
-        assert httpx.post(f"{api}/instances/{inst['id']}/join", headers=h(u)).status_code == 200
+    for u in users[1:3]:  # the party leader lets the others in
+        rid = httpx.post(f"{api}/instances/{inst['id']}/requests", headers=h(u)).json()["id"]
+        assert httpx.post(f"{api}/instances/{inst['id']}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
     assert httpx.post(f"{api}/instances/{inst['id']}/start", headers=h(users[0])).json()["status"] == "active"
 
-    start(["scripts/run_server.sh", f"--port={GAME_PORT}", "--players=3", "--seed=3", f"--api-url={api}",
-           f"--world-id={world['id']}", f"--instance-id={inst['id']}", "--set=combat.beat_delay_ms=30", "--set=combat.planning_timeout_seconds=20"],
+    start(["scripts/run_server.sh", f"--port={GAME_PORT}", "--seed=3", f"--api-url={api}",
+           "--set=combat.beat_delay_ms=30", "--set=combat.planning_timeout_seconds=20"],
           env={"GAME_API_SERVER_KEY": SERVER_KEY}, log="server")
     time.sleep(4)
     outsider = start(["scripts/godot.sh", "--headless", "--path", ".", "res://game/client/bot_main.tscn", "--",
-                      f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=outsider", f"--token={users[3]['access_token']}", f"--world-id={world['id']}"], log="outsider")
+                      f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=outsider", f"--token={users[3]['access_token']}", f"--world-id={world['id']}", f"--instance-id={inst['id']}"], log="outsider")
     bots = [start(["scripts/godot.sh", "--headless", "--path", ".", "res://game/client/bot_main.tscn", "--",
-                   f"--url=ws://127.0.0.1:{GAME_PORT}", f"--name=ignored{i}", f"--token={u['access_token']}", f"--world-id={world['id']}"], log=f"bot{i}")
+                   f"--url=ws://127.0.0.1:{GAME_PORT}", f"--name=ignored{i}", f"--token={u['access_token']}", f"--world-id={world['id']}", f"--instance-id={inst['id']}"], log=f"bot{i}")
             for i, u in enumerate(users[:3])]
     bad = start(["scripts/godot.sh", "--headless", "--path", ".", "res://game/client/bot_main.tscn", "--",
-                 f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=mallory", "--token=not.a.jwt", f"--world-id={world['id']}"], log="bad")
+                 f"--url=ws://127.0.0.1:{GAME_PORT}", "--name=mallory", "--token=not.a.jwt", f"--world-id={world['id']}", f"--instance-id={inst['id']}"], log="bad")
 
     for b in bots:
         b.wait(timeout=150)
@@ -116,7 +113,7 @@ try:
     srv = (tmp / "server.log").read_text()
     if "Aldric disconnected" not in srv:
         fail("server did not use persisted character names:\n" + srv)
-    if "rejected: You are not on this activity's roster" not in (tmp / "outsider.log").read_text():
+    if "not on this party's roster" not in (tmp / "outsider.log").read_text():
         fail("a character outside the roster was admitted")
     time.sleep(1)
     with pool.connection() as c:

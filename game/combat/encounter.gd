@@ -11,6 +11,19 @@ static func definition() -> EncounterDef:
 	return load(DEFINITION) as EncounterDef
 
 
+## An encounter by id (a file in game/content/encounters), or null if the id is malformed or has no such file.
+## Ids come from the API's activity definitions; this refuses anything that is not a plain name.
+static func load_definition(id: String) -> EncounterDef:
+	var plain := id != ""
+	for ch in id:
+		if not (ch in "abcdefghijklmnopqrstuvwxyz0123456789_"):
+			plain = false
+	var path := "res://game/content/encounters/%s.tres" % id
+	if not plain or not ResourceLoader.exists(path):
+		return null
+	return load(path) as EncounterDef
+
+
 static func max_players() -> int:
 	return definition().max_players()
 

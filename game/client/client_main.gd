@@ -132,9 +132,10 @@ func _enter_account_mode(env: Dictionary) -> void:
 	account.setup(env)
 	connect_panel = account
 	connect_status = account.status
-	account.entered.connect(func(server_url: String, token: String, display_name: String, world_id: String) -> void:
+	account.entered.connect(func(server_url: String, token: String, display_name: String, world_id: String, instance_id: String) -> void:
 		net.access_token = token
 		net.world_id = world_id
+		net.instance_id = instance_id
 		net.start(server_url, display_name))
 	account.token_refreshed.connect(func(token: String) -> void: net.access_token = token)
 	account.backed_out.connect(func() -> void:

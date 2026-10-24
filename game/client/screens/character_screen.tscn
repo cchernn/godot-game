@@ -16,18 +16,7 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="EnterButton" type="Button" parent="."]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Enter battle"
-
-[node name="ManageRequestsButton" type="Button" parent="."]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Join requests"
-visible = false
-
 [node name="CharacterBackButton" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Choose another world"
+text = "Back"

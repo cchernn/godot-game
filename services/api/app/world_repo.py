@@ -180,19 +180,30 @@ class WorldMixin:
         routes = [{k: r[k] for k in ("id", "from", "to", "travel_days")} for r in d.routes.values() if ("route", r["id"]) in vis]
         visible_nodes = {n["id"] for n in nodes}
         board = [{"id": a["id"], "node": a["node"], "name": a["name"], "kind": a["kind"], "one_time": a.get("one_time", False),
-                  "available": state.get(a["id"], "available") == "available", "instance": live.get(a["id"])}
+                  "available": state.get(a["id"], "available") == "available", "max_players": a["max_players"], "instance": live.get(a["id"])}
                  for a in d.activities.values() if a["node"] in visible_nodes]
         return {"world": {"id": str(w["id"]), "name": w["name"], "template": f"{w['template_id']}@{w['definition_version']}",
                           "state_revision": w["state_revision"]},
                 "location": char["node_id"] if char else None, "nodes": nodes, "routes": routes, "activities": board}
 
-    # ---- activity instances ----
+    # ---- activity instances (a "party" is an instance with a leader and a roster) ----
 
     def _char_for(self, conn, world_id, user_id) -> dict:
-        c = conn.execute("select * from characters where world_id=%s and user_id=%s and status='active'", (world_id, user_id)).fetchone()
+        c = conn.execute("select * from characters where world_id=%s and user_id=%s and status='active' for update", (world_id, user_id)).fetchone()
         if c is None:
             raise Forbidden("You need an active character in this world")
         return c
+
+    @staticmethod
+    def _live_party_of(conn, character_id) -> dict | None:
+        """The forming or active party a character is on, if any. A character is on at most one."""
+        return conn.execute("select i.* from activity_instances i join activity_roster r on r.instance_id = i.id "
+                            "where r.character_id=%s and i.status in ('forming','active')", (character_id,)).fetchone()
+
+    def _check_presence(self, d: WorldDefinition, char: dict, act: dict) -> None:
+        """Physical presence matters only once the overworld exists: the template switches it on."""
+        if d.rules.get("require_location", True) and char["node_id"] != act["node"]:
+            raise Forbidden("You must be at the activity's location")
 
     def start_instance(self, world_id: uuid.UUID, user_id: uuid.UUID, activity_id: str) -> dict:
         if not self.is_member(world_id, user_id):
@@ -206,8 +217,9 @@ class WorldMixin:
                 char = self._char_for(conn, world_id, user_id)
                 if ("node", act["node"]) not in self._visible(conn, world_id, char["id"]):
                     raise Forbidden("You have not discovered this location")
-                if char["node_id"] != act["node"]:
-                    raise Forbidden("You must be at the activity's location")
+                self._check_presence(d, char, act)
+                if self._live_party_of(conn, char["id"]):
+                    raise Conflict("You are already in a party")
                 done = conn.execute("select 1 from world_activities where world_id=%s and activity_id=%s and status='completed'",
                                     (world_id, activity_id)).fetchone()
                 if done:
@@ -216,88 +228,200 @@ class WorldMixin:
                                     (world_id, activity_id, act["kind"], char["id"])).fetchone()
                 conn.execute("insert into activity_roster (instance_id, character_id) values (%s,%s)", (inst["id"], char["id"]))
         except psycopg.errors.UniqueViolation as e:
-            name = e.diag.constraint_name or ""
-            raise Conflict("Another major instance is already active in this world" if name == "instance_one_live_major"
-                           else "This activity already has an active instance") from e
+            raise Conflict("Another major instance is already active in this world") from e
         return _row(inst)
 
-    def join_instance(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+    def _roster_size(self, conn, instance_id) -> int:
+        return conn.execute("select count(*) n from activity_roster where instance_id=%s", (instance_id,)).fetchone()["n"]
+
+    def request_party(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        """Asks the party's leader to let this player's character in."""
         with self.pool.connection() as conn:
             inst = conn.execute("select * from activity_instances where id=%s for update", (instance_id,)).fetchone()
             if inst is None:
-                raise NotFound("Instance not found")
+                raise NotFound("Party not found")
             if not self.is_member(inst["world_id"], user_id):
                 raise Forbidden("Not a member of this world")
             char = self._char_for(conn, inst["world_id"], user_id)
-            act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
             if inst["status"] != "forming":
-                raise Conflict("The roster is locked")
-            if char["node_id"] != act["node"]:
-                raise Forbidden("You must be at the activity's location")
-            n = conn.execute("select count(*) n from activity_roster where instance_id=%s", (instance_id,)).fetchone()["n"]
-            if n >= act.get("max_players", 8):
-                raise Conflict("The roster is full")
+                raise Conflict("This party has already started")
+            d = self.definition(inst["world_id"])
+            act = d.activities[inst["activity_id"]]
+            self._check_presence(d, char, act)
+            if conn.execute("select 1 from activity_roster where instance_id=%s and character_id=%s", (instance_id, char["id"])).fetchone():
+                raise Conflict("Already in this party")
+            if self._live_party_of(conn, char["id"]):
+                raise Conflict("You are already in a party")
+            if self._roster_size(conn, instance_id) >= act["max_players"]:
+                raise Conflict("The party is full")
             try:
-                conn.execute("insert into activity_roster (instance_id, character_id) values (%s,%s)", (instance_id, char["id"]))
+                req = conn.execute("insert into instance_join_requests (instance_id, character_id, user_id) values (%s,%s,%s) returning *",
+                                   (instance_id, char["id"], user_id)).fetchone()
             except psycopg.errors.UniqueViolation as e:
-                raise Conflict("Already on the roster") from e
-        return _row(inst)
+                raise Conflict("You have already asked to join this party") from e
+        return _row(req)
+
+    def cancel_party_request(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        with self.pool.connection() as conn:
+            done = conn.execute("update instance_join_requests set status='cancelled', decided_at=now() "
+                                "where instance_id=%s and user_id=%s and status='pending' returning id", (instance_id, user_id)).fetchone()
+        if done is None:
+            raise NotFound("No pending request")
+
+    def list_party_requests(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> list[dict]:
+        with self.pool.connection() as conn:
+            inst = self._leader_instance(conn, instance_id, user_id)
+            rows = conn.execute("select q.id, q.character_id, q.created_at, c.name, c.class from instance_join_requests q "
+                                "join characters c on c.id = q.character_id where q.instance_id=%s and q.status='pending' order by q.created_at",
+                                (inst["id"],)).fetchall()
+        return [_row(r) for r in rows]
+
+    def decide_party_request(self, instance_id: uuid.UUID, user_id: uuid.UUID, request_id: uuid.UUID, approve: bool) -> dict:
+        with self.pool.connection() as conn:
+            inst = self._leader_instance(conn, instance_id, user_id)
+            req = conn.execute("select * from instance_join_requests where id=%s and instance_id=%s for update", (request_id, instance_id)).fetchone()
+            if req is None:
+                raise NotFound("Request not found")
+            if req["status"] != "pending":
+                raise Conflict("Request already decided")
+            if approve:
+                if inst["status"] != "forming":
+                    raise Conflict("The party has already started")
+                act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
+                if self._roster_size(conn, instance_id) >= act["max_players"]:
+                    raise Conflict("The party is full")
+                if self._live_party_of(conn, req["character_id"]):
+                    raise Conflict("That player has joined another party")
+                conn.execute("insert into activity_roster (instance_id, character_id) values (%s,%s)", (instance_id, req["character_id"]))
+                # They are in now; any other pending asks of theirs no longer apply.
+                conn.execute("update instance_join_requests set status='cancelled', decided_at=now() "
+                             "where user_id=%s and status='pending' and id<>%s", (req["user_id"], request_id))
+            req = conn.execute("update instance_join_requests set status=%s, decided_at=now() where id=%s returning *",
+                               ("approved" if approve else "rejected", request_id)).fetchone()
+        return _row(req)
 
     def leave_instance(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        """Leaves a forming party. If the leader leaves, the longest-standing member takes over; an empty party is cancelled."""
         with self.pool.connection() as conn:
             inst = conn.execute("select * from activity_instances where id=%s for update", (instance_id,)).fetchone()
             if inst is None:
-                raise NotFound("Instance not found")
+                raise NotFound("Party not found")
             char = self._char_for(conn, inst["world_id"], user_id)
             if inst["status"] != "forming":
-                raise Conflict("Cannot leave after the instance has started")
+                raise Conflict("Cannot leave after the party has started")
+            gone = conn.execute("delete from activity_roster where instance_id=%s and character_id=%s returning character_id",
+                                (instance_id, char["id"])).fetchone()
+            if gone is None:
+                raise NotFound("You are not in this party")
             if inst["leader_character_id"] == char["id"]:
-                raise Conflict("The leader must cancel instead of leaving")
-            conn.execute("delete from activity_roster where instance_id=%s and character_id=%s", (instance_id, char["id"]))
+                nxt = conn.execute("select character_id from activity_roster where instance_id=%s order by joined_at limit 1", (instance_id,)).fetchone()
+                if nxt is None:
+                    conn.execute("update activity_instances set status='cancelled', ended_at=now() where id=%s", (instance_id,))
+                    conn.execute("update instance_join_requests set status='cancelled', decided_at=now() where instance_id=%s and status='pending'", (instance_id,))
+                else:
+                    conn.execute("update activity_instances set leader_character_id=%s where id=%s", (nxt["character_id"], instance_id))
 
     def _leader_instance(self, conn, instance_id, user_id) -> dict:
         inst = conn.execute("select i.*, c.user_id leader_user from activity_instances i join characters c on c.id = i.leader_character_id "
                             "where i.id=%s for update of i", (instance_id,)).fetchone()
         if inst is None:
-            raise NotFound("Instance not found")
+            raise NotFound("Party not found")
         if inst["leader_user"] != user_id:  # the server validates every leader decision
-            raise Forbidden("Only the activity leader can do that")
+            raise Forbidden("Only the party leader can do that")
         return inst
 
     def lock_and_start_instance(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         with self.pool.connection() as conn:
             inst = self._leader_instance(conn, instance_id, user_id)
             if inst["status"] != "forming":
-                raise Conflict("Instance already started or ended")
+                raise Conflict("Party already started or ended")
             inst = conn.execute("update activity_instances set status='active' where id=%s returning *", (instance_id,)).fetchone()
+            conn.execute("update instance_join_requests set status='cancelled', decided_at=now() where instance_id=%s and status='pending'", (instance_id,))
         return _row(inst)
 
     def cancel_instance(self, instance_id: uuid.UUID, user_id: uuid.UUID | None = None) -> dict:
-        """Leader cancels a forming instance; the game server (user_id=None) may cancel any live one."""
+        """Leader cancels a forming party; the game server (user_id=None) may cancel any live one."""
         with self.pool.connection() as conn:
             if user_id is not None:
                 inst = self._leader_instance(conn, instance_id, user_id)
                 if inst["status"] != "forming":
-                    raise Conflict("Only a forming instance can be cancelled by its leader")
+                    raise Conflict("Only a forming party can be cancelled by its leader")
             else:
                 inst = conn.execute("select * from activity_instances where id=%s for update", (instance_id,)).fetchone()
                 if inst is None:
-                    raise NotFound("Instance not found")
+                    raise NotFound("Party not found")
                 if inst["status"] == "cancelled":
                     return _row(inst)
                 if inst["status"] == "finished":
-                    raise Conflict("Instance already finished")
+                    raise Conflict("Party already finished")
             inst = conn.execute("update activity_instances set status='cancelled', ended_at=now() where id=%s returning *", (instance_id,)).fetchone()
+            conn.execute("update instance_join_requests set status='cancelled', decided_at=now() where instance_id=%s and status='pending'", (instance_id,))
         return _row(inst)
 
     def get_instance(self, instance_id: uuid.UUID) -> dict:
+        """For the game server: the party's state and roster, plus what its activity says to run."""
         with self.pool.connection() as conn:
             inst = conn.execute("select * from activity_instances where id=%s", (instance_id,)).fetchone()
             if inst is None:
-                raise NotFound("Instance not found")
-            roster = conn.execute("select c.id, c.user_id, c.name from activity_roster r join characters c on c.id=r.character_id "
+                raise NotFound("Party not found")
+            roster = conn.execute("select c.id, c.user_id, c.name, c.class from activity_roster r join characters c on c.id=r.character_id "
                                   "where r.instance_id=%s order by r.joined_at", (instance_id,)).fetchall()
-        return {**_row(inst), "roster": [_row(r) for r in roster]}
+        act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
+        return {**_row(inst), "roster": [_row(r) for r in roster], "encounter": act["encounter"],
+                "activity_name": act["name"], "max_players": act["max_players"]}
+
+    def party_seat(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        """Lets the game server check that this user's character is on an active party's roster."""
+        inst = self.get_instance(instance_id)
+        if inst["status"] != "active":
+            raise Conflict("This party's battle is not running" if inst["status"] == "forming" else "This party's battle has ended")
+        if str(user_id) not in {r["user_id"] for r in inst["roster"]}:
+            raise Forbidden("You are not on this party's roster")
+        return inst
+
+    # ---- party views for players ----
+
+    def _party_rows(self, conn, rows: list[dict], world_id, user_id) -> list[dict]:
+        if not rows:
+            return []
+        d = self.definition(world_id)
+        ids = [r["id"] for r in rows]
+        roster = conn.execute("select r.instance_id, c.id, c.user_id, c.name, c.class from activity_roster r join characters c on c.id=r.character_id "
+                              "where r.instance_id = any(%s) order by r.joined_at", (ids,)).fetchall()
+        asked = {r["instance_id"] for r in conn.execute("select instance_id from instance_join_requests where user_id=%s and status='pending'",
+                                                         (user_id,)).fetchall()}
+        out = []
+        for i in rows:
+            act = d.activities[i["activity_id"]]
+            members = [{"id": _s(m["id"]), "name": m["name"], "class": m["class"]} for m in roster if m["instance_id"] == i["id"]]
+            mine = [m for m in roster if m["instance_id"] == i["id"] and m["user_id"] == user_id]
+            if mine:
+                relation = "leader" if mine[0]["id"] == i["leader_character_id"] else "member"
+            else:
+                relation = "pending" if i["id"] in asked else "none"
+            leader = next((m for m in members if m["id"] == _s(i["leader_character_id"])), None)
+            out.append({"id": _s(i["id"]), "activity_id": i["activity_id"], "activity_name": act["name"], "kind": i["kind"],
+                        "status": i["status"], "max_players": act["max_players"], "leader": leader, "members": members,
+                        "relation": relation, "open": i["status"] == "forming" and len(members) < act["max_players"]})
+        return out
+
+    def list_parties(self, world_id: uuid.UUID, user_id: uuid.UUID) -> list[dict]:
+        """Every live party in the world, with the caller's relation to each (leader | member | pending | none)."""
+        if not self.is_member(world_id, user_id):
+            raise Forbidden("Not a member of this world")
+        with self.pool.connection() as conn:
+            rows = conn.execute("select * from activity_instances where world_id=%s and status in ('forming','active') order by created_at",
+                                (world_id,)).fetchall()
+            return self._party_rows(conn, rows, world_id, user_id)
+
+    def get_party(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        with self.pool.connection() as conn:
+            inst = conn.execute("select * from activity_instances where id=%s", (instance_id,)).fetchone()
+            if inst is None:
+                raise NotFound("Party not found")
+            if not self.is_member(inst["world_id"], user_id):
+                raise Forbidden("Not a member of this world")
+            return self._party_rows(conn, [inst], inst["world_id"], user_id)[0]
 
     def complete_instance(self, instance_id: uuid.UUID) -> tuple[dict, bool]:
         """Atomically finishes an active instance and applies its world changes. First completion of a

@@ -31,7 +31,7 @@ All in `game/shared/config/balance.json` (AP thresholds, movement bonus, beats p
 - **Tile-targeted attacks** hit only opposing combatants; no friendly fire.
 - **Simultaneous wipe** = draw (no tie rule specified).
 - **Fog:** hidden enemies are omitted from snapshots; events involving only hidden units are dropped; if a hidden unit acts on a visible one, it's shown as "Something unseen". Plans are never sent except to their owner.
-- **Disconnects:** committed plans stand; a not-Ready player gets their current valid queue at the timeout. With nobody connected, timers freeze and the 5‑minute monotonic grace period runs; after it the instance is destroyed. After a finished battle the same party restarts after 10 s (prototype convenience).
+- **Disconnects:** committed plans stand; a not-Ready player gets their current valid queue at the timeout. With nobody connected, timers freeze and the 5‑minute monotonic grace period runs; after it the party's battle is abandoned and the API cancels the party.
 - **Identity:** guests are accepted only when the server runs with `--env=local --allow-guests` (default env is `production`); reconnect uses a server-issued secret token, never a client-chosen id. Supabase auth replaces this in Phase 5.
 
 ### Not yet verified
@@ -55,24 +55,44 @@ Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `u
 - **Graph & discovery:** routes are first-class with stable ids; several routes may join the same nodes. Discovery has two scopes, `character` and `world`, chosen per discovery event; a character sees default-visible ∪ world-scope ∪ their own discoveries.
 - **Revision:** `worlds.state_revision` increases by exactly 1 in each successful transaction that changes shared world state (world-scope reveal that was new, completion of a one-time activity or a completion that reveals something new). Character-scope discoveries, no-op reveals, replays and failed transactions do not advance it.
 - **Membership:** request → host approve/reject; approval grants access only (no character). Host may remove members (never the host); removal sets `status='removed'`, keeping all data; reapproval restores the same row and character.
-- **Activities:** each node has a board (the overview lists activities at discovered nodes). Starting requires membership, a character, a discovered node and physical presence (`characters.node_id`). Duplicate instances and a second concurrent major instance are prevented by partial unique indexes (atomic reservation, tested under concurrency). Roster: leader-only start/cancel, capacity per activity, locked after start, no voluntary leaving after start.
-- **Completion:** `POST /internal/instances/{id}/complete` (service key) atomically marks the instance finished, claims the one-time activity (first completion wins), applies `on_complete` reveals and bumps the revision once. Replays return the stored outcome. The Godot server (`--instance-id=`) admits only rostered characters, completes the instance on victory and cancels it otherwise.
+- **Activities:** each node has a board (the overview lists activities at discovered nodes). Starting requires membership, a character and a discovered node; physical presence (`characters.node_id`) is required only when the template sets `rules.require_location`. A second concurrent major instance is prevented by a partial unique index (atomic reservation, tested under concurrency); minor activities may run in several parties at once. Roster: join requests decided by the leader, leader-only start/cancel, capacity per activity, locked after start, no voluntary leaving after start, leader handover (see Parties below).
+- **Completion:** `POST /internal/instances/{id}/complete` (service key) atomically marks the instance finished, claims the one-time activity (first completion wins), applies `on_complete` reveals and bumps the revision once. Replays return the stored outcome. The Godot server admits only rostered characters of an active party, completes the instance on victory and cancels it otherwise.
 - **Not built (needs presence/travel):** travel and the campaign clock, host succession/expiry (depends on who is connected, so it belongs to the Godot session layer), ending a removed member's live session immediately (the API only blocks the next verification), retirement blocking during travel/activities, template migrations.
 
-## Player flow and battle lifecycle (server)
-- The server keeps one party at a time. Players arriving in the lobby get `s_lobby` ({players, needed}); the battle starts when the party is full.
-- When a battle ends the server sends `s_result` ({outcome, rounds, xp, you, saved}) at once (saved=false) and again after the API stored the
-  result (saved=true). There is no automatic replay: players press Continue (disconnecting), and when the last one leaves the server resets to an
-  empty lobby. A player who reconnects to the result screen is sent the result again. After `RESULT_HOLD_MS` (120 s) any stragglers are removed.
+## Parties and the battle lifecycle
+A **party** is an activity instance (a session of an activity) with a leader and a roster. The API owns it; the battle server only runs it.
+- **Making a party:** a member with a character picks an activity (`POST /worlds/{id}/activities/{activity}/instances`) and becomes its leader. Several parties may
+  run the same activity at once (the one-live-major-instance-per-world reservation stays), and a character is on at most one live party. Whether the
+  character must be standing at the activity's location is the template rule `require_location` (off for now; it switches on with the overworld).
+- **Joining a party:** `POST /instances/{id}/requests`; the **leader** approves or rejects (`/instances/{id}/requests/{rid}/approve|reject`), the player can cancel
+  (`/requests/cancel`). Approval puts the character on the roster and withdraws their other pending asks. There is no direct join.
+- **Leaving:** a forming party can be left; if the leader leaves, the longest-standing member becomes leader, and the last one out cancels it.
+- **Starting:** the leader's `POST /instances/{id}/start` locks the roster (pending asks are withdrawn) and sets the party `active`. Members' lobbies notice on their
+  next refresh and connect to the battle server.
+- **Listing:** `GET /worlds/{id}/parties` returns every live party with its roster and the caller's relation to it (leader / member / pending / none).
+  `GET /instances/{id}` is one party (the party lobby polls it).
+- **The battle server** is told the world and the party in `c_hello`. The API (`/internal/auth/session` with `instance_id`) checks the character is on the
+  roster of an *active* party and returns the party and its activity's `encounter` id; the server loads `game/content/encounters/<id>.tres`, seats the
+  whole roster in roster order, and starts when everyone has arrived or after `lobby.gather_seconds` (a late or absent member keeps their seat and can still
+  join in, like a dropped player). Rooms are keyed by party; two parties never see each other. Guest play (local development) is one anonymous room that
+  starts at `lobby.players_required`.
+- **Reconnecting:** a party's seat belongs to the character, so a closed tab can return from the hub (**Return to battle**) while the party is active. If the
+  server restarted and lost the room, the next arrival builds a fresh room and battle for the same roster. If nobody comes back within the grace period the
+  server cancels the party.
+- **The end:** the server sends `s_result` ({outcome, rounds, xp, you, saved}) at once (saved=false) and again after the API stored the result (saved=true), and
+  completes the instance on victory (applying world changes) or cancels it otherwise. Players press Continue (disconnecting); when the last one leaves, the room
+  is dropped. A player who reconnects to the result screen is sent the result again. After `RESULT_HOLD_MS` (120 s) any stragglers are removed.
+- **Activities say what to run:** each activity in the world template names an `encounter` (a file in `game/content/encounters`) and a `max_players`.
+  `tests/unit/test_stats.gd` checks every activity's encounter exists and has enough seats.
 - Joining a world: `GET /worlds/{id}/membership` returns the user's standing (member / pending / rejected / removed / none) and whether they are the
   host; non-members request access, the host approves or rejects. Requests carry the requester's email (display label only).
 
 ## Worlds and rooms
 - After sign-in the client always shows a world picker (`GET /worlds/available`: every world, its player count and the caller's standing; no member identities).
-  Opening a world runs the membership flow (member -> character, otherwise request to join).
-- The battle server is not bound to a world. Each client names the world it is entering in `c_hello`; the server has the API confirm membership and the
-  character in that world, then places the player in that world's room (own lobby, battle, clocks, result). Rooms never mix players.
-  `--world-id` (or an activity instance's world) optionally restricts a server to one world. `scripts/e2e_worlds.py` runs two worlds at once on one server.
+  Opening a world runs the membership flow (member -> the world hub, otherwise request to join). The hub (parties, character, world management for the host,
+  settings) is the main menu; a player without a character is sent to the character creator from there.
+- The battle server is not bound to a world. `--world-id` optionally restricts a server to one world. `scripts/e2e_worlds.py` runs two parties in two worlds at
+  once on one server.
 
 ## Stats and encounters as resources
 Unit stats are `UnitTemplate` resources (`game/content/stats`), and an `EncounterDef` resource (`game/content/encounters/prototype.tres`) names the map, the party
@@ -91,5 +111,10 @@ Before a battle the client shows one screen at a time. Each screen (`game/client
 `CharacterCreator`) is a self-contained scene that only displays things and announces what the player did through signals; it never touches the network.
 `AccountFlow` (`game/client/account_flow.gd`) is the coordinator: it owns the Supabase session, every call to the API and the routing, listens to the
 screens' signals, and calls methods on the screens to tell them what to show. `ClientMain` owns the connection to the battle server and the battle UI,
-and talks to `AccountFlow` through its signals (`entered`, `backed_out`, `token_refreshed`) and `show_lobby` / `return_to_menu`. Adding a screen means a new
+and talks to `AccountFlow` through its signals (`entered(server, token, name, world, party)`, `backed_out`, `token_refreshed`) and `show_lobby` / `return_to_menu`. Adding a screen means a new
 scene + script, one instance in `account_flow.tscn`, one entry in `_screens`, and the signal connections (worked example in docs/guide/01-login-screen.md).
+
+The screens: `sign_in`, `world_picker`, `join` (ask to join a world), `world_hub` (the main menu), `character` (view), `character_creator`, `parties`
+(live parties; ask to join one or start your own), `create_party` (pick an activity), `party_lobby` (roster, the leader's requests and Start), `world_management`
+(the host's join requests), `settings` (placeholder) and `lobby` (waiting on the battle server for the party to arrive). `parties`, `party_lobby` and `join`
+refresh themselves on a `Timer` while visible. The parties list avoids full-screen assumptions: in the overworld it becomes a small in-game panel.

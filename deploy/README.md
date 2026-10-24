@@ -15,7 +15,7 @@ fetched during image builds (the first web build downloads ~1.3 GB of export tem
 
 ## Locally
 ```bash
-scripts/stack.sh init     # writes deploy/*/.env from services/api/.env and game/client/client_env.json (PLAYERS=3 for a bigger party)
+scripts/stack.sh init     # writes deploy/*/.env from services/api/.env and game/client/client_env.json
 scripts/stack.sh up       # build + start api, game, web   (up game  = just one)
 scripts/stack.sh ps | logs game | restart game | down
 ```

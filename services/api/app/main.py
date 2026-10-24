@@ -37,6 +37,7 @@ class CharacterIn(BaseModel):
 class SessionIn(BaseModel):
     token: str = Field(max_length=4096)
     world_id: uuid.UUID
+    instance_id: uuid.UUID | None = None  # set when entering a party's battle: the roster is checked too
 
 
 class ParticipantIn(BaseModel):
@@ -162,8 +163,14 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
             raise HTTPException(401, str(e)) from e
         if not r.is_member(body.world_id, ident.user_id):
             raise HTTPException(403, "Not a member of this world")
-        return {"user_id": str(ident.user_id), "guest": ident.is_guest,
-                "character": r.active_character(body.world_id, ident.user_id)}
+        out = {"user_id": str(ident.user_id), "guest": ident.is_guest,
+               "character": r.active_character(body.world_id, ident.user_id)}
+        if body.instance_id is not None:
+            party = r.party_seat(body.instance_id, ident.user_id)
+            if party["world_id"] != str(body.world_id):
+                raise HTTPException(403, "That party belongs to another world")
+            out["instance"] = party
+        return out
 
     @app.post("/internal/combat-results", dependencies=[Depends(server_only)])
     def combat_result(body: CombatResultIn, r: Repository = Depends(repo)) -> dict:
@@ -207,9 +214,30 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
                        r: Repository = Depends(repo)) -> dict:
         return r.start_instance(world_id, user.user_id, activity_id)
 
-    @app.post("/instances/{instance_id}/join")
-    def join_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.join_instance(instance_id, user.user_id)
+    @app.get("/worlds/{world_id}/parties")
+    def list_parties(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_parties(world_id, user.user_id)
+
+    @app.get("/instances/{instance_id}")
+    def get_party(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.get_party(instance_id, user.user_id)
+
+    @app.post("/instances/{instance_id}/requests", status_code=201)
+    def request_party(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.request_party(instance_id, user.user_id)
+
+    @app.post("/instances/{instance_id}/requests/cancel", status_code=204)
+    def cancel_party_request(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.cancel_party_request(instance_id, user.user_id)
+
+    @app.get("/instances/{instance_id}/requests")
+    def list_party_requests(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_party_requests(instance_id, user.user_id)
+
+    @app.post("/instances/{instance_id}/requests/{request_id}/{decision}")
+    def decide_party_request(instance_id: uuid.UUID, request_id: uuid.UUID, decision: Literal["approve", "reject"],
+                             user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.decide_party_request(instance_id, user.user_id, request_id, decision == "approve")
 
     @app.post("/instances/{instance_id}/leave", status_code=204)
     def leave_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:

@@ -3,7 +3,7 @@
   "id": "prototype",
   "version": 1,
   "start_node": "hollowmere",
-  "rules": {"discovery_scope": "character"},
+  "rules": {"discovery_scope": "character", "require_location": false},
   "nodes": [
     {"id": "hollowmere", "name": "Hollowmere", "kind": "settlement", "initially_visible": true},
     {"id": "blackwood", "name": "The Blackwood", "kind": "wilderness", "initially_visible": true},
@@ -19,12 +19,14 @@
     {"id": "tunnel_ak_crypt", "from": "ashen_keep", "to": "sunken_crypt", "travel_days": 2, "initially_visible": false}
   ],
   "activities": [
+    {"id": "training_skirmish", "node": "hollowmere", "name": "Training skirmish", "kind": "minor",
+     "one_time": false, "max_players": 4, "encounter": "prototype"},
     {"id": "cellar_rats", "node": "hollowmere", "name": "Clear the cellar", "kind": "minor",
-     "one_time": false, "max_players": 4},
+     "one_time": false, "max_players": 4, "encounter": "prototype"},
     {"id": "wolf_hunt", "node": "blackwood", "name": "Thin the wolf pack", "kind": "minor",
-     "one_time": false, "max_players": 4},
+     "one_time": false, "max_players": 4, "encounter": "prototype"},
     {"id": "ashen_keep_siege", "node": "ashen_keep", "name": "Break the siege of Ashen Keep", "kind": "major",
-     "one_time": true, "max_players": 8,
+     "one_time": true, "max_players": 4, "encounter": "prototype",
      "on_complete": {"reveal": [{"kind": "node", "id": "sunken_crypt"}, {"kind": "route", "id": "tunnel_ak_crypt"}]}}
   ]
 }

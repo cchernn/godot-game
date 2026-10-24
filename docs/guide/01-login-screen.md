@@ -16,10 +16,15 @@ ClientMain  (client_main.tscn)         owns the battle UI and the connection to 
       ├─ SignInScreen        sign_in_screen.tscn        ← the login
       ├─ WorldPickerScreen   world_picker_screen.tscn
       ├─ JoinScreen          join_screen.tscn
+      ├─ WorldHubScreen      world_hub_screen.tscn      the main menu of a world
       ├─ CharacterScreen     character_screen.tscn
-      ├─ HostRequestsScreen  host_requests_screen.tscn  (rows: ui/join_request_row.tscn)
       ├─ CharacterCreator    character_creator.tscn
-      ├─ LobbyScreen         lobby_screen.tscn
+      ├─ PartiesScreen       parties_screen.tscn
+      ├─ CreatePartyScreen   create_party_screen.tscn
+      ├─ PartyLobbyScreen    party_lobby_screen.tscn    (rows: ui/join_request_row.tscn)
+      ├─ WorldManagementScreen  world_management_screen.tscn  (rows: ui/join_request_row.tscn)
+      ├─ SettingsScreen      settings_screen.tscn
+      ├─ LobbyScreen         lobby_screen.tscn          waiting on the battle server
       └─ StatusLabel         one shared message line
 ```
 
@@ -83,9 +88,9 @@ form and reporting input, it belongs in the screen.*
 | Show exactly one screen | `_show(screen)` and the `_screens` array | Loops the array and sets `visible`. Adding a screen means adding it to `_screens`. |
 | Talk to the API / Supabase | `_request()`, `api()`, `_auth_call()` | One `HTTPRequest` per call, `await`ed. Returns `{status, data, error}` so callers never touch raw responses. |
 | Keep the session | `sign_in()`, `_adopt_session()`, `_refresh()` | Details below. |
-| Decide where to go next | `_step_worlds()`, `_step_character()`, `_show_join()`, ... | The routing. Reads like a story: sign in → picker → membership check → character or join screen. |
+| Decide where to go next | `_step_worlds()`, `_step_world()`, `_step_hub()`, `_step_parties()`, ... | The routing. Reads like a story: sign in → picker → membership check → hub (or the join screen) → parties → party lobby → battle. |
 
-It exposes only a small surface to `ClientMain`: the signals `entered`, `backed_out`, `token_refreshed`, and the methods `show_lobby()` and
+It exposes only a small surface to `ClientMain`: the signals `entered(server, token, name, world, party)`, `backed_out`, `token_refreshed`, and the methods `show_lobby()` and
 `return_to_menu()`. Everything else is internal.
 
 ## 4. How sign-in works in this game
@@ -120,7 +125,7 @@ variables *before* the node is ready crashes with "on a base object of type 'Nil
 **`class_name` as a typed handle.** `SignInScreen`, `CharacterCreator` and friends are global types. Typing the variable
 (`var _sign_in: SignInScreen`) gives you autocomplete, catches typos at parse time, and lets you call the screen's methods directly.
 
-**`@export var row_scene: PackedScene`.** `HostRequestsScreen` does not hardcode which scene makes a row; you drag one into the Inspector. Code
+**`@export var row_scene: PackedScene`.** `WorldManagementScreen` (and `PartyLobbyScreen`) do not hardcode which scene makes a row; you drag one into the Inspector. Code
 instances it with `row_scene.instantiate() as JoinRequestRow`. Use this whenever a script creates many copies of something a designer might restyle.
 
 **Instance overrides.** In `account_flow.tscn` each `[node name="SignInScreen" parent="Layout" instance=...]` also carries `layout_mode` and
@@ -136,7 +141,7 @@ page advances by itself once the host approves. The screen stops the timer in `v
 Timer nodes are easier to see and tweak in the editor than `get_tree().create_timer()` calls buried in code.
 
 **Lambdas and `bind()`.** `func() -> void: ...` creates an inline handler; variables it uses are *captured by value* when it is created (see how
-`HostRequestsScreen` creates one pair of handlers per row). `.bind(false)` appends an argument to a callable. Use `bind` for "same handler,
+`WorldManagementScreen` creates one pair of handlers per row). `.bind(false)` appends an argument to a callable. Use `bind` for "same handler,
 different constant", a lambda for a one-off.
 
 **Themes cross instance boundaries.** The theme is set once on `ClientMain`. Every screen inside inherits it, wherever it is instanced. Per-node
@@ -188,8 +193,8 @@ A "tip" screen shown once after sign-in and before the world picker. This is the
 
 ### Exercise C: read before you change
 Open `character_creator.gd` and `account_flow.gd` side by side. Trace what happens from the moment you press **Create** in the creator to
-the moment the new character appears on the character screen. You should cross: the signal `create_requested` → `_on_create_character_requested`
-→ `api(POST /characters)` → `_step_character()` → `_show_character()` → `CharacterScreen.show_character()`. That is the whole pattern in one path.
+the moment the new character appears on the world hub. You should cross: the signal `create_requested` → `_on_create_character_requested`
+→ `api(POST /characters)` → `_step_hub()` → `WorldHubScreen.show_character()`. That is the whole pattern in one path.
 
 ## 7. Where an elaborate character creator would go
 

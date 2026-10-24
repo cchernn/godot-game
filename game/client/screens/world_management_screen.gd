@@ -1,6 +1,6 @@
-class_name HostRequestsScreen
+class_name WorldManagementScreen
 extends VBoxContainer
-## The host's list of people asking to join, one row (join_request_row.tscn) each.
+## The host's tools for the world. For now that is the list of people asking to join, one row (join_request_row.tscn) each.
 
 signal decision_made(request_id: String, approve: bool, row: JoinRequestRow)
 signal back_pressed
@@ -8,12 +8,12 @@ signal back_pressed
 ## One of these per pending request.
 @export var row_scene: PackedScene
 
-@onready var _label: Label = %HostLabel
+@onready var _label: Label = %ManagementLabel
 @onready var _rows: VBoxContainer = %RequestRows
 
 
 func _ready() -> void:
-	%HostBackButton.pressed.connect(func() -> void: back_pressed.emit())
+	%ManagementBackButton.pressed.connect(func() -> void: back_pressed.emit())
 
 
 func show_loading() -> void:

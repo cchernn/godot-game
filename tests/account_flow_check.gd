@@ -39,11 +39,12 @@ func _initialize() -> void:
 	_check(me["status"] == 200, "character lookup (%s)" % str(me["data"].get("name", me["error"]) if me["data"] is Dictionary else ""))
 
 	var entered: Array = []
-	flow.entered.connect(func(url: String, tok: String, nm: String, world: String) -> void: entered.append([url, tok, nm, world]))
+	flow.entered.connect(func(url: String, tok: String, nm: String, world: String, party: String) -> void: entered.append([url, tok, nm, world, party]))
 	flow._world = {"id": wid, "name": "picked"}
-	flow._enter("Aldric")
-	_check(entered.size() == 1 and entered[0][1] == flow.access_token and entered[0][0] == env["server_url"] and entered[0][3] == wid,
-		"entering emits server URL, token and the chosen world")
+	flow._character = {"name": "Aldric"}
+	flow._enter_battle("party-1")
+	_check(entered.size() == 1 and entered[0][1] == flow.access_token and entered[0][0] == env["server_url"] and entered[0][3] == wid \
+		and entered[0][4] == "party-1", "entering emits server URL, token, the chosen world and the party")
 
 	var old := flow.access_token
 	_check(await flow._refresh(), "refresh token exchange works")

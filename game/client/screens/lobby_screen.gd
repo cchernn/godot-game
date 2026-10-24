@@ -1,6 +1,6 @@
 class_name LobbyScreen
 extends VBoxContainer
-## The waiting room: who is here and how many the battle needs.
+## The waiting room on the battle server: which party members have arrived.
 
 signal leave_pressed
 
@@ -20,7 +20,7 @@ func show_connecting() -> void:
 ## info: {players: [names], needed: int}, as sent by the server.
 func show_lobby(info: Dictionary) -> void:
 	var names: Array = info["players"]
-	_label.text = "Waiting for players (%d/%d). The battle starts when the party is full." % [names.size(), info["needed"]]
+	_label.text = "Waiting for the party (%d/%d here). The battle starts when everyone has arrived." % [names.size(), info["needed"]]
 	_list.clear()
 	for n in names:
 		_list.add_item(str(n))

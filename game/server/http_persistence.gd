@@ -31,12 +31,15 @@ func _post(path: String, body: Dictionary) -> Dictionary:
 	return {"ok": status >= 200 and status < 300, "status": status, "body": data, "error": detail}
 
 
-func verify_session(token: String, world_id: String) -> Dictionary:
-	var r := await _post("/internal/auth/session", {"token": token, "world_id": world_id})
+func verify_session(token: String, world_id: String, instance_id: String = "") -> Dictionary:
+	var body := {"token": token, "world_id": world_id}
+	if instance_id != "":
+		body["instance_id"] = instance_id
+	var r := await _post("/internal/auth/session", body)
 	if not r["ok"]:
 		return {"ok": false, "error": "Sign-in failed: %s" % r["error"]}
 	var b: Dictionary = r["body"]
-	return {"ok": true, "user_id": b["user_id"], "character": b["character"]}
+	return {"ok": true, "user_id": b["user_id"], "character": b["character"], "instance": b.get("instance", {})}
 
 
 func commit_result(world_id: String, key: String, outcome: String, rounds: int, participants: Array) -> Dictionary:

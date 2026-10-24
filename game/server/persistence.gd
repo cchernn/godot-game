@@ -4,9 +4,10 @@ extends RefCounted
 ## the implementation talks to the FastAPI service, never to the database directly.
 
 
-## Returns {ok, user_id, character: Dictionary or null, error}. Identity is derived from the token; the
-## API checks the user is a member of `world_id` and returns their active character there.
-func verify_session(_token: String, _world_id: String) -> Dictionary:
+## Returns {ok, user_id, character: Dictionary or null, instance: Dictionary, error}. Identity is derived from
+## the token; the API checks the user is a member of `world_id`, returns their active character there, and
+## (for a party) checks the character is on the active party's roster and describes the party.
+func verify_session(_token: String, _world_id: String, _instance_id: String = "") -> Dictionary:
 	return {"ok": false, "error": "Persistence is not configured"}
 
 
@@ -15,7 +16,7 @@ func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: i
 	return {"ok": true, "duplicate": false}
 
 
-## Returns {ok, instance: {status, roster: [{id, user_id, name}]}, error}.
+## Returns {ok, instance: {status, encounter, max_players, roster: [{id, user_id, name, class}]}, error}.
 func get_instance(_instance_id: String) -> Dictionary:
 	return {"ok": false, "error": "Persistence is not configured"}
 

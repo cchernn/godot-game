@@ -4,7 +4,6 @@
 Reads the settings you already maintain (services/api/.env and game/client/client_env.json) so
 secrets are entered once. Local ports: web 8080, API 8081, game server 8082; the API's private
 port 8000 is how the game server reaches it (production: bind it to the host's private IP).
-PLAYERS=n sets the party size that starts a battle (default 1).
 PUBLIC_HOST=<public ip or domain> prepares a build other people can reach: the web build points at that
 host instead of localhost, CORS allows its origin, and the environment becomes "shared" (guests off).
 """
@@ -53,7 +52,6 @@ write("game", [
     "API_URL=http://host.docker.internal:8000",
     f"GAME_API_SERVER_KEY={api['GAME_API_SERVER_API_KEY']}",
     f"GAME_ENV={environment}",
-    f"PLAYERS={os.environ.get('PLAYERS', '1')}",
 ])
 write("web", [
     "SITE_ADDRESS=:80", f"HTTP_PORT={WEB}", f"HTTPS_PORT={WEB + 362}",

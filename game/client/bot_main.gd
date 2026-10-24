@@ -21,6 +21,7 @@ func _ready() -> void:
 	var nm := "Bot"
 	var access := ""
 	var world := ""
+	var party := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--url="):
 			url = arg.substr(6)
@@ -30,6 +31,8 @@ func _ready() -> void:
 			access = arg.substr(8)
 		elif arg.begins_with("--world-id="):
 			world = arg.substr(11)
+		elif arg.begins_with("--instance-id="):
+			party = arg.substr(14)
 		elif arg.begins_with("--drop-at-planning="):
 			_drop_plan_round = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--drop-at-round="):
@@ -38,6 +41,7 @@ func _ready() -> void:
 	net.persist_token = false
 	net.access_token = access
 	net.world_id = world
+	net.instance_id = party
 	add_child(net)
 	net.welcomed.connect(func(i: Dictionary) -> void:
 		_welcomes += 1
@@ -48,7 +52,7 @@ func _ready() -> void:
 	net.rejected.connect(func(t: String) -> void:
 		print("[%s] rejected: %s" % [nm, t])
 		if t.begins_with("Sign-in failed") or t.begins_with("Create a character") or t.begins_with("Guest access") \
-				or t.begins_with("Choose a world") or t.begins_with("This server does not"):
+				or t.begins_with("Choose a world") or t.begins_with("Choose a party") or t.begins_with("This server does not"):
 			get_tree().create_timer(0.3).timeout.connect(func() -> void: get_tree().quit(3)))
 	net.plan_result.connect(func(ok: bool, e: String) -> void:
 		if not ok:

@@ -10,15 +10,15 @@ scripts/run_server.sh --players=2    # dedicated server (local env, guests on) o
 ```
 Play: run the server, then open the project in Godot 4.7.2 and press F5 (use *Debug → Customize Run Instances*
 to launch several clients, optionally with args `--url=ws://127.0.0.1:9080 --name=Alice`).
-The battle starts once `lobby.players_required` players join. Design notes: `docs/architecture.md`.
+(Guest play only: the battle starts once `lobby.players_required` guests join. Signed-in play runs parties; see below.) Design notes: `docs/architecture.md`.
 
 ## Playing with a Supabase account (local)
 
 1. Fill `services/api/.env` (see `.env.example`) and check `game/client/client_env.json`
    (project URL, publishable key).
-2. `scripts/stack.sh init && scripts/stack.sh up` starts the API, battle server and web client in Docker (`PLAYERS=n` for the party size).
-3. Open http://localhost:8080, or open the project in the Godot editor on Windows and press F5. Sign in, create a character once,
-   then **Enter battle**. The client falls back to the guest connect screen if `client_env.json`
+2. `scripts/stack.sh init && scripts/stack.sh up` starts the API, battle server and web client in Docker.
+3. Open http://localhost:8080, or open the project in the Godot editor on Windows and press F5. Sign in, pick a world and create a character once,
+   then open **Parties** from the world hub. The client falls back to the guest connect screen if `client_env.json`
    is absent or `--url=` is passed.
 
 `tests/account_flow_check.gd` is a live check of the sign-in flow (needs `ACCT_EMAIL`/`ACCT_PASSWORD`
@@ -28,9 +28,11 @@ and a running API); it is not part of `scripts/test.sh`.
 Open the page -> sign in or create an account (Supabase; new accounts confirm by email) -> **choose a world** from the list (every
 world is listed with your standing in it, even when there is only one) -> if you are not in it yet, **Request to
 join** and wait for the host (the host sees **Join requests (n)** on their character screen and approves or rejects) -> create a
-character once -> **Enter battle** -> lobby (who is waiting, starts automatically when the party is full) -> plan and ready each
-round -> result screen (victory/defeat, XP) -> **Continue** back to the character screen. Screens: `docs/editor-guide.md`;
-a real-browser test of this flow: `tests/browser/README.md`. One battle server hosts every world, one room per world.
+character once -> you land on the **world hub** (Parties, Character, World management for the host, Settings) -> **Parties**: start a party for an
+activity (you lead it) or ask a leader to let you into one -> **party lobby** (the leader approves requests and presses **Start battle**) -> the battle server
+gathers the party -> plan and ready each round -> result screen (victory/defeat, XP) -> **Continue** back to the hub. A closed tab can come back to a battle in
+progress from the hub (**Return to battle**). Screens: `docs/editor-guide.md`; a real-browser test of this flow: `tests/browser/README.md`.
+One battle server hosts every party in every world, one room per party.
 
 ## Deployment
 
@@ -53,8 +55,6 @@ scripts/stack.sh ps              # status
 scripts/stack.sh logs game       # follow a service's log
 scripts/stack.sh down            # stop everything (or: down web)
 ```
-
-`PLAYERS=3 scripts/stack.sh init` sets how many players start a battle (default 1).
 
 ### Own testing (localhost)
 `scripts/stack.sh init && scripts/stack.sh up`, then open http://localhost:8080 (or press F5 in the Godot editor).

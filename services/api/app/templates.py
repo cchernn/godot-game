@@ -54,6 +54,10 @@ def parse(raw: dict) -> WorldDefinition:
         for a in activities.values():
             if a["node"] not in nodes or a["kind"] not in ("minor", "major"):
                 raise TemplateError(f"activity {a['id']} is invalid")
+            if not re.fullmatch(r"[a-z0-9_]+", str(a.get("encounter", ""))):
+                raise TemplateError(f"activity {a['id']} needs an encounter id")
+            if not isinstance(a.get("max_players"), int) or a["max_players"] < 1:
+                raise TemplateError(f"activity {a['id']} needs max_players")
             if a.get("one_time") and a["kind"] != "major":
                 raise TemplateError("only major activities can be one-time")
             for rv in a.get("on_complete", {}).get("reveal", []):

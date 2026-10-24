@@ -2,7 +2,7 @@ extends Node
 ## Autoload shared by client and server so RPC node paths match. It only carries messages;
 ## the server app and the client decide what they mean. Client->server methods run on the server only.
 
-signal hello_received(peer_id: int, display_name: String, token: String, world_id: String)
+signal hello_received(peer_id: int, display_name: String, token: String, world_id: String, instance_id: String)
 signal plan_received(peer_id: int, actions: Variant)
 signal ready_received(peer_id: int, flag: bool)
 
@@ -19,9 +19,9 @@ signal rejected(text: String)
 # ---- client -> server ----
 
 @rpc("any_peer", "call_remote", "reliable")
-func c_hello(display_name: String, token: String, world_id: String) -> void:
+func c_hello(display_name: String, token: String, world_id: String, instance_id: String) -> void:
 	if multiplayer.is_server():
-		hello_received.emit(multiplayer.get_remote_sender_id(), display_name, token, world_id)
+		hello_received.emit(multiplayer.get_remote_sender_id(), display_name, token, world_id, instance_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")

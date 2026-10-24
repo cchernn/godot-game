@@ -1,0 +1,59 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/client/screens/party_lobby_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://game/content/ui/join_request_row.tscn" id="2"]
+
+[node name="PartyLobbyScreen" type="VBoxContainer"]
+theme_override_constants/separation = 6
+script = ExtResource("1")
+row_scene = ExtResource("2")
+
+[node name="PartyTitleLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="PartyHintLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="RosterList" type="ItemList" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 90)
+
+[node name="RequestsBox" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 6
+
+[node name="RequestsLabel" type="Label" parent="RequestsBox"]
+layout_mode = 2
+text = "Asking to join"
+
+[node name="PartyRequestRows" type="VBoxContainer" parent="RequestsBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StartButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+text = "Start battle"
+
+[node name="PartyLeaveButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Leave party"
+
+[node name="PartyBackButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Back to hub"
+
+[node name="PartyTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 3.0

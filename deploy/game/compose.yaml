@@ -11,8 +11,6 @@ services:
       API_URL: ${API_URL:?set API_URL (the API's private address) in deploy/game/.env}
       GAME_ENV: ${GAME_ENV:-production}
       WORLD_ID: ${WORLD_ID:-}
-      PLAYERS: ${PLAYERS:-3}
-      INSTANCE_ID: ${INSTANCE_ID:-}
       ALLOW_GUESTS: "false"
     extra_hosts:
       - "host.docker.internal:host-gateway"

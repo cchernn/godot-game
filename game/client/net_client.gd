@@ -22,6 +22,8 @@ var token: String = ""
 var access_token: String = ""
 ## The world being entered (API mode); the server asks the API whether this player is a member of it.
 var world_id: String = ""
+## The party whose battle is being entered (API mode); the server checks the character is on its roster.
+var instance_id: String = ""
 var persist_token: bool = true
 var connected: bool = false
 var _connecting: bool = false
@@ -48,7 +50,7 @@ func _ready() -> void:
 	Gateway.rejected.connect(func(t: String) -> void:
 		_fatal = t.begins_with("Guest access") or t.begins_with("A battle") or t.begins_with("The party") \
 			or t.begins_with("Sign-in failed") or t.begins_with("Create a character") or t.begins_with("Choose a world") \
-			or t.begins_with("This server does not") or t.begins_with("You are in a battle") or t.begins_with("The previous battle")
+			or t.begins_with("This server does not") or t.begins_with("You are in a battle") or t.begins_with("The previous battle") or t.begins_with("Choose a party") or t.begins_with("This activity")
 		rejected.emit(t))
 
 
@@ -101,7 +103,7 @@ func _on_connected() -> void:
 	_connecting = false
 	connected = true
 	connection_changed.emit(true)
-	Gateway.c_hello.rpc_id(1, display_name, access_token if access_token != "" else token, world_id)
+	Gateway.c_hello.rpc_id(1, display_name, access_token if access_token != "" else token, world_id, instance_id)
 
 
 func _on_lost() -> void:

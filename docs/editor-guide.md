@@ -18,7 +18,7 @@ project from `project.godot`; the first open imports everything.
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
 | Fog / move / target / hover highlights | `game/content/board/materials/*.tres` | Inspector |
 | Battle screen: side panel, log, result text, guest connect panel | `game/client/client_main.tscn` | the 2D editor |
-| Each pre-battle screen: sign-in, world picker, join, character, character creator, host approvals, lobby | `game/client/screens/*.tscn` (one scene each) | the 2D editor |
+| Each pre-battle screen: sign-in, world picker, join, world hub, character, character creator, parties, create party, party lobby, world management, settings, battle-server lobby | `game/client/screens/*.tscn` (one scene each) | the 2D editor |
 | How those screens are put together and switched | `game/client/account_flow.tscn` (+ `account_flow.gd`) | the 2D editor |
 | One join request in the host's list | `game/content/ui/join_request_row.tscn` | the 2D editor |
 | Victory / defeat panel | `ResultPanel` in `game/client/client_main.tscn` | the 2D editor |
@@ -78,8 +78,8 @@ If they disagree, the client logs a warning and draws the server's layout, and t
 ## The UI (2D editor)
 `client_main.tscn` holds the whole battle screen: `SidePanel` (status, AP, skill list, facing buttons, plan queue, Undo / Clear / Ready,
 error line, combat log), `Banner`, the guest `ConnectPanel`, `ResultPanel`, and the `AccountFlow` coordinator. Every screen before a battle is its own
-scene in `game/client/screens/` (`sign_in_screen`, `world_picker_screen`, `join_screen`, `character_screen`, `character_creator`,
-`host_requests_screen`, `lobby_screen`). `account_flow.tscn` just instances them one under another and shows one at a time; open a screen's own
+scene in `game/client/screens/` (`sign_in_screen`, `world_picker_screen`, `join_screen`, `world_hub_screen`, `character_screen`,
+`character_creator`, `parties_screen`, `create_party_screen`, `party_lobby_screen`, `world_management_screen`, `settings_screen`, `lobby_screen`). `account_flow.tscn` just instances them one under another and shows one at a time; open a screen's own
 scene to edit it. The character creator is deliberately a separate scene so it can grow (see docs/guide/01-login-screen.md).
 The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the code when a battle begins; `ResultPanel` appears when it ends.
 - **Move, resize, restyle anything**: containers, margins, fonts, colours, icons, extra decoration labels or images.
@@ -96,6 +96,8 @@ the **Stats** group: max HP, dexterity (sets AP and speed), power (added to dama
 (pick skill resources from `game/content/skills`). Each field has a tooltip. All values
 are provisional. Godot only writes non-default values into the file, so a stat at its default (e.g. 0) will not appear in the text, but it is
 there in the Inspector.
+- **Which activity runs which battle:** each activity in the world template (`services/api/templates/prototype@1.json`) has an `"encounter"` (the file name,
+  without `.tres`, in `game/content/encounters`) and a `"max_players"`. Keep `max_players` no larger than the encounter's Classes list; a test fails if it is.
 - **Which units a battle uses:** open `encounters/prototype.tres`. **Map** takes a painted map scene; **Classes** is the party: seat 0 uses the
   first, seat 1 the second, and so on, and a player's character class picks the matching entry. The list length is the maximum party size.
   **Enemies** is the roster in order: the first stands on spawn marker `E0`, the second on `E1`, and so on (the same enemy can appear twice).

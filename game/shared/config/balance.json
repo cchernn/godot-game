@@ -44,7 +44,8 @@
     }
   },
   "lobby": {
-    "players_required": 2
+    "players_required": 2,
+    "gather_seconds": 30
   },
   "rewards": {
     "_note": "PROVISIONAL XP: participation plus a victory bonus.",

@@ -4,67 +4,92 @@
 [ext_resource type="PackedScene" path="res://game/client/screens/sign_in_screen.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://game/client/screens/world_picker_screen.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://game/client/screens/join_screen.tscn" id="4"]
-[ext_resource type="PackedScene" path="res://game/client/screens/character_screen.tscn" id="5"]
-[ext_resource type="PackedScene" path="res://game/client/screens/host_requests_screen.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://game/client/screens/world_hub_screen.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://game/client/screens/character_screen.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/client/screens/character_creator.tscn" id="7"]
-[ext_resource type="PackedScene" path="res://game/client/screens/lobby_screen.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://game/client/screens/parties_screen.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://game/client/screens/create_party_screen.tscn" id="9"]
+[ext_resource type="PackedScene" path="res://game/client/screens/party_lobby_screen.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://game/client/screens/world_management_screen.tscn" id="11"]
+[ext_resource type="PackedScene" path="res://game/client/screens/settings_screen.tscn" id="12"]
+[ext_resource type="PackedScene" path="res://game/client/screens/lobby_screen.tscn" id="13"]
 
-[node name="AccountFlow" type="PanelContainer" unique_id=106401834]
-custom_minimum_size = Vector2(420, 0)
+[node name="AccountFlow" type="PanelContainer"]
+custom_minimum_size = Vector2(520, 0)
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -210.0
+offset_left = -260.0
 offset_top = -10.0
-offset_right = 210.0
+offset_right = 260.0
 offset_bottom = 10.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="RefreshTimer" type="Timer" parent="." unique_id=696617564]
+[node name="RefreshTimer" type="Timer" parent="."]
 unique_name_in_owner = true
 one_shot = true
 
-[node name="Layout" type="VBoxContainer" parent="." unique_id=336665553]
+[node name="Layout" type="VBoxContainer" parent="."]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="TitleLabel" type="Label" parent="Layout" unique_id=303141141]
+[node name="TitleLabel" type="Label" parent="Layout"]
 layout_mode = 2
 text = "Unnamed"
 
-[node name="SignInScreen" parent="Layout" unique_id=817504179 instance=ExtResource("2")]
+[node name="SignInScreen" parent="Layout" instance=ExtResource("2")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="WorldPickerScreen" parent="Layout" unique_id=968285012 instance=ExtResource("3")]
+[node name="WorldPickerScreen" parent="Layout" instance=ExtResource("3")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="JoinScreen" parent="Layout" unique_id=736647549 instance=ExtResource("4")]
+[node name="JoinScreen" parent="Layout" instance=ExtResource("4")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="CharacterScreen" parent="Layout" unique_id=788184297 instance=ExtResource("5")]
+[node name="WorldHubScreen" parent="Layout" instance=ExtResource("5")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="HostRequestsScreen" parent="Layout" unique_id=1078941933 instance=ExtResource("6")]
+[node name="CharacterScreen" parent="Layout" instance=ExtResource("6")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="CharacterCreator" parent="Layout" unique_id=871956445 instance=ExtResource("7")]
+[node name="CharacterCreator" parent="Layout" instance=ExtResource("7")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="LobbyScreen" parent="Layout" unique_id=369376578 instance=ExtResource("8")]
+[node name="PartiesScreen" parent="Layout" instance=ExtResource("8")]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="StatusLabel" type="Label" parent="Layout" unique_id=254502628]
+[node name="CreatePartyScreen" parent="Layout" instance=ExtResource("9")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PartyLobbyScreen" parent="Layout" instance=ExtResource("10")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="WorldManagementScreen" parent="Layout" instance=ExtResource("11")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="SettingsScreen" parent="Layout" instance=ExtResource("12")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="LobbyScreen" parent="Layout" instance=ExtResource("13")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
