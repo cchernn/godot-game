@@ -61,14 +61,14 @@ class SessionIn(BaseModel):
 
 class ParticipantIn(BaseModel):
     character_id: uuid.UUID
-    outcome: Literal["survived", "downed", "eliminated"]
+    outcome: Literal["survived", "downed", "eliminated", "escaped"]
     xp: int = Field(ge=0, le=100_000)
 
 
 class CombatResultIn(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=128)
     world_id: uuid.UUID
-    outcome: Literal["players_win", "players_lose", "draw"]
+    outcome: Literal["players_win", "players_lose", "draw", "escaped"]
     rounds: int = Field(ge=1, le=10_000)
     participants: list[ParticipantIn] = Field(max_length=16)
 
@@ -96,7 +96,7 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     if pool is None:
         pool = make_pool(settings.database_url)
         migrate(pool)
-    app.state.repo = Repository(pool, TemplateStore(settings.templates_dir))
+    app.state.repo = Repository(pool, TemplateStore(settings.templates_dir), presence_seconds=settings.presence_seconds)
 
     def repo(request: Request) -> Repository:
         return request.app.state.repo
@@ -257,6 +257,10 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     @app.get("/worlds/{world_id}/parties")
     def list_parties(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
         return r.list_parties(world_id, user.user_id)
+
+    @app.post("/worlds/{world_id}/presence", status_code=204)
+    def presence(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.touch_presence(world_id, user.user_id)
 
     @app.get("/worlds/{world_id}/parties/me")
     def my_party(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:

@@ -41,6 +41,8 @@ var interrupt_points: int = 0
 var skills_used: Dictionary = {}
 ## Prepared reaction: {skill, expires_beat} or empty.
 var reaction: Dictionary = {}
+## Asked to escape while beats were resolving; takes effect before the next beat.
+var escape_pending: bool = false
 ## Player id controlling this character ("" for AI).
 var controller: String = ""
 
@@ -50,4 +52,4 @@ func is_active(round_number: int) -> bool:
 
 
 func is_present() -> bool:
-	return life_state != Enums.LifeState.ELIMINATED
+	return life_state != Enums.LifeState.ELIMINATED and life_state != Enums.LifeState.ESCAPED

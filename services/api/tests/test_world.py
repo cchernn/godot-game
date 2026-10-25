@@ -699,3 +699,70 @@ def test_a_removed_member_drops_out_of_the_running_battle(client, pool):
     assert client.post(f"/worlds/{w['id']}/members/{uid}/remove", headers=auth(t1)).status_code == 204
     assert roster() == ["C0"], "the removed player no longer holds a seat"
     assert [m["name"] for m in my_party(client, w["id"], t1)["members"]] == ["C0"]
+
+
+def beat(client, wid, tok):
+    assert client.post(f"/worlds/{wid}/presence", headers=auth(tok)).status_code == 204
+
+
+def go_offline(pool, character_id, seconds=60):
+    with pool.connection() as c:
+        c.execute("update characters set last_seen_at = now() - make_interval(secs => %s) where id=%s", (seconds, character_id))
+
+
+def test_coming_back_alone_to_an_offline_party_starts_a_new_session_alone(client, pool):
+    w, [t1, t2], [c1, c2] = party(client, pool)
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    set_node(pool, c1["id"], "hollowmere")
+    beat(client, w["id"], t1)
+    beat(client, w["id"], t2)
+    beat(client, w["id"], t1)
+    assert len(my_party(client, w["id"], t1)["members"]) == 2, "a heartbeat inside the window changes nothing"
+    go_offline(pool, c1["id"])
+    go_offline(pool, c2["id"])
+    beat(client, w["id"], t1)  # a new session, and the other member is offline
+    mine = my_party(client, w["id"], t1)
+    assert [m["name"] for m in mine["members"]] == ["C0"] and mine["id"] != pid and mine["node_id"] == "hollowmere"
+    assert [m["name"] for m in my_party(client, w["id"], t2)["members"]] == ["C1"], "the other player is alone too"
+
+
+def test_a_returning_player_keeps_a_party_whose_other_member_is_online(client, pool):
+    w, [t1, t2], [c1, c2] = party(client, pool)
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    beat(client, w["id"], t2)
+    go_offline(pool, c1["id"])
+    beat(client, w["id"], t1)
+    assert my_party(client, w["id"], t1)["id"] == pid
+
+
+def test_a_party_in_an_activity_is_not_reset_by_a_new_session(client, pool):
+    w, [t1, t2], [c1, c2] = party(client, pool)
+    join_party(client, my_party(client, w["id"], t1)["id"], t1, t2)
+    new_party(client, w["id"], t1)
+    beat(client, w["id"], t1)
+    go_offline(pool, c1["id"])
+    go_offline(pool, c2["id"])
+    beat(client, w["id"], t1)
+    assert len(my_party(client, w["id"], t1)["members"]) == 2
+
+
+def test_listing_disbands_idle_parties_whose_members_are_all_offline(client, pool):
+    w, [t1, t2, t3], [c1, c2, c3] = party(client, pool, 3)
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    for t in (t1, t2, t3):
+        beat(client, w["id"], t)
+    assert any(len(p["members"]) == 2 for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t3)).json())
+    go_offline(pool, c1["id"])
+    go_offline(pool, c2["id"])
+    listed = client.get(f"/worlds/{w['id']}/parties", headers=auth(t3)).json()
+    assert sorted(len(p["members"]) for p in listed) == [1, 1, 1]
+    assert [m["name"] for m in my_party(client, w["id"], t2)["members"]] == ["C1"]
+
+
+def test_presence_needs_membership(client, pool):
+    w, [t1], _ = party(client, pool, 1)
+    stranger, _ = new_user()
+    assert client.post(f"/worlds/{w['id']}/presence", headers=auth(stranger)).status_code == 403

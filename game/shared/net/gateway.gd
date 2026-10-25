@@ -5,6 +5,7 @@ extends Node
 signal hello_received(peer_id: int, display_name: String, token: String, world_id: String, instance_id: String)
 signal plan_received(peer_id: int, actions: Variant)
 signal ready_received(peer_id: int, flag: bool)
+signal escape_received(peer_id: int)
 
 signal welcomed(info: Dictionary)
 signal snapshot_received(snap: Dictionary)
@@ -34,6 +35,13 @@ func c_plan(actions: Variant) -> void:
 func c_ready(flag: bool) -> void:
 	if multiplayer.is_server():
 		ready_received.emit(multiplayer.get_remote_sender_id(), flag)
+
+
+## The sender's character leaves the battle (always succeeds for now) and spectates.
+@rpc("any_peer", "call_remote", "reliable")
+func c_escape() -> void:
+	if multiplayer.is_server():
+		escape_received.emit(multiplayer.get_remote_sender_id())
 
 
 # ---- server -> client ----
@@ -74,7 +82,7 @@ func s_lobby(info: Dictionary) -> void:
 	lobby_received.emit(info)
 
 
-## End of a battle: {outcome: "players_win"|"players_lose"|"draw", rounds, xp, you: "survived"|"downed"|"eliminated", saved: bool}.
+## End of a battle: {outcome: "players_win"|"players_lose"|"draw"|"escaped", rounds, xp, you: "survived"|"downed"|"eliminated"|"escaped", saved: bool}.
 ## Sent when the battle finishes (saved = false) and again once the result is stored (saved = true).
 @rpc("authority", "call_remote", "reliable")
 func s_result(info: Dictionary) -> void:

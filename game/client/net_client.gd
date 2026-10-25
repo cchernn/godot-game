@@ -130,3 +130,8 @@ func send_plan(actions: Array) -> void:
 func send_ready(flag: bool) -> void:
 	if connected:
 		Gateway.c_ready.rpc_id(1, flag)
+
+
+func send_escape() -> void:
+	if connected:
+		Gateway.c_escape.rpc_id(1)

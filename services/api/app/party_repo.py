@@ -77,6 +77,49 @@ class PartyMixin:
         return conn.execute("select c.id, c.user_id, c.name, c.class from party_members m join characters c on c.id = m.character_id "
                             "where m.party_id=%s order by m.joined_at", (party_id,)).fetchall()
 
+    # ---- presence ----
+
+    def _online(self, conn, character_id) -> bool:
+        """Seen within the presence window. A character that has never reported in (no heartbeat yet) is given the benefit of the doubt."""
+        return conn.execute("select coalesce(last_seen_at > now() - make_interval(secs => %s), true) as online from characters where id=%s",
+                            (self.presence_seconds, character_id)).fetchone()["online"]
+
+    def _dissolve(self, conn, party) -> None:
+        """Everyone in an idle party goes their own way (each into a party of one at the node they stood at); the leader keeps the old one."""
+        members = self._members(conn, party["id"])
+        for m in members:
+            if m["id"] != party["leader_character_id"]:
+                self._detach(conn, m["id"])
+                self._party_of(conn, {**m, "world_id": party["world_id"], "node_id": party["node_id"]})
+        conn.execute("update party_join_requests set status='cancelled', decided_at=now() where party_id=%s and status='pending'", (party["id"],))
+
+    def touch_presence(self, world_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        """The client's heartbeat. A player who was away longer than the presence window is on a new session: if nobody else
+        in their idle party is still online, they leave it (a party of one, at the same place). A party that is running an
+        activity is left alone; the game server ends that when nobody is connected."""
+        if not self.is_member(world_id, user_id):
+            raise Forbidden("Not a member of this world")
+        with self.pool.connection() as conn:
+            char = conn.execute("select * from characters where world_id=%s and user_id=%s and status='active' for update", (world_id, user_id)).fetchone()
+            if char is None:
+                return
+            fresh = self._online(conn, char["id"])
+            conn.execute("update characters set last_seen_at=now() where id=%s", (char["id"],))
+            if fresh:
+                return
+            p = self._party_of(conn, char)
+            others = [m for m in self._members(conn, p["id"]) if m["id"] != char["id"]]
+            if others and self._live_run(conn, p["id"]) is None and not any(self._online(conn, m["id"]) for m in others):
+                self._detach(conn, char["id"])
+                self._party_of(conn, char)
+
+    def _sweep_offline_parties(self, conn, world_id) -> None:
+        """Disbands idle parties of two or more where every member is offline."""
+        for p in conn.execute("select p.* from parties p where p.world_id=%s and p.status='open' "
+                              "and (select count(*) from party_members m where m.party_id=p.id) > 1", (world_id,)).fetchall():
+            if self._live_run(conn, p["id"]) is None and not any(self._online(conn, m["id"]) for m in self._members(conn, p["id"])):
+                self._dissolve(conn, p)
+
     # ---- the player's own party ----
 
     def my_party(self, world_id: uuid.UUID, user_id: uuid.UUID) -> dict:
@@ -282,6 +325,7 @@ class PartyMixin:
             char = conn.execute("select * from characters where world_id=%s and user_id=%s and status='active' for update", (world_id, user_id)).fetchone()
             if char is not None:
                 self._party_of(conn, char)  # the caller's own party exists before they look at the list
+            self._sweep_offline_parties(conn, world_id)
             rows = conn.execute("select * from parties where world_id=%s and status='open' order by created_at", (world_id,)).fetchall()
             return self._party_rows(conn, rows, world_id, user_id)
 

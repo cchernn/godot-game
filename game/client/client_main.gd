@@ -30,6 +30,9 @@ var _in_battle: bool = false
 var _selftest: bool = false
 var _selftest_round: int = -1
 var _skill_buttons: Dictionary = {}
+## Escape asks twice (a second press within this many seconds confirms), so a stray click cannot abandon the fight.
+@export var escape_confirm_seconds: float = 4.0
+var _escape_armed_until_ms: int = 0
 var _state: String = "menu"
 var _last_hover: Vector2i = Vector2i(-1, -1)
 var _preview_sig: int = 0
@@ -46,6 +49,7 @@ var _preview_sig: int = 0
 @onready var skill_box: VBoxContainer = %SkillBox
 @onready var queue_list: ItemList = %QueueList
 @onready var ready_btn: Button = %ReadyButton
+@onready var escape_btn: Button = %EscapeButton
 @onready var error_label: Label = %ErrorLabel
 @onready var log_view: RichTextLabel = %LogView
 @onready var board_holder: Control = %BoardHolder
@@ -129,6 +133,7 @@ func _wire_ui() -> void:
 	%UndoButton.pressed.connect(_undo)
 	%ClearButton.pressed.connect(_clear_plan)
 	ready_btn.toggled.connect(_on_ready_toggled)
+	escape_btn.pressed.connect(_on_escape_pressed)
 	%ConnectButton.pressed.connect(_connect)
 	%ContinueButton.pressed.connect(_on_continue_pressed)
 	_set_battle_view(false)
@@ -274,12 +279,14 @@ func _on_lobby(info: Dictionary) -> void:
 
 func _on_result(info: Dictionary) -> void:
 	_set_state("result")
-	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW"}
+	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED"}
 	result_title.text = titles.get(info["outcome"], "BATTLE OVER")
 	var lines: Array[String] = ["Round %d" % info["rounds"]]
 	if info["xp"] > 0:
 		lines.append("+%d XP%s" % [info["xp"], "" if info["saved"] else " (saving…)"])
-	if info["you"] != "survived":
+	if info["you"] == "escaped":
+		lines.append("You escaped.")
+	elif info["you"] != "survived":
 		lines.append("You were %s." % info["you"])
 	result_detail.text = "\n".join(lines)
 	result_panel.show()
@@ -495,6 +502,23 @@ func _on_ready_toggled(pressed: bool) -> void:
 	net.send_ready(pressed)
 
 
+func _can_escape() -> bool:
+	return not snap.is_empty() and snap["phase"] != Enums.RoundPhase.FINISHED and not me.is_empty() and not me.get("escaping", false)
+
+
+func _on_escape_pressed() -> void:
+	if not _can_escape():
+		return
+	if Time.get_ticks_msec() > _escape_armed_until_ms:
+		_escape_armed_until_ms = Time.get_ticks_msec() + int(escape_confirm_seconds * 1000)
+		error_label.text = "Press Escape again to leave the fight. You will keep watching."
+		_refresh()
+		return
+	_escape_armed_until_ms = 0
+	error_label.text = ""
+	net.send_escape()
+
+
 # ---------- Display ----------
 
 func _unit_name(id: String) -> String:
@@ -520,12 +544,16 @@ func _refresh() -> void:
 			status_label.modulate = Color(1, 0.45, 0.4)
 		elif left <= timer_warn_seconds:
 			status_label.modulate = Color(1, 0.8, 0.35)
-	if snap["eliminated"]:
+	if snap["escaped"]:
+		status_label.text += "\nYou escaped — watching until the battle ends."
+	elif snap["eliminated"]:
 		status_label.text += "\nYou were eliminated — spectating."
 	elif not me.is_empty() and me["life"] == Enums.LifeState.DOWNED:
 		status_label.text += "\nYou are downed. An ally can revive you once."
 	elif not me.is_empty() and not me["active"]:
 		status_label.text += "\nRevived: you cannot act this round."
+	if not me.is_empty() and me.get("escaping", false):
+		status_label.text += "\nEscaping at the end of this beat."
 	if not me.is_empty():
 		var cap: int = me["ap_capacity"]
 		if snap["phase"] == Enums.RoundPhase.PLANNING:
@@ -572,6 +600,9 @@ func _refresh() -> void:
 	ready_btn.disabled = me.is_empty() or snap["phase"] != Enums.RoundPhase.PLANNING or not me.get("active", false)
 	ready_btn.set_pressed_no_signal(not me.is_empty() and me["ready"])
 	ready_btn.text = "Withdraw Ready" if ready_btn.button_pressed else "Ready"
+	var armed := Time.get_ticks_msec() <= _escape_armed_until_ms
+	escape_btn.disabled = not _can_escape()
+	escape_btn.text = "Escaping…" if me.get("escaping", false) else ("Really escape?" if armed else "Escape")
 	for id: String in _skill_buttons:
 		(_skill_buttons[id] as Button).disabled = not can
 		(_skill_buttons[id] as Button).set_pressed_no_signal(id == mode)
@@ -634,7 +665,7 @@ func _process(_delta: float) -> void:
 	if board.hover != _last_hover:
 		_last_hover = board.hover
 		_update_hover_text()
-	if not snap.is_empty() and snap.get("timer_ms", -1) >= 0:
+	if not snap.is_empty() and (snap.get("timer_ms", -1) >= 0 or (escape_btn.text == "Really escape?" and Time.get_ticks_msec() > _escape_armed_until_ms)):
 		_refresh()
 
 

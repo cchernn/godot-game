@@ -21,8 +21,9 @@ def _row(r: dict | None) -> dict | None:
 class Repository(PartyMixin, WorldMixin):
     """All durable reads/writes. Gameplay rules never live here."""
 
-    def __init__(self, pool: ConnectionPool, templates: TemplateStore | None = None):
+    def __init__(self, pool: ConnectionPool, templates: TemplateStore | None = None, presence_seconds: int = 30):
         self.pool = pool
+        self.presence_seconds = presence_seconds
         self.templates = templates or TemplateStore()
 
     # ---- worlds ----

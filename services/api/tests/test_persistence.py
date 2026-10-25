@@ -118,3 +118,11 @@ def test_restart_recovery_data_survives_new_connection_pool(keep_xp_client, pool
 def test_migrations_are_idempotent(pool):
     from app.db import migrate
     assert migrate(pool) == []
+
+
+def test_an_escape_result_and_an_escaped_participant_are_stored(client):
+    w, [(a, _), _] = setup_world(client)
+    ca = make_char(client, w["id"], a).json()["id"]
+    body = result_body(w["id"], [ca], outcome="escaped")
+    body["participants"][0]["outcome"] = "escaped"
+    assert client.post("/internal/combat-results", json=body, headers=SERVER).status_code == 200

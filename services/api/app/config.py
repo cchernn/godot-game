@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Browser origins allowed to call the API (the web build's origin). Empty = no CORS headers.
     cors_origins: list[str] = []
 
+    # PROVISIONAL: a player counts as online this long after their last heartbeat. A party whose members are all
+    # offline is disbanded, and a player who comes back after a gap starts alone (see party_repo.touch_presence).
+    presence_seconds: int = 30
+
     templates_dir: str | None = None  # default: services/api/templates
 
     # Shared secret for service-to-service calls from the Godot server.

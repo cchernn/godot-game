@@ -161,16 +161,56 @@ func begin_resolution() -> void:
 func resolve_next_beat() -> void:
 	if state.phase != Enums.RoundPhase.RESOLVING:
 		return
+	for c: Combatant in state.team_members(Enums.Team.PLAYERS):
+		if c.escape_pending:
+			_do_escape(c)
+	if _conclude():
+		return
 	beat += 1
 	_resolver.run_beat()
-	outcome = check_victory()
-	if outcome != Enums.Outcome.NONE:
-		state.phase = Enums.RoundPhase.FINISHED
-		var msg := {Enums.Outcome.PLAYERS_WIN: "Victory!", Enums.Outcome.PLAYERS_LOSE: "Defeat.",
-			Enums.Outcome.DRAW: "Mutual destruction."}[outcome] as String
-		emit("victory", msg)
-	elif beat >= beats_per_round:
+	if not _conclude() and beat >= beats_per_round:
 		_end_round()
+
+
+## Ends the encounter if the objective is settled. Returns true when it is over.
+func _conclude() -> bool:
+	outcome = check_victory()
+	if outcome == Enums.Outcome.NONE:
+		return false
+	state.phase = Enums.RoundPhase.FINISHED
+	var msg := {Enums.Outcome.PLAYERS_WIN: "Victory!", Enums.Outcome.PLAYERS_LOSE: "Defeat.",
+		Enums.Outcome.DRAW: "Mutual destruction.", Enums.Outcome.ESCAPED: "The party got away."}[outcome] as String
+	emit("victory", msg)
+	return true
+
+
+## A character leaves the fight. It always works for now (PROVISIONAL: no chance to fail, no cost). While planning it
+## takes effect at once; while beats are resolving it takes effect before the next beat. The escaped character
+## spectates until the battle ends.
+func escape(cid: String) -> Dictionary:
+	var c := state.get_c(cid)
+	if c == null or c.team != Enums.Team.PLAYERS or state.phase == Enums.RoundPhase.FINISHED \
+			or (c.life_state != Enums.LifeState.ALIVE and c.life_state != Enums.LifeState.DOWNED):
+		return _err("You cannot escape now")
+	if state.phase == Enums.RoundPhase.RESOLVING:
+		c.escape_pending = true
+	else:
+		_do_escape(c)
+		_conclude()
+	return {"ok": true, "error": ""}
+
+
+func _do_escape(c: Combatant) -> void:
+	c.escape_pending = false
+	if c.life_state != Enums.LifeState.ALIVE and c.life_state != Enums.LifeState.DOWNED:
+		return
+	c.life_state = Enums.LifeState.ESCAPED
+	c.ready = false
+	c.plan = []
+	c.ap_reserved = 0
+	c.current = null
+	c.reaction = {}
+	emit("escape", "{a} escapes!", c.id, "", {}, true)
 
 
 func _end_round() -> void:
@@ -196,6 +236,9 @@ func check_victory() -> int:
 	if not enemies_up:
 		return Enums.Outcome.PLAYERS_WIN
 	if not players_up:
+		for c: Combatant in state.team_members(Enums.Team.PLAYERS):
+			if c.life_state == Enums.LifeState.ESCAPED:
+				return Enums.Outcome.ESCAPED
 		return Enums.Outcome.PLAYERS_LOSE
 	return Enums.Outcome.NONE
 
@@ -261,7 +304,7 @@ func snapshot_for(cid: String) -> Dictionary:
 		var own := c.id == cid
 		if c.team == Enums.Team.ENEMIES and not team_can_see_combatant(Enums.Team.PLAYERS, c):
 			continue
-		if c.life_state == Enums.LifeState.ELIMINATED:
+		if c.life_state == Enums.LifeState.ELIMINATED or c.life_state == Enums.LifeState.ESCAPED:
 			continue
 		var u := {"id": c.id, "name": c.display_name, "visual": c.visual, "team": c.team, "cell": c.cell, "facing": c.facing,
 			"hp": c.hp, "max_hp": c.max_hp, "life": c.life_state, "ready": c.ready,
@@ -275,6 +318,7 @@ func snapshot_for(cid: String) -> Dictionary:
 			u["dexterity"] = c.dexterity
 			u["tiles_per_ap"] = cfg.tiles_per_ap(c.dexterity)
 			u["reaction"] = not c.reaction.is_empty()
+			u["escaping"] = c.escape_pending
 		elif me != null and c.team == me.team:  # allies see each other's AP, never each other's plans
 			u["ap_capacity"] = c.ap_capacity
 			u["ap_reserved"] = c.ap_reserved
@@ -284,8 +328,9 @@ func snapshot_for(cid: String) -> Dictionary:
 		for a in me.plan:
 			plan.append(a.to_dict())
 	var eliminated := me != null and me.life_state == Enums.LifeState.ELIMINATED
+	var escaped := me != null and me.life_state == Enums.LifeState.ESCAPED
 	return {"round": state.round_number, "phase": state.phase, "beat": beat,
-		"beats_per_round": beats_per_round, "outcome": outcome, "you": cid, "eliminated": eliminated,
+		"beats_per_round": beats_per_round, "outcome": outcome, "you": cid, "eliminated": eliminated, "escaped": escaped,
 		"map": {"id": map_id, "w": bf.width, "h": bf.height, "terrain": Array(bf.terrain), "elev": Array(bf.elevation)},
 		"units": units, "plan": plan}
 

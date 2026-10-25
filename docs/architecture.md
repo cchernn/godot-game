@@ -31,6 +31,10 @@ All in `game/shared/config/balance.json` (AP thresholds, movement bonus, beats p
 - **Tile-targeted attacks** hit only opposing combatants; no friendly fire.
 - **Simultaneous wipe** = draw (no tie rule specified).
 - **Fog:** hidden enemies are omitted from snapshots; events involving only hidden units are dropped; if a hidden unit acts on a visible one, it's shown as "Something unseen". Plans are never sent except to their owner.
+- **Escape:** any player character (alive or downed) can leave the fight with `c_escape` (the Escape button asks twice). It always succeeds for now (PROVISIONAL, no chance
+  and no cost). While planning it takes effect at once; during resolution it takes effect before the next beat. The escaped character leaves the board, is not waited for, and
+  watches until the battle ends. When no player character is left standing and at least one escaped, the outcome is `escaped` (the run is cancelled, as for a defeat); otherwise the usual
+  win/lose rules apply, and an escaped character gets the participation XP but not the victory bonus.
 - **Disconnects:** committed plans stand; a not-Ready player gets their current valid queue at the timeout. With nobody connected, timers freeze and the 5‑minute monotonic grace period runs; after it the party's battle is abandoned and the API cancels the party.
 - **Identity:** guests are accepted only when the server runs with `--env=local --allow-guests` (default env is `production`); reconnect uses a server-issued secret token, never a client-chosen id. Supabase auth replaces this in Phase 5.
 
@@ -66,6 +70,11 @@ party playing one activity; the battle server runs it, and when it ends the part
 - **Joining a party:** `POST /parties/{id}/requests`; the **leader** approves or rejects (`/parties/{id}/requests/{rid}/approve|reject`), the player can cancel
   (`/requests/cancel`). Joining only works from the party's own node, for a character who is on their own (leave a group first), while the party is idle
   and under `max_party_size`. Approval moves the character out of their party of one and withdraws their other pending asks. There is no direct join.
+- **Presence:** the client sends `POST /worlds/{id}/presence` every 10 s while it is inside a world (hub, map and battle alike; the `PresenceTimer` in
+  `account_flow.tscn`). A player counts as online for `presence_seconds` (30, PROVISIONAL, `GAME_API_PRESENCE_SECONDS`) after the last one. A player who comes back after
+  a longer gap is on a new session: if nobody else in their idle party is online, they leave it and are alone, at the same node. Listing the world's parties disbands
+  idle parties whose members are all offline. A party that is running an activity is never reset; the battle server ends that run after its own grace period. A
+  character that has never sent a heartbeat counts as online.
 - **Leaving:** `POST /parties/{id}/leave` puts you in a new party of one; if the leader leaves, the longest-standing member leads on; an emptied party closes.
   A lone character cannot leave. The leader can also hand over (`POST /parties/{id}/leader`). None of this is possible mid-activity.
 - **Travel:** `POST /parties/{id}/travel {node_id}` (leader only, idle party) moves the party and every member along a discovered route to a neighbouring

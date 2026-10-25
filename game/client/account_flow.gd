@@ -23,6 +23,9 @@ var user_email: String = ""
 
 @onready var status: Label = %StatusLabel
 @onready var _refresh_timer: Timer = %RefreshTimer
+## Tells the server this player is still in the world (every few seconds; set in the scene). The server treats a player as
+## away after about 30 seconds without one.
+@onready var _presence_timer: Timer = %PresenceTimer
 @onready var _sign_in: SignInScreen = %SignInScreen
 @onready var _worlds_screen: WorldPickerScreen = %WorldPickerScreen
 @onready var _join: JoinScreen = %JoinScreen
@@ -66,6 +69,7 @@ static func load_env() -> Dictionary:
 
 func _ready() -> void:
 	_refresh_timer.timeout.connect(_on_refresh_due)
+	_presence_timer.timeout.connect(_send_presence)
 	_sign_in.sign_in_pressed.connect(_on_sign_in_requested.bind(false))
 	_sign_in.create_account_pressed.connect(_on_sign_in_requested.bind(true))
 	_worlds_screen.open_world_requested.connect(_step_world)
@@ -338,9 +342,18 @@ func _step_world(world: Dictionary) -> void:
 	_membership = m["data"]
 	_world = _membership["world"]
 	if _membership["status"] == "member":
+		await _send_presence() # first, so the server can tell a new session from a reload before the party is read
 		_step_hub()
 	else:
 		_show_join()
+
+
+## The heartbeat: only while the player is inside a world they belong to (the hub, the map and the battle all count).
+func _send_presence() -> void:
+	if access_token == "" or _world.is_empty() or _membership.get("status", "") != "member" \
+			or _sign_in.visible or _worlds_screen.visible:
+		return
+	await api(HTTPClient.METHOD_POST, "/worlds/%s/presence" % _world["id"])
 
 
 # ---------- World hub ----------

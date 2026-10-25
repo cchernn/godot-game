@@ -161,6 +161,12 @@ layout_mode = 2
 toggle_mode = true
 text = "Ready"
 
+[node name="EscapeButton" type="Button" parent="SidePanel/Layout/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Leave the fight. You keep watching until it ends."
+text = "Escape"
+
 [node name="ErrorLabel" type="Label" parent="SidePanel/Layout"]
 unique_name_in_owner = true
 modulate = Color(1, 0.5, 0.4, 1)

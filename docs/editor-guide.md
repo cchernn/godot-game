@@ -96,6 +96,12 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 - The 3D board area is the `BoardHolder` node; its width is set by `SidePanel`'s left offset (360 px), so resize both together.
 - To preview the screens without a server, press **F6** on `client_main.tscn` (guest connect panel). The battle panel fills in once connected.
 
+## Escape button and presence timer
+
+- `client_main.tscn` → `SidePanel/Layout/ButtonRow/EscapeButton` is a normal button: move, restyle or rename its text there. The script only reads its `%EscapeButton` name.
+  How long the second press counts is the `escape_confirm_seconds` export on the root node.
+- `account_flow.tscn` → `PresenceTimer` sends the "still here" signal; `Wait Time` is the interval (10 s). The server's 30 second window is not set in the editor.
+
 ## Stats (Inspector)
 Every class and enemy is a `UnitTemplate` resource. Double-click one in the FileSystem dock (e.g. `stats/classes/warrior.tres`) and edit
 the **Stats** group: max HP, dexterity (sets AP and speed), power (added to damage), armor, accuracy, evasion, and the **Skills** list

@@ -6,7 +6,7 @@ extends VBoxContainer
 signal back_pressed
 signal retire_requested
 
-const RESULT_TEXT := {"players_win": "Victory", "players_lose": "Defeat", "draw": "Draw"}
+const RESULT_TEXT := {"players_win": "Victory", "players_lose": "Defeat", "draw": "Draw", "escaped": "Escaped"}
 
 @onready var _world: Label = %WorldLabel
 @onready var _character: Label = %CharacterLabel

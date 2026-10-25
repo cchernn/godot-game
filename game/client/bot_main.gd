@@ -13,6 +13,8 @@ var _drop_plan_round: int = -1
 var _dropped_plan: bool = false
 var _welcomes: int = 0
 var _finished: bool = false
+var _escape_round: int = -1
+var _escaped: bool = false
 
 
 func _ready() -> void:
@@ -35,6 +37,8 @@ func _ready() -> void:
 			party = arg.substr(14)
 		elif arg.begins_with("--drop-at-planning="):
 			_drop_plan_round = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--escape-at-round="):
+			_escape_round = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--drop-at-round="):
 			_drop_round = int(arg.get_slice("=", 1))
 	net = NetClient.new()
@@ -82,6 +86,13 @@ func _on_snapshot(s: Dictionary) -> void:
 		print("[%s] dropping connection during planning (round %d, plan locked: %s)" % [name, s["round"], str(s["plan"])])
 		net.simulate_drop()
 		return
+	if _escape_round > 0 and not _escaped and s["round"] == _escape_round and s["phase"] == Enums.RoundPhase.PLANNING and not me.is_empty():
+		_escaped = true
+		print("[%s] escaping (round %d)" % [name, s["round"]])
+		net.send_escape()
+		return
+	if _escaped and not s.get("escaped", false) and s["phase"] != Enums.RoundPhase.FINISHED:
+		print("[%s] ERROR still in the fight after escaping" % name)
 	if s["phase"] == Enums.RoundPhase.FINISHED and not _finished:
 		_finished = true
 		print("[bot] FINISHED outcome=%d round=%d me=%s" % [s["outcome"], s["round"], str(me.get("hp", "-"))])

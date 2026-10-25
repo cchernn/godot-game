@@ -88,6 +88,7 @@ func _ready() -> void:
 	Gateway.hello_received.connect(_on_hello)
 	Gateway.plan_received.connect(_on_plan)
 	Gateway.ready_received.connect(_on_ready)
+	Gateway.escape_received.connect(_on_escape)
 	print("[server] listening on %s port %d (env=%s, guests=%s, persistence=%s, players_required=%d, worlds=%s)" % [
 		"wss" if tls else "ws", port, env, allow_guests, "api" if persistence else "off", players_required,
 		_world_filter if _world_filter != "" else "any"])
@@ -330,7 +331,7 @@ func _on_hello(peer_id: int, display_name: String, token: String, world_id: Stri
 	else:
 		_push(rec)
 		if room.battle.state.phase == Enums.RoundPhase.FINISHED and not room.result_info.is_empty():
-			Gateway.s_result.rpc_id(peer_id, room.result_info)
+			Gateway.s_result.rpc_id(peer_id, _result_for(room, rec))
 
 
 func _welcome_info(rec: PlayerRec, room: Room) -> Dictionary:
@@ -466,10 +467,17 @@ func _tick_battle(room: Room, now: int) -> void:
 				if battle.state.phase == Enums.RoundPhase.PLANNING:
 					room.planning_deadline = now + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
 				_push_all(room)
-				if battle.state.phase == Enums.RoundPhase.FINISHED:
-					room.reset_at = now + RESULT_HOLD_MS
-					print("[server] battle finished: outcome %d (party %s)" % [battle.outcome, room.key if room.key != "" else "-"])
-					_finish_battle(room, battle, room.battle_key)
+				_conclude_if_finished(room, now)
+
+
+## Once a battle has just ended (by a beat or by the last escape), start the result hold and store the result.
+func _conclude_if_finished(room: Room, now: int) -> void:
+	var battle := room.battle
+	if battle.state.phase != Enums.RoundPhase.FINISHED or room.reset_at != 0:
+		return
+	room.reset_at = now + RESULT_HOLD_MS
+	print("[server] battle finished: outcome %d (party %s)" % [battle.outcome, room.key if room.key != "" else "-"])
+	_finish_battle(room, battle, room.battle_key)
 
 
 ## Back to an empty lobby for the next party; `kick` disconnects anyone still on the result screen.
@@ -511,6 +519,18 @@ func _on_ready(peer_id: int, flag: bool) -> void:
 	_push_all(room)
 
 
+func _on_escape(peer_id: int) -> void:
+	var rec := _rec_for(peer_id)
+	var room := _room_of(rec) if rec != null else null
+	if room == null or room.battle == null:
+		return
+	var r := room.battle.escape(rec.combatant_id)
+	if not r["ok"]:
+		Gateway.s_plan_result.rpc_id(peer_id, false, r["error"])
+	_push_all(room)
+	_conclude_if_finished(room, Time.get_ticks_msec())
+
+
 # ---------- Outbound state ----------
 
 func _push_all(room: Room) -> void:
@@ -543,12 +563,9 @@ func _push(rec: PlayerRec) -> void:
 
 ## Tells the players how it ended, stores the result, then tells them it is saved.
 func _finish_battle(room: Room, battle: Battle, key: String) -> void:
-	var win := battle.outcome == Enums.Outcome.PLAYERS_WIN
-	var xp: int = cfg.get_value("rewards", "xp_participation") + (cfg.get_value("rewards", "xp_victory_bonus") as int if win else 0)
 	var names := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
-		Enums.Outcome.DRAW: "draw"}
-	room.result_info = {"outcome": names[battle.outcome], "rounds": battle.state.round_number,
-		"xp": xp if persistence != null else 0, "saved": persistence == null}
+		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}
+	room.result_info = {"outcome": names[battle.outcome], "rounds": battle.state.round_number, "saved": persistence == null}
 	_send_results(room, battle)
 	if persistence == null:
 		return
@@ -562,11 +579,34 @@ func _send_results(room: Room, battle: Battle) -> void:
 	for rec in _members(room):
 		if rec.peer_id == -1:
 			continue
-		var info := room.result_info.duplicate()
-		var c := battle.state.get_c(rec.combatant_id)
-		info["you"] = "downed" if c.life_state == Enums.LifeState.DOWNED else \
-			("eliminated" if c.life_state == Enums.LifeState.ELIMINATED else "survived")
-		Gateway.s_result.rpc_id(rec.peer_id, info)
+		Gateway.s_result.rpc_id(rec.peer_id, _result_for(room, rec))
+
+
+## The result as one player sees it: the room's outcome plus what became of their own character.
+func _result_for(room: Room, rec: PlayerRec) -> Dictionary:
+	var info := room.result_info.duplicate()
+	var c := room.battle.state.get_c(rec.combatant_id)
+	info["you"] = _fate(c)
+	info["xp"] = _xp_for(room.battle, c) if persistence != null else 0
+	return info
+
+
+func _fate(c: Combatant) -> String:
+	match c.life_state:
+		Enums.LifeState.DOWNED:
+			return "downed"
+		Enums.LifeState.ELIMINATED:
+			return "eliminated"
+		Enums.LifeState.ESCAPED:
+			return "escaped"
+	return "survived"
+
+
+## XP for one character: everyone gets the participation share; the victory bonus goes to those still in the fight at the end.
+func _xp_for(battle: Battle, c: Combatant) -> int:
+	var bonus: int = cfg.get_value("rewards", "xp_victory_bonus")
+	var won := battle.outcome == Enums.Outcome.PLAYERS_WIN and c.life_state != Enums.LifeState.ESCAPED
+	return (cfg.get_value("rewards", "xp_participation") as int) + (bonus if won else 0)
 
 
 ## Commits the finished encounter once. Retried with the same idempotency key, so a retry after a
@@ -574,19 +614,12 @@ func _send_results(room: Room, battle: Battle) -> void:
 func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	if room.instance_id != "":
 		_finish_instance(room.instance_id, battle.outcome == Enums.Outcome.PLAYERS_WIN)
-	var win := battle.outcome == Enums.Outcome.PLAYERS_WIN
-	var xp: int = cfg.get_value("rewards", "xp_participation") + (cfg.get_value("rewards", "xp_victory_bonus") as int if win else 0)
 	var participants: Array = []
 	for rec in _members(room):
 		var c := battle.state.get_c(rec.combatant_id)
-		var outcome := "survived"
-		if c.life_state == Enums.LifeState.DOWNED:
-			outcome = "downed"
-		elif c.life_state == Enums.LifeState.ELIMINATED:
-			outcome = "eliminated"
-		participants.append({"character_id": rec.character["id"], "outcome": outcome, "xp": xp})
+		participants.append({"character_id": rec.character["id"], "outcome": _fate(c), "xp": _xp_for(battle, c)})
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
-		Enums.Outcome.DRAW: "draw"}[battle.outcome] as String
+		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String
 	for attempt in 5:
 		var r := await persistence.commit_result(room.world_id, key, outcome_name, battle.state.round_number, participants)
 		if r["ok"]:
