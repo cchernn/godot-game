@@ -695,3 +695,18 @@ func test_join_request_row_reports_approve_and_reject() -> void:
 	row.set_busy(true)
 	assert_true((row.get_node("%ApproveButton") as Button).disabled and (row.get_node("%RejectButton") as Button).disabled)
 	row.free()
+
+
+func test_event_log_groups_by_beat_and_recaps_the_round() -> void:
+	var c := _client()
+	var log_view := c.get_node("%LogView") as RichTextLabel
+	c.call("_on_events", [
+		{"type": "hit", "round": 1, "beat": 1, "text": "A hits B"},
+		{"type": "miss", "round": 1, "beat": 1, "text": "B misses A"},
+		{"type": "hit", "round": 1, "beat": 2, "text": "A hits B"},
+		{"type": "round_start", "round": 2, "beat": 0, "text": "Round 2"}])
+	var t := log_view.get_parsed_text()
+	assert_eq(t.count("Round 1 · Beat 1"), 1, "one header per beat")
+	assert_true("Round 1 · Beat 2" in t, "second beat header")
+	assert_true("Last round: 2 hit, 1 miss" in t, "recap line")
+	c.free()

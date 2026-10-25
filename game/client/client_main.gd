@@ -17,6 +17,9 @@ var snap: Dictionary = {}
 var me: Dictionary = {}
 var plan: Array[Dictionary] = []
 var _plan_round: int = -1
+var _log_round: int = -1
+var _log_beat: int = -1
+var _round_tally: Dictionary = {}
 var _prev_plan: Array[Dictionary] = []
 var mode: String = ""
 var _snap_time_ms: int = 0
@@ -168,6 +171,9 @@ func _on_connection(ok: bool) -> void:
 func _on_welcome(info: Dictionary) -> void:
 	_in_battle = info["in_battle"]
 	log_view.clear() # the server replays the visible history after (re)connecting
+	_log_round = -1
+	_log_beat = -1
+	_round_tally.clear()
 	_plan_round = -1
 	if not _in_battle:
 		connect_panel.show()
@@ -201,6 +207,15 @@ func _on_snapshot(s: Dictionary) -> void:
 
 func _on_events(list: Array) -> void:
 	for e: Dictionary in list:
+		var round_no: int = e.get("round", 0)
+		var beat_no: int = e.get("beat", 0)
+		if e["type"] == "round_start":
+			_append_recap()
+		elif beat_no > 0 and (round_no != _log_round or beat_no != _log_beat):
+			log_view.append_text("[color=#6f7a8c]— Round %d · Beat %d —[/color]\n" % [round_no, beat_no])
+		_log_round = round_no
+		_log_beat = beat_no
+		_round_tally[e["type"]] = int(_round_tally.get(e["type"], 0)) + 1
 		var col := "#c8c8c8"
 		match e["type"]:
 			"hit", "eliminated", "downed": col = "#ff7b6b"
@@ -210,6 +225,18 @@ func _on_events(list: Array) -> void:
 			"round_start", "resolution_start": col = "#7fb2ff"
 			"victory": col = "#ffffff"
 		log_view.append_text("[color=%s]%s[/color]\n" % [col, e["text"]])
+
+
+## One line summing up the round that just resolved, from the event types seen since the last recap.
+func _append_recap() -> void:
+	var parts: Array[String] = []
+	for t: String in ["hit", "miss", "downed", "eliminated", "revived", "interrupt"]:
+		var n: int = _round_tally.get(t, 0)
+		if n > 0:
+			parts.append("%d %s" % [n, t])
+	_round_tally.clear()
+	if not parts.is_empty():
+		log_view.append_text("[color=#7fb2ff]Last round: %s[/color]\n" % ", ".join(parts))
 
 
 ## The board and side panel only exist while a battle is on; before and after, the screen is the menu.
@@ -268,6 +295,9 @@ func _on_continue_pressed() -> void:
 	for ch in skill_box.get_children():
 		ch.queue_free()
 	log_view.clear()
+	_log_round = -1
+	_log_beat = -1
+	_round_tally.clear()
 	error_label.text = ""
 	banner.text = ""
 	board.reset()
