@@ -726,3 +726,21 @@ func test_planning_countdown_changes_colour_as_time_runs_out() -> void:
 	c.call("_on_snapshot", s)
 	assert_true(label.modulate.g < 0.5, "red when urgent")
 	c.free()
+
+
+func test_fog_tiles_are_called_out_and_unseen_events_are_tinted() -> void:
+	var c := _client()
+	c.call("_on_snapshot", _snapshot())
+	var board := c.get("board") as Board3D
+	var fogged := Vector2i(-1, -1)
+	for y in board.bf.height:
+		for x in board.bf.width:
+			if not board.is_seen(Vector2i(x, y)):
+				fogged = Vector2i(x, y)
+	assert_true(fogged.x >= 0, "the opening snapshot leaves some tiles in fog")
+	board.hover = fogged
+	c.call("_update_hover_text")
+	assert_true("Fog" in (c.get_node("%HoverLabel") as Label).text, "fog hover")
+	c.call("_on_events", [{"type": "hit", "round": 1, "beat": 1, "text": "Something unseen hits Aldric"}])
+	assert_true("Something unseen" in (c.get_node("%LogView") as RichTextLabel).get_parsed_text())
+	c.free()

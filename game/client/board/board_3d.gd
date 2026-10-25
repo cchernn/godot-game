@@ -52,6 +52,11 @@ var _overlay_sig: int = 0
 var _serial: int = 0
 
 
+## True when the player's team currently sees this tile (its own units are always shown).
+func is_seen(cell: Vector2i) -> bool:
+	return _seen.has(cell)
+
+
 func _ready() -> void:
 	_sight = GameConfig.load_file().get_value("combat", "sight_range")
 

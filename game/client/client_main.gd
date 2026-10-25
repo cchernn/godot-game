@@ -227,6 +227,8 @@ func _on_events(list: Array) -> void:
 			"revived": col = "#7be08a"
 			"round_start", "resolution_start": col = "#7fb2ff"
 			"victory": col = "#ffffff"
+		if "unseen" in String(e["text"]):
+			col = "#b69af0" # something happened out of sight
 		log_view.append_text("[color=%s]%s[/color]\n" % [col, e["text"]])
 
 
@@ -379,6 +381,8 @@ func _update_preview() -> void:
 ## One line about the tile under the mouse: what a walk there costs, or whether the target is in reach.
 func _update_hover_text() -> void:
 	hover_label.text = ""
+	if not snap.is_empty() and board.bf != null and board.bf.in_bounds(board.hover) and not board.is_seen(board.hover):
+		hover_label.text = "Fog: not visible to your team"
 	var sk: SkillDef = skills.get_skill(mode) if mode != "" else null
 	if sk == null or snap.is_empty() or not _can_edit() or sk.kind == Enums.SkillKind.REACTION or not board.bf.in_bounds(board.hover):
 		return
@@ -392,6 +396,8 @@ func _update_hover_text() -> void:
 			cost = Pathfinder.ap_cost(board.bf, path, me["tiles_per_ap"], 1)
 	hover_label.text = TargetingPreview.hover_text(sk, snap["units"], me, board.bf, from, board.hover, path_len, cost,
 		me["ap_capacity"] - _plan_cost())
+	if not board.is_seen(board.hover):
+		hover_label.text += " (fog: not visible to your team)"
 
 
 func _plan_cost() -> int:

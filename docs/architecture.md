@@ -99,6 +99,11 @@ marks the units it can target (green). Hovering a tile says what a walk there co
 with "Beats used: n of 8" under the queue. This lives in `game/client/targeting_preview.gd` (pure functions, unit-tested); the shading materials are
 `game/content/board/materials/range.tres` and `valid.tres`, set on the board scene. It is a preview only: the server validates every plan.
 
+While a round resolves the server sends each beat's events one beat delay (700 ms) apart; the log groups them under "Round n · Beat b" headers and adds a
+"Last round: 3 hit, 1 miss" recap line when the next round starts. The status line counts the planning time down and turns amber and then red
+(`timer_warn_seconds` 30 and `timer_urgent_seconds` 10, exported on the client scene, PROVISIONAL). Tiles your team cannot see stay fogged on the board;
+hovering one says so, and events about an unseen enemy are tinted purple in the log.
+
 ## Characters
 
 - One active character per player per world. `GET /worlds/{id}/characters` lists every character in the world (active, then retired) with its
