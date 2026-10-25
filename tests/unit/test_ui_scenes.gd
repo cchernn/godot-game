@@ -710,3 +710,19 @@ func test_event_log_groups_by_beat_and_recaps_the_round() -> void:
 	assert_true("Round 1 · Beat 2" in t, "second beat header")
 	assert_true("Last round: 2 hit, 1 miss" in t, "recap line")
 	c.free()
+
+
+func test_planning_countdown_changes_colour_as_time_runs_out() -> void:
+	var c := _client()
+	var s := _snapshot()
+	s["timer_ms"] = 60000
+	c.call("_on_snapshot", s)
+	var label := c.get_node("%StatusLabel") as Label
+	assert_eq(label.modulate, Color.WHITE, "plenty of time")
+	s["timer_ms"] = 20000
+	c.call("_on_snapshot", s)
+	assert_true(label.modulate != Color.WHITE and label.modulate.g > 0.7, "amber warning")
+	s["timer_ms"] = 5000
+	c.call("_on_snapshot", s)
+	assert_true(label.modulate.g < 0.5, "red when urgent")
+	c.free()

@@ -17,6 +17,9 @@ var snap: Dictionary = {}
 var me: Dictionary = {}
 var plan: Array[Dictionary] = []
 var _plan_round: int = -1
+## Planning countdown colours: amber at or under the first, red at or under the second (seconds).
+@export var timer_warn_seconds: int = 30
+@export var timer_urgent_seconds: int = 10
 var _log_round: int = -1
 var _log_beat: int = -1
 var _round_tally: Dictionary = {}
@@ -504,6 +507,13 @@ func _refresh() -> void:
 		secs = "  (%ds)" % maxi(0, ceili((snap["timer_ms"] - (Time.get_ticks_msec() - _snap_time_ms)) / 1000.0))
 	status_label.text = "Round %d — %s%s   Beat %d/%d" % [snap["round"], phase_names[snap["phase"]], secs,
 		snap["beat"], snap["beats_per_round"]]
+	status_label.modulate = Color.WHITE
+	if snap.get("timer_ms", -1) >= 0:
+		var left := ceili((snap["timer_ms"] - (Time.get_ticks_msec() - _snap_time_ms)) / 1000.0)
+		if left <= timer_urgent_seconds:
+			status_label.modulate = Color(1, 0.45, 0.4)
+		elif left <= timer_warn_seconds:
+			status_label.modulate = Color(1, 0.8, 0.35)
 	if snap["eliminated"]:
 		status_label.text += "\nYou were eliminated — spectating."
 	elif not me.is_empty() and me["life"] == Enums.LifeState.DOWNED:
