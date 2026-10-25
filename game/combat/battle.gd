@@ -275,6 +275,9 @@ func snapshot_for(cid: String) -> Dictionary:
 			u["dexterity"] = c.dexterity
 			u["tiles_per_ap"] = cfg.tiles_per_ap(c.dexterity)
 			u["reaction"] = not c.reaction.is_empty()
+		elif me != null and c.team == me.team:  # allies see each other's AP, never each other's plans
+			u["ap_capacity"] = c.ap_capacity
+			u["ap_reserved"] = c.ap_reserved
 		units.append(u)
 	var plan: Array[Dictionary] = []
 	if me != null:

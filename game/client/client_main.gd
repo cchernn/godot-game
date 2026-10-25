@@ -6,6 +6,8 @@ extends Control
 
 ## Skills are listed as buttons made from this scene (game/content/ui/skill_button.tscn).
 @export var skill_button_scene: PackedScene
+## The strip of cards under the board (game/content/ui/unit_card.tscn): your party, and the enemies in sight.
+@export var unit_card_scene: PackedScene
 ## Turn off to always use the plain guest connect screen, even when client_env.json exists.
 @export var account_mode_enabled: bool = true
 
@@ -40,6 +42,9 @@ var _state: String = "menu"
 @onready var log_view: RichTextLabel = %LogView
 @onready var board_holder: Control = %BoardHolder
 @onready var side_panel: Control = %SidePanel
+@onready var unit_strip: Control = %UnitStrip
+@onready var party_cards: HBoxContainer = %PartyCards
+@onready var enemy_cards: HBoxContainer = %EnemyCards
 @onready var result_panel: Control = %ResultPanel
 @onready var result_title: Label = %ResultTitle
 @onready var result_detail: Label = %ResultDetail
@@ -207,6 +212,7 @@ func _on_events(list: Array) -> void:
 func _set_battle_view(on: bool) -> void:
 	board_holder.visible = on
 	side_panel.visible = on
+	unit_strip.visible = on
 	if not on:
 		result_panel.hide()
 
@@ -449,6 +455,7 @@ func _refresh() -> void:
 			for u: Dictionary in snap["units"]:
 				if u["id"] == a["target"]:
 					board.plan_marks.append(u["cell"])
+	_refresh_cards()
 	var can := _can_edit()
 	ready_btn.disabled = me.is_empty() or snap["phase"] != Enums.RoundPhase.PLANNING or not me.get("active", false)
 	ready_btn.set_pressed_no_signal(not me.is_empty() and me["ready"])
@@ -456,6 +463,42 @@ func _refresh() -> void:
 	for id: String in _skill_buttons:
 		(_skill_buttons[id] as Button).disabled = not can
 		(_skill_buttons[id] as Button).set_pressed_no_signal(id == mode)
+
+
+## One card per visible unit, reused between snapshots: allies (you first) in the party row, enemies in sight above it.
+func _refresh_cards() -> void:
+	var allies: Array[Dictionary] = []
+	var enemies: Array[Dictionary] = []
+	for u: Dictionary in snap["units"]:
+		if u["team"] == Enums.Team.PLAYERS:
+			if u["id"] == snap["you"]:
+				allies.push_front(u)
+			else:
+				allies.append(u)
+		else:
+			enemies.append(u)
+	_fill_cards(party_cards, allies)
+	_fill_cards(enemy_cards, enemies)
+
+
+func _fill_cards(row: HBoxContainer, units: Array[Dictionary]) -> void:
+	var have := {}
+	for card in row.get_children():
+		have[card.name] = card
+	var wanted := {}
+	for i in units.size():
+		var u := units[i]
+		wanted[u["id"]] = true
+		var card := have.get(u["id"]) as UnitCard
+		if card == null:
+			card = unit_card_scene.instantiate() as UnitCard
+			card.name = u["id"]
+			row.add_child(card)
+		row.move_child(card, i)
+		card.show_unit(u, snap["phase"], u["id"] == snap["you"])
+	for id: String in have:
+		if not wanted.has(id):
+			(have[id] as Node).queue_free()
 
 
 func _rebuild_skill_buttons() -> void:

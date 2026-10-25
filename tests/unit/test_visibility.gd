@@ -37,6 +37,16 @@ func test_hidden_enemies_are_never_in_snapshot_or_public_events() -> void:
 		assert_true(not "e moves" in (ev["text"] as String) and not (ev["type"] == "move" and ev["actor"] == "e"))
 
 
+func test_allies_see_each_others_ap_but_enemies_do_not_get_any() -> void:
+	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1)), Fx.player("b", V(1, 1), {"dex": 12}), Fx.enemy("e", V(4, 1))])
+	var by_id := {}
+	for u: Dictionary in b.snapshot_for("a")["units"]:
+		by_id[u["id"]] = u
+	assert_true(by_id["b"].has("ap_capacity") and by_id["b"].has("ap_reserved"), "an ally's AP is shared")
+	assert_true(not by_id["b"].has("skills") and not by_id["b"].has("plan"), "but not their skills or plan")
+	assert_true(not by_id["e"].has("ap_capacity"), "enemies' AP is not sent")
+
+
 func test_snapshot_never_contains_enemy_plans() -> void:
 	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1)), Fx.enemy("e", V(2, 1))])
 	Fx.plan(b, "e", [Fx.act("strike", "a")])

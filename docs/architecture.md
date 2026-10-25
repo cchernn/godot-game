@@ -87,6 +87,12 @@ A **party** is an activity instance (a session of an activity) with a leader and
 - Joining a world: `GET /worlds/{id}/membership` returns the user's standing (member / pending / rejected / removed / none) and whether they are the
   host; non-members request access, the host approves or rejects. Requests carry the requester's email (display label only).
 
+## Battle screen
+
+A strip of cards under the board (`game/content/ui/unit_card.tscn`) shows the player's party (you first) and the enemies in sight: name, class, HP bar,
+and for allies their AP (and AP reserved after Ready) and whether they are Planning or Ready. The snapshot gives allies each other's AP and Ready state, never
+their skills or plans; hidden enemies get no card.
+
 ## Characters
 
 - One active character per player per world. `GET /worlds/{id}/characters` lists every character in the world (active, then retired) with its

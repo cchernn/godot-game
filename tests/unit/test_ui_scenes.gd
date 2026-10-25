@@ -5,7 +5,7 @@ const ACCOUNT := "res://game/client/account_flow.tscn"
 const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "FaceSouth", "FaceWest", "QueueList",
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
-	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow"]
+	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards"]
 
 
 func _client() -> Control:
@@ -48,6 +48,49 @@ func test_a_snapshot_fills_the_panel_and_builds_skill_buttons() -> void:
 	assert_true(first.toggle_mode and first.text.begins_with("Move"))
 	assert_true(not (c.get_node("%ReadyButton") as Button).disabled)
 	c.free()
+
+
+func test_the_strip_shows_one_card_per_visible_unit_with_you_first() -> void:
+	var c := _client()
+	var s := _snapshot()
+	c._on_snapshot(s)
+	var party := c.get_node("%PartyCards") as HBoxContainer
+	var enemies := c.get_node("%EnemyCards") as HBoxContainer
+	var allies := (s["units"] as Array).filter(func(u: Dictionary) -> bool: return u["team"] == Enums.Team.PLAYERS)
+	var foes := (s["units"] as Array).filter(func(u: Dictionary) -> bool: return u["team"] != Enums.Team.PLAYERS)
+	assert_eq(party.get_child_count(), allies.size())
+	assert_eq(enemies.get_child_count(), foes.size(), "only enemies in sight get a card")
+	assert_eq(party.get_child(0).name, StringName(s["you"]), "your own card comes first")
+	assert_true((c.get_node("%UnitStrip") as Control).visible)
+	c._on_snapshot(s) # a second snapshot reuses the cards
+	assert_eq(party.get_child_count(), allies.size())
+	c.free()
+
+
+func test_unit_card_shows_hp_ap_and_ready_state() -> void:
+	var card := (load("res://game/content/ui/unit_card.tscn") as PackedScene).instantiate() as UnitCard
+	(Engine.get_main_loop() as SceneTree).root.add_child(card)
+	var u := {"id": "pc1", "name": "Brea", "visual": "ranger", "team": Enums.Team.PLAYERS, "hp": 12, "max_hp": 28,
+		"life": Enums.LifeState.ALIVE, "ready": false, "active": true, "ap_capacity": 4, "ap_reserved": 0}
+	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
+	assert_eq((card.get_node("%NameLabel") as Label).text, "Brea - Ranger")
+	assert_eq((card.get_node("%HpLabel") as Label).text, "HP 12/28")
+	assert_eq((card.get_node("%HpBar") as ProgressBar).value, 12.0)
+	assert_eq((card.get_node("%StatusLabel") as Label).text, "AP 4 - Planning")
+	u["ready"] = true
+	u["ap_reserved"] = 2
+	card.show_unit(u, Enums.RoundPhase.PLANNING, true)
+	assert_eq((card.get_node("%NameLabel") as Label).text, "Brea (you) - Ranger")
+	assert_eq((card.get_node("%StatusLabel") as Label).text, "AP 4 (2 reserved) - Ready")
+	u["life"] = Enums.LifeState.DOWNED
+	card.show_unit(u, Enums.RoundPhase.RESOLVING, false)
+	assert_eq((card.get_node("%StatusLabel") as Label).text, "AP 4 (2 reserved) - Downed")
+	var e := {"id": "g1", "name": "Ghoul", "visual": "ghoul", "team": Enums.Team.ENEMIES, "hp": 9, "max_hp": 18,
+		"life": Enums.LifeState.ALIVE, "ready": false, "active": true}
+	card.show_unit(e, Enums.RoundPhase.PLANNING, false)
+	assert_eq((card.get_node("%NameLabel") as Label).text, "Ghoul", "no class and no AP for an enemy")
+	assert_eq((card.get_node("%StatusLabel") as Label).text, "")
+	card.free()
 
 
 func test_pressing_a_skill_and_clicking_a_tile_queues_a_plan() -> void:
