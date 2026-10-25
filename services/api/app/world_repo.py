@@ -131,6 +131,8 @@ class WorldMixin:
             conn.execute("update world_members set status='removed' where world_id=%s and user_id=%s", (world_id, user_id))
             for c in conn.execute("select id from characters where world_id=%s and user_id=%s and status='active'", (world_id, user_id)).fetchall():
                 self._detach(conn, c["id"])  # a removed member leaves their party
+                conn.execute("delete from activity_roster where character_id=%s and instance_id in "
+                             "(select id from activity_instances where status in ('forming','active'))", (c["id"],))  # and the battle they were in
 
     def list_members(self, world_id: uuid.UUID, host_id: uuid.UUID) -> list[dict]:
         """Active members for the host's management screen: who they are (their join label, else their character) and their role."""
@@ -265,7 +267,8 @@ class WorldMixin:
             if inst is None:
                 raise NotFound("Party not found")
             roster = conn.execute("select c.id, c.user_id, c.name, c.class from activity_roster r join characters c on c.id=r.character_id "
-                                  "where r.instance_id=%s order by r.joined_at", (instance_id,)).fetchall()
+                                  "where r.instance_id=%s and (%s::uuid is null or r.character_id in (select character_id from party_members where party_id=%s)) "
+                                  "order by r.joined_at", (instance_id, inst["party_id"], inst["party_id"])).fetchall()
         act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
         return {**_row(inst), "roster": [_row(r) for r in roster], "encounter": act["encounter"],
                 "activity_name": act["name"], "max_players": act["max_players"]}

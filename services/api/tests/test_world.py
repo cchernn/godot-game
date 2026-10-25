@@ -687,3 +687,15 @@ def test_leader_hands_the_party_to_a_member(client, pool):
     assert client.post(f"/parties/{iid}/leader", json=body(c1), headers=auth(t1)).status_code == 403, "no longer the leader"
     start(client, iid, t2)
     assert client.post(f"/parties/{iid}/leader", json=body(c1), headers=auth(t2)).status_code == 409, "not mid-activity"
+
+
+def test_a_removed_member_drops_out_of_the_running_battle(client, pool):
+    w, [t1, t2], [c1, c2] = party(client, pool)
+    join_party(client, my_party(client, w["id"], t1)["id"], t1, t2)
+    rid = new_party(client, w["id"], t1)
+    roster = lambda: [r["name"] for r in client.get(f"/internal/instances/{rid}", headers=SERVER).json()["roster"]]
+    assert roster() == ["C0", "C1"]
+    uid = client.get(f"/worlds/{w['id']}/characters/me", headers=auth(t2)).json()["user_id"]
+    assert client.post(f"/worlds/{w['id']}/members/{uid}/remove", headers=auth(t1)).status_code == 204
+    assert roster() == ["C0"], "the removed player no longer holds a seat"
+    assert [m["name"] for m in my_party(client, w["id"], t1)["members"]] == ["C0"]
