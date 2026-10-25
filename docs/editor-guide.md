@@ -124,7 +124,7 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
 
 ## Things that are still code (for now)
 The global tuning in `config/balance.json` (hit chance, the AP table, rewards) is a JSON file, not an Inspector resource. Game rules,
-networking and the API stay in code. The dropdown choices for origin and class on the character creator mirror the server's rules (`character_creator.gd`).
+networking and the API stay in code. The dropdown choices for class on the character creator mirror the server's rules (`character_creator.gd`).
 
 ## `tools/generate_content.gd`
 The one-time scaffold that created these files. It never overwrites existing files; `-- --force` regenerates everything and

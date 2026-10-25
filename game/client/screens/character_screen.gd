@@ -47,7 +47,7 @@ func show_checking(world_name: String) -> void:
 
 func show_character(c: Dictionary) -> void:
 	_name = str(c["name"])
-	_character.text = "%s\nLevel %d %s (%s)" % [c["name"], c["level"], str(c["class"]).capitalize(), c["origin"]]
+	_character.text = "%s\nLevel %d %s" % [c["name"], c["level"], str(c["class"]).capitalize()]
 	_xp.text = "%d XP" % c["xp"]
 	_confirm.text = ""
 	_sync_retire()

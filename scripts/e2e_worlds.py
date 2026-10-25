@@ -72,7 +72,7 @@ try:
     names = {"a1": "Aldric", "a2": "Aria", "a3": "Arden", "b1": "Bran", "b2": "Brea"}
     for n, u in users.items():
         r = httpx.post(f"{api}/worlds/{worlds[n[0]]['id']}/characters", headers=h(u),
-                       json={"name": names[n], "origin": "outcast", "class": "warrior"})
+                       json={"name": names[n], "class": "warrior"})
         assert r.status_code == 201, r.text
     listing = {w["name"]: w for w in httpx.get(api + "/worlds/available", headers=h(users["a1"])).json()}
     assert listing["World a"]["status"] == "member" and listing["World b"]["status"] == "none", listing

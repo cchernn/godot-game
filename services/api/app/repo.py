@@ -60,15 +60,15 @@ class Repository(WorldMixin):
 
     # ---- characters ----
 
-    def create_character(self, world_id: uuid.UUID, user_id: uuid.UUID, name: str, origin: str, cls: str) -> dict:
+    def create_character(self, world_id: uuid.UUID, user_id: uuid.UUID, name: str, cls: str) -> dict:
         if not self.is_member(world_id, user_id):
             raise Forbidden("Not a member of this world")
         start_node = self.definition(world_id).start_node
         try:
             with self.pool.connection() as conn:
                 r = conn.execute(
-                    "insert into characters (world_id, user_id, name, origin, class, node_id) values (%s,%s,%s,%s,%s,%s) returning *",
-                    (world_id, user_id, name, origin, cls, start_node)).fetchone()
+                    "insert into characters (world_id, user_id, name, class, node_id) values (%s,%s,%s,%s,%s) returning *",
+                    (world_id, user_id, name, cls, start_node)).fetchone()
         except psycopg.errors.UniqueViolation as e:
             raise Conflict("You already have an active character in this world") from e
         return _row(r)
@@ -97,7 +97,7 @@ class Repository(WorldMixin):
             raise Forbidden("Not a member of this world")
         with self.pool.connection() as conn:
             rows = conn.execute(
-                "select c.id, c.user_id, c.name, c.class, c.origin, c.level, c.status, c.retired_at, m.role, "
+                "select c.id, c.user_id, c.name, c.class, c.level, c.status, c.retired_at, m.role, "
                 "  (select r.requester_label from world_join_requests r where r.world_id = c.world_id and r.user_id = c.user_id "
                 "     and r.requester_label is not null order by r.created_at desc limit 1) as label "
                 "from characters c join world_members m on m.world_id = c.world_id and m.user_id = c.user_id "
@@ -105,7 +105,7 @@ class Repository(WorldMixin):
         out = []
         for r in rows:
             owner = r["label"].split("@")[0] if r["label"] else ("Host" if r["role"] == "host" else "Player %s" % str(r["user_id"])[:8])
-            out.append({"id": str(r["id"]), "name": r["name"], "class": r["class"], "origin": r["origin"], "level": r["level"],
+            out.append({"id": str(r["id"]), "name": r["name"], "class": r["class"], "level": r["level"],
                         "status": r["status"], "owner": owner, "mine": r["user_id"] == user_id})
         return out
 

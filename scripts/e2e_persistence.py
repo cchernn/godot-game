@@ -63,7 +63,7 @@ try:
         assert httpx.post(f"{api}/worlds/{world['id']}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
     chars = []
     for u, name, cls in zip(users, ["Aldric", "Brea", "Corin", "Outsider"], ["warrior", "ranger", "cleric", "rogue"]):
-        r = httpx.post(f"{api}/worlds/{world['id']}/characters", json={"name": name, "origin": "outcast", "class": cls}, headers=h(u))
+        r = httpx.post(f"{api}/worlds/{world['id']}/characters", json={"name": name, "class": cls}, headers=h(u))
         assert r.status_code == 201, r.text
         chars.append(r.json())
 

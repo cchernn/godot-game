@@ -16,7 +16,7 @@ def add_member(pool, world_id, user_id):
 
 
 def make_char(client, world_id, tok, name="Hero", cls="warrior"):
-    return client.post(f"/worlds/{world_id}/characters", json={"name": name, "origin": "outcast", "class": cls}, headers=auth(tok))
+    return client.post(f"/worlds/{world_id}/characters", json={"name": name, "class": cls}, headers=auth(tok))
 
 
 def test_one_active_character_per_player_per_world_and_retirement(client):
@@ -42,9 +42,9 @@ def test_authorization_membership_and_ownership(client, pool):
     assert client.get("/worlds", headers=auth(other)).json()[0]["id"] == w["id"]
 
 
-def test_class_and_origin_are_validated(client):
+def test_class_is_validated(client):
     w, [(tok, _), _] = setup_world(client)
-    r = client.post(f"/worlds/{w['id']}/characters", json={"name": "x", "origin": "nope", "class": "warrior"}, headers=auth(tok))
+    r = client.post(f"/worlds/{w['id']}/characters", json={"name": "x", "class": "nope"}, headers=auth(tok))
     assert r.status_code == 422
 
 

@@ -73,7 +73,7 @@ func _on_sign_in_requested(email: String, password: String, create: bool) -> voi
 Why this is worth the trouble:
 - **Each screen is testable and editable alone.** Press F6 on `sign_in_screen.tscn` and it runs without a server. The tests in
   `tests/unit/test_ui_scenes.gd` instantiate each screen by itself, press its buttons and check the signals.
-- **Screens are swappable.** A fancy character creator only has to keep emitting `create_requested(name, origin, class_id)`.
+- **Screens are swappable.** A fancy character creator only has to keep emitting `create_requested(name, class_id)`.
 - **No tangled dependencies:** screens never reference each other. When something goes wrong you look in exactly one place.
 
 Rule of thumb for new code: *if it needs the network, the session or another screen, it belongs in the coordinator; if it is about showing a
@@ -199,9 +199,9 @@ the moment the new character appears on the world hub. You should cross: the sig
 ## 7. Where an elaborate character creator would go
 
 `character_creator.tscn` is deliberately its own scene. To grow it:
-- Keep its contract: emit `create_requested(character_name, origin, class_id)` (add parameters when you add choices) and `back_pressed`.
+- Keep its contract: emit `create_requested(character_name, class_id)` (add parameters when you add choices) and `back_pressed`.
 - Build it from sub-scenes: for example a live preview using a `SubViewportContainer` around a `SubViewport` that contains a unit scene from
-  `game/content/units/`, plus tabs for origin, class and appearance. Option lists make good resources (`@export var options: Array[...]`).
+  `game/content/units/`, plus tabs for class and appearance. Option lists make good resources (`@export var options: Array[...]`).
 - Anything the character should *remember* needs the backend: a column in the API's `characters` table, validation in `services/api`, and
   sending it to other players so their clients draw your character too. That part is code; the screen is not.
 
@@ -225,7 +225,7 @@ the moment the new character appears on the world hub. You should cross: the sig
   big script refactors so diffs stay readable.
 - After an editor change, the **browser** version needs a rebuild: `scripts/stack.sh up web`. A change to message formats between client and
   server (`gateway.gd`) needs `game` and `web` rebuilt together.
-- Class and origin lists live in three places (the API's `rules.py`, `character_creator.gd`, and `game/content/stats/classes`). Tests fail if they drift.
+- The class list lives in three places (the API's `rules.py`, `character_creator.gd`, and `game/content/stats/classes`). Tests fail if they drift.
 
 ## Next lesson
 The world picker and character screens: filling an `ItemList` from API data, the membership rules behind "joined / request pending / not joined", and

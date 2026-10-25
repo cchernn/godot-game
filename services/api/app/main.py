@@ -42,7 +42,6 @@ class RevealIn(BaseModel):
 
 class CharacterIn(BaseModel):
     name: str = Field(min_length=1, max_length=32)
-    origin: str
     cls: str = Field(alias="class")
 
 
@@ -147,9 +146,9 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     @app.post("/worlds/{world_id}/characters", status_code=201)
     def create_character(world_id: uuid.UUID, body: CharacterIn, user: Identity = Depends(current_user),
                          r: Repository = Depends(repo)) -> dict:
-        if body.cls not in rules.CLASSES or body.origin not in rules.ORIGINS:
-            raise HTTPException(422, "Unknown class or origin")
-        return r.create_character(world_id, user.user_id, body.name, body.origin, body.cls)
+        if body.cls not in rules.CLASSES:
+            raise HTTPException(422, "Unknown class")
+        return r.create_character(world_id, user.user_id, body.name, body.cls)
 
     @app.get("/worlds/{world_id}/characters/me")
     def my_character(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:

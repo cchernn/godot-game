@@ -32,7 +32,7 @@ def join(client, world_id, host_tok):
 
 
 def char(client, world_id, tok, name="Hero", cls="warrior"):
-    r = client.post(f"/worlds/{world_id}/characters", json={"name": name, "origin": "outcast", "class": cls}, headers=auth(tok))
+    r = client.post(f"/worlds/{world_id}/characters", json={"name": name, "class": cls}, headers=auth(tok))
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -126,7 +126,7 @@ def test_rejected_request_grants_nothing(client):
 
 
 def make_char_status(client, world_id, tok):
-    return client.post(f"/worlds/{world_id}/characters", json={"name": "x", "origin": "outcast", "class": "warrior"}, headers=auth(tok)).status_code
+    return client.post(f"/worlds/{world_id}/characters", json={"name": "x", "class": "warrior"}, headers=auth(tok)).status_code
 
 
 def test_removal_revokes_access_but_keeps_data_and_reapproval_restores_it(client):

@@ -434,9 +434,9 @@ func _step_create_character() -> void:
 	_show(_creator)
 
 
-func _on_create_character_requested(character_name: String, origin: String, class_id: String) -> void:
+func _on_create_character_requested(character_name: String, class_id: String) -> void:
 	var c := await api(HTTPClient.METHOD_POST, "/worlds/%s/characters" % _world["id"],
-		{"name": character_name, "origin": origin, "class": class_id})
+		{"name": character_name, "class": class_id})
 	if c["status"] == 201:
 		status.text = ""
 		_step_hub()

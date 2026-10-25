@@ -306,8 +306,8 @@ func test_character_screen_shows_stats_skills_battles_and_everyones_characters()
 	s.retire_requested.connect(func() -> void: got.append("retire"))
 	s.show_checking("Hollow")
 	assert_eq((s.get_node("%WorldLabel") as Label).text, "World: Hollow")
-	s.show_character({"name": "Aldric", "level": 1, "class": "warrior", "origin": "soldier", "xp": 0})
-	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nLevel 1 Warrior (soldier)")
+	s.show_character({"name": "Aldric", "level": 1, "class": "warrior", "xp": 0})
+	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nLevel 1 Warrior")
 	assert_eq((s.get_node("%XpLabel") as Label).text, "0 XP")
 	assert_true((s.get_node("%StatsLabel") as Label).text.begins_with("HP "), "stats come from the class resource")
 	assert_true((s.get_node("%SkillsList") as ItemList).item_count >= 2, "and so do the skills")
@@ -339,20 +339,18 @@ func test_character_screen_shows_stats_skills_battles_and_everyones_characters()
 
 func test_character_creator_announces_the_choice() -> void:
 	var s := _screen("res://game/client/screens/character_creator.tscn") as CharacterCreator
-	assert_eq((s.get_node("%OriginOption") as OptionButton).item_count, CharacterCreator.ORIGINS.size())
 	assert_eq((s.get_node("%ClassOption") as OptionButton).item_count, CharacterCreator.CLASSES.size())
 	var made: Array = []
 	var messages: Array[String] = []
-	s.create_requested.connect(func(n: String, o: String, c: String) -> void: made.append([n, o, c]))
+	s.create_requested.connect(func(n: String, c: String) -> void: made.append([n, c]))
 	s.message.connect(func(t: String) -> void: messages.append(t))
 	_press(s, "CreateCharacterButton")
 	assert_eq(messages, ["Enter a name"] as Array[String])
 	assert_eq(made, [])
 	(s.get_node("%CharacterNameEdit") as LineEdit).text = " Tessa "
-	(s.get_node("%OriginOption") as OptionButton).select(1)
 	(s.get_node("%ClassOption") as OptionButton).select(2)
 	_press(s, "CreateCharacterButton")
-	assert_eq(made, [["Tessa", "soldier", "cleric"]])
+	assert_eq(made, [["Tessa", "cleric"]])
 	s.reset()
 	assert_eq((s.get_node("%CharacterNameEdit") as LineEdit).text, "")
 	assert_eq((s.get_node("%ClassOption") as OptionButton).selected, 0)
