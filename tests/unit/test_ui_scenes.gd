@@ -5,7 +5,7 @@ const ACCOUNT := "res://game/client/account_flow.tscn"
 const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "FaceSouth", "FaceWest", "QueueList",
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
-	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards"]
+	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel"]
 
 
 func _client() -> Control:
@@ -91,6 +91,24 @@ func test_unit_card_shows_hp_ap_and_ready_state() -> void:
 	assert_eq((card.get_node("%NameLabel") as Label).text, "Ghoul", "no class and no AP for an enemy")
 	assert_eq((card.get_node("%StatusLabel") as Label).text, "")
 	card.free()
+
+
+func test_picking_a_skill_shades_the_board_and_the_queue_shows_beats() -> void:
+	var c := _client()
+	c._on_snapshot(_snapshot())
+	var board := c.board as Board3D
+	assert_eq(board.range_cells.size(), 0, "nothing is shaded until a skill is picked")
+	assert_eq((c.get_node("%BeatsLabel") as Label).text, "Beats used: 0 of 8")
+	c._on_skill_pressed("move")
+	assert_true(board.range_cells.size() > 0, "reachable tiles are shaded")
+	assert_eq(board.valid_cells.size(), 0)
+	c._on_skill_pressed("strike")
+	assert_true(board.range_cells.size() > 0, "a strike's reach is shaded")
+	c._on_skill_pressed("move")
+	c._on_cell_clicked(Vector2i(1, 2), "")
+	assert_true((c.get_node("%QueueList") as ItemList).get_item_text(0).ends_with("[1 AP, beat 1]"))
+	assert_eq((c.get_node("%BeatsLabel") as Label).text, "Beats used: 1 of 8")
+	c.free()
 
 
 func test_pressing_a_skill_and_clicking_a_tile_queues_a_plan() -> void:

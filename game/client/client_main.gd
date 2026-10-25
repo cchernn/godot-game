@@ -25,6 +25,8 @@ var _selftest: bool = false
 var _selftest_round: int = -1
 var _skill_buttons: Dictionary = {}
 var _state: String = "menu"
+var _last_hover: Vector2i = Vector2i(-1, -1)
+var _preview_sig: int = 0
 
 # The layout lives in client_main.tscn; nodes are found by their unique names (%Name), so
 # you can move or restyle them in the editor as long as the names stay.
@@ -42,6 +44,8 @@ var _state: String = "menu"
 @onready var log_view: RichTextLabel = %LogView
 @onready var board_holder: Control = %BoardHolder
 @onready var side_panel: Control = %SidePanel
+@onready var hover_label: Label = %HoverLabel
+@onready var beats_label: Label = %BeatsLabel
 @onready var unit_strip: Control = %UnitStrip
 @onready var party_cards: HBoxContainer = %PartyCards
 @onready var enemy_cards: HBoxContainer = %EnemyCards
@@ -308,6 +312,55 @@ func _action_cost(a: Dictionary) -> int:
 	return sk.total_ap()
 
 
+## Beats an action takes in the queue (see TargetingPreview.action_beats).
+func _action_beats(a: Dictionary) -> int:
+	var path_len := (a["path"] as Array).size() if a["skill"] == "move" else 0
+	return TargetingPreview.action_beats(skills.get_skill(a["skill"]), path_len, me.get("tiles_per_ap", 1))
+
+
+## Shades what the picked skill can reach (blue) and the units it can hit (green) on the board.
+func _update_preview() -> void:
+	var sig := hash([mode, plan, snap["round"], snap["phase"], me.get("cell"), me.get("ready"), snap["units"].size()])
+	if sig == _preview_sig:
+		return
+	_preview_sig = sig
+	board.range_cells.clear()
+	board.valid_cells.clear()
+	var sk: SkillDef = skills.get_skill(mode) if mode != "" else null
+	if sk == null or not _can_edit() or sk.kind == Enums.SkillKind.REACTION:
+		_update_hover_text()
+		return
+	var from := _predicted_cell()
+	if sk.kind == Enums.SkillKind.MOVE:
+		board.range_cells.assign(TargetingPreview.reachable(board.bf, from, _blocked_cells(from), me["tiles_per_ap"], 1,
+			me["ap_capacity"] - _plan_cost()))
+	else:
+		board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, sk.attack_range))
+		var ids := TargetingPreview.valid_targets(board.bf, snap["units"], me, sk, from)
+		for u: Dictionary in snap["units"]:
+			if u["id"] in ids:
+				board.valid_cells.append(u["cell"])
+	_update_hover_text()
+
+
+## One line about the tile under the mouse: what a walk there costs, or whether the target is in reach.
+func _update_hover_text() -> void:
+	hover_label.text = ""
+	var sk: SkillDef = skills.get_skill(mode) if mode != "" else null
+	if sk == null or snap.is_empty() or not _can_edit() or sk.kind == Enums.SkillKind.REACTION or not board.bf.in_bounds(board.hover):
+		return
+	var from := _predicted_cell()
+	var path_len := 0
+	var cost := -1
+	if sk.kind == Enums.SkillKind.MOVE:
+		var path := Pathfinder.path_to(Pathfinder.search(board.bf, from, _blocked_cells(from), 1), from, board.hover)
+		path_len = path.size()
+		if path_len > 0:
+			cost = Pathfinder.ap_cost(board.bf, path, me["tiles_per_ap"], 1)
+	hover_label.text = TargetingPreview.hover_text(sk, snap["units"], me, board.bf, from, board.hover, path_len, cost,
+		me["ap_capacity"] - _plan_cost())
+
+
 func _plan_cost() -> int:
 	var t := 0
 	for a in plan:
@@ -329,13 +382,8 @@ func _on_cell_clicked(cell: Vector2i, unit_id: String) -> void:
 	var sk := skills.get_skill(mode)
 	_prev_plan = plan.duplicate(true)
 	if sk.kind == Enums.SkillKind.MOVE:
-		var blocked := {}
-		for u: Dictionary in snap["units"]:
-			if u["life"] != Enums.LifeState.ELIMINATED:
-				blocked[u["cell"]] = true
 		var start := _predicted_cell()
-		blocked.erase(start)
-		var res := Pathfinder.search(board.bf, start, blocked, 1)
+		var res := Pathfinder.search(board.bf, start, _blocked_cells(start), 1)
 		var path := Pathfinder.path_to(res, start, cell)
 		if path.is_empty():
 			error_label.text = "No path to that tile"
@@ -353,6 +401,16 @@ func _on_cell_clicked(cell: Vector2i, unit_id: String) -> void:
 		return
 	error_label.text = ""
 	_push_plan()
+
+
+## Tiles a walk cannot pass: every unit still standing, except the one at `start`.
+func _blocked_cells(start: Vector2i) -> Dictionary:
+	var blocked := {}
+	for u: Dictionary in snap["units"]:
+		if u["life"] != Enums.LifeState.ELIMINATED:
+			blocked[u["cell"]] = true
+	blocked.erase(start)
+	return blocked
 
 
 func _on_skill_pressed(id: String) -> void:
@@ -433,6 +491,7 @@ func _refresh() -> void:
 			ap_label.modulate = Color.WHITE
 		_rebuild_skill_buttons()
 	queue_list.clear()
+	var beat := 1
 	for a in plan:
 		var sk := skills.get_skill(a["skill"])
 		var txt := sk.display_name
@@ -442,7 +501,13 @@ func _refresh() -> void:
 			txt += " → " + _unit_name(a["target"])
 		elif a.has("cell"):
 			txt += " → %s" % str(a["cell"])
-		queue_list.add_item("%s  [%d AP]" % [txt, _action_cost(a)])
+		var n := _action_beats(a)
+		queue_list.add_item("%s  [%d AP, %s %d%s]" % [txt, _action_cost(a), "beat" if n == 1 else "beats", beat,
+			"" if n == 1 else "-%d" % (beat + n - 1)])
+		beat += n
+	var beats_cap: int = snap["beats_per_round"]
+	beats_label.text = "Beats used: %d of %d" % [beat - 1, beats_cap]
+	beats_label.modulate = Color(1, 0.5, 0.4) if beat - 1 > beats_cap else Color.WHITE
 	board.plan_cells.clear()
 	board.plan_marks.clear()
 	for a in plan:
@@ -456,6 +521,7 @@ func _refresh() -> void:
 				if u["id"] == a["target"]:
 					board.plan_marks.append(u["cell"])
 	_refresh_cards()
+	_update_preview()
 	var can := _can_edit()
 	ready_btn.disabled = me.is_empty() or snap["phase"] != Enums.RoundPhase.PLANNING or not me.get("active", false)
 	ready_btn.set_pressed_no_signal(not me.is_empty() and me["ready"])
@@ -519,6 +585,9 @@ func _rebuild_skill_buttons() -> void:
 
 
 func _process(_delta: float) -> void:
+	if board.hover != _last_hover:
+		_last_hover = board.hover
+		_update_hover_text()
 	if not snap.is_empty() and snap.get("timer_ms", -1) >= 0:
 		_refresh()
 

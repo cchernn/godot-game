@@ -93,6 +93,12 @@ A strip of cards under the board (`game/content/ui/unit_card.tscn`) shows the pl
 and for allies their AP (and AP reserved after Ready) and whether they are Planning or Ready. The snapshot gives allies each other's AP and Ready state, never
 their skills or plans; hidden enemies get no card.
 
+While planning, picking a skill shades what it can reach (blue: tiles a walk can reach with the AP you have left, or a skill's range with line of sight) and
+marks the units it can target (green). Hovering a tile says what a walk there costs ("3 tile(s), 4 AP: 2 more than you have") or why a target is not valid
+(out of range, no line of sight, an ally). Each queued action shows the beats it takes (a walk is ceil(tiles / tiles per AP) beats, a skill one per stage),
+with "Beats used: n of 8" under the queue. This lives in `game/client/targeting_preview.gd` (pure functions, unit-tested); the shading materials are
+`game/content/board/materials/range.tres` and `valid.tres`, set on the board scene. It is a preview only: the server validates every plan.
+
 ## Characters
 
 - One active character per player per world. `GET /worlds/{id}/characters` lists every character in the world (active, then retired) with its

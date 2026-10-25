@@ -128,9 +128,18 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "W"
 
+[node name="HoverLabel" type="Label" parent="SidePanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
 [node name="QueueList" type="ItemList" parent="SidePanel/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="BeatsLabel" type="Label" parent="SidePanel/Layout"]
+unique_name_in_owner = true
 layout_mode = 2
 
 [node name="ButtonRow" type="HBoxContainer" parent="SidePanel/Layout"]
@@ -160,7 +169,7 @@ autowrap_mode = 3
 
 [node name="LogView" type="RichTextLabel" parent="SidePanel/Layout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 200)
+custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
