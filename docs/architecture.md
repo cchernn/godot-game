@@ -54,25 +54,30 @@ Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `u
 - **Templates** (`services/api/templates/<id>@<version>.json`, validated by `app/templates.py`): immutable versioned blueprints (nodes, routes, activities, rules). A world pins `(template_id, definition_version)` at creation and is initialized exactly once: initial visibility and one-time-activity state are copied into rows. Editing/adding a template version never touches existing worlds; moving a world to a new version would need an explicit migration (not built). Content is placeholder.
 - **Graph & discovery:** routes are first-class with stable ids; several routes may join the same nodes. Discovery has two scopes, `character` and `world`, chosen per discovery event; a character sees default-visible ∪ world-scope ∪ their own discoveries.
 - **Revision:** `worlds.state_revision` increases by exactly 1 in each successful transaction that changes shared world state (world-scope reveal that was new, completion of a one-time activity or a completion that reveals something new). Character-scope discoveries, no-op reveals, replays and failed transactions do not advance it.
-- **Membership:** request → host approve/reject; approval grants access only (no character). Host may remove members (never the host); removal sets `status='removed'`, keeping all data; reapproval restores the same row and character. The host can also list members (`GET /worlds/{id}/members`), rename the world (`POST .../rename`) and delete it for good (`POST .../delete` with `confirm_name` equal to the world's name; refused with 409 while a party is forming or active). Deletion removes members, characters, parties, discoveries and combat history, and cannot be undone. The World management screen has all of these. `GET /worlds/{id}/info` gives the host read-only facts (template and version, created date, member, character, live-party and battle counts).
+- **Membership:** request → host approve/reject; approval grants access only (no character). Host may remove members (never the host); removal sets `status='removed'`, keeping all data; reapproval restores the same row and character. The host can also list members (`GET /worlds/{id}/members`), rename the world (`POST .../rename`) and delete it for good (`POST .../delete` with `confirm_name` equal to the world's name; refused with 409 while an activity is running). Deletion removes members, characters, parties, discoveries and combat history, and cannot be undone. The World management screen has all of these. `GET /worlds/{id}/info` gives the host read-only facts (template and version, created date, member, character, live-party and battle counts).
 - **Activities:** each node has a board (the overview lists activities at discovered nodes). Starting requires membership, a character and a discovered node; physical presence (`characters.node_id`) is required only when the template sets `rules.require_location`. A second concurrent major instance is prevented by a partial unique index (atomic reservation, tested under concurrency); minor activities may run in several parties at once. Roster: join requests decided by the leader, leader-only start/cancel, capacity per activity, locked after start, no voluntary leaving after start, leader handover (see Parties below).
 - **Completion:** `POST /internal/instances/{id}/complete` (service key) atomically marks the instance finished, claims the one-time activity (first completion wins), applies `on_complete` reveals and bumps the revision once. Replays return the stored outcome. The Godot server admits only rostered characters of an active party, completes the instance on victory and cancels it otherwise.
-- **Not built (needs presence/travel):** travel and the campaign clock, host succession/expiry (depends on who is connected, so it belongs to the Godot session layer), ending a removed member's live session immediately (the API only blocks the next verification), retirement blocking during travel/activities, template migrations.
+- **Not built:** the campaign clock (travel is instant), host succession/expiry (depends on who is connected, so it belongs to the Godot session layer), ending a removed member's live session immediately (the API only blocks the next verification), retirement blocking during travel/activities, template migrations.
 
 ## Parties and the battle lifecycle
-A **party** is an activity instance (a session of an activity) with a leader and a roster. The API owns it; the battle server only runs it.
-- **Making a party:** a member with a character picks an activity (`POST /worlds/{id}/activities/{activity}/instances`) and becomes its leader. Several parties may
-  run the same activity at once (the one-live-major-instance-per-world reservation stays), and a character is on at most one live party. Whether the
-  character must be standing at the activity's location is the template rule `require_location` (off for now; it switches on with the overworld).
-- **Joining a party:** `POST /instances/{id}/requests`; the **leader** approves or rejects (`/instances/{id}/requests/{rid}/approve|reject`), the player can cancel
-  (`/requests/cancel`). Approval puts the character on the roster and withdraws their other pending asks. There is no direct join.
-- **Leaving:** a forming party can be left; if the leader leaves, the longest-standing member becomes leader, and the last one out cancels it.
-- **Starting:** the leader's `POST /instances/{id}/start` locks the roster (pending asks are withdrawn) and sets the party `active`. Members' lobbies notice on their
-  next refresh and connect to the battle server.
-- **Listing:** `GET /worlds/{id}/parties` returns every live party with its roster and the caller's relation to it (leader / member / pending / none).
-  `GET /instances/{id}` is one party (the party lobby polls it).
+A **party** is a leader, a roster and a place on the map (`parties`, `party_members`). Every character is always in exactly one party: a lone character is a
+party of one, made when the character is created (or on first use for older characters). An **activity run** (`activity_instances`, with a `party_id`) is the
+party playing one activity; the battle server runs it, and when it ends the party is idle again at the same node. The API owns all of it.
+- **Joining a party:** `POST /parties/{id}/requests`; the **leader** approves or rejects (`/parties/{id}/requests/{rid}/approve|reject`), the player can cancel
+  (`/requests/cancel`). Joining only works from the party's own node, for a character who is on their own (leave a group first), while the party is idle
+  and under `max_party_size`. Approval moves the character out of their party of one and withdraws their other pending asks. There is no direct join.
+- **Leaving:** `POST /parties/{id}/leave` puts you in a new party of one; if the leader leaves, the longest-standing member leads on; an emptied party closes.
+  A lone character cannot leave. The leader can also hand over (`POST /parties/{id}/leader`). None of this is possible mid-activity.
+- **Travel:** `POST /parties/{id}/travel {node_id}` (leader only, idle party) moves the party and every member along a discovered route to a neighbouring
+  node. It is instant for now: the routes' `travel_days` are stored but unused until the campaign clock exists.
+- **Starting an activity:** `POST /parties/{id}/start {activity_id}` (leader only) creates the run as `active` with the party's roster. The party must be at the
+  activity's node when the template rule `require_location` is on (it is), the node must be discovered, and the party must fit `max_players`. Several parties may
+  run the same activity at once (the one-live-major-instance-per-world reservation stays). Members' overworld screens notice the run on their next refresh and
+  connect to the battle server. `max_party_size` is a template rule (PROVISIONAL, 4).
+- **Listing:** `GET /worlds/{id}/parties` returns every party with its roster, node, current run and the caller's relation to it (leader / member / pending /
+  none) and whether it is `here` (at the caller's node); `GET /worlds/{id}/parties/me` is the caller's own, `GET /parties/{id}` one of them.
 - **The battle server** is told the world and the party in `c_hello`. The API (`/internal/auth/session` with `instance_id`) checks the character is on the
-  roster of an *active* party and returns the party and its activity's `encounter` id; the server loads `game/content/encounters/<id>.tres`, seats the
+  roster of an *active* run and returns the run and its activity's `encounter` id; the server loads `game/content/encounters/<id>.tres`, seats the
   whole roster in roster order, and starts when everyone has arrived or after `lobby.gather_seconds` (a late or absent member keeps their seat and can still
   join in, like a dropped player). Rooms are keyed by party; two parties never see each other. Guest play (local development) is one anonymous room that
   starts at `lobby.players_required`.
@@ -110,10 +115,10 @@ hovering one says so, and events about an unseen enemy are tinted purple in the 
   owner, which is the owner's join label (their email) or `Host` / a short id; `GET /worlds/{id}/characters/me/battles` is the caller's last 5 battles.
 - The Character page (`character_screen.tscn`, tabs: Overview, Battles, Characters) reads stats and skills from the class resource in
   `game/content/stats/classes`, so editing the resource changes the page. Retiring needs the character's name typed and is refused (409) while the
-  character is on a forming or active party; the retired character stays in the world's "Fallen" list and the player can create a new one.
+  character is in a running activity; retiring takes them out of their party; the retired character stays in the world's "Fallen" list and the player can create a new one.
 - Levels do not move yet (all level 1). The prototype template sets the world rule `reset_xp_after_battle` (PROVISIONAL, testing aid): the award is
   recorded in the battle history, then the character's XP goes back to 0. Remove the rule from the template to keep XP.
-- A party leader can hand the party to another roster member before it starts (`POST /instances/{id}/leader`).
+- A party leader can hand the party to another member while it is idle (`POST /parties/{id}/leader`).
 
 ## Worlds and rooms
 - After sign-in the client always shows a world picker (`GET /worlds/available`: every world, its player count and the caller's standing; no member identities).
@@ -142,7 +147,12 @@ screens' signals, and calls methods on the screens to tell them what to show. `C
 and talks to `AccountFlow` through its signals (`entered(server, token, name, world, party)`, `backed_out`, `token_refreshed`) and `show_lobby` / `return_to_menu`. Adding a screen means a new
 scene + script, one instance in `account_flow.tscn`, one entry in `_screens`, and the signal connections (worked example in docs/guide/01-login-screen.md).
 
-The screens: `sign_in`, `world_picker`, `join` (ask to join a world), `world_hub` (the main menu), `character` (view), `character_creator`, `parties`
-(live parties; ask to join one or start your own), `create_party` (pick an activity), `party_lobby` (roster, the leader's requests and Start), `world_management`
-(the host's join requests), `settings` (placeholder) and `lobby` (waiting on the battle server for the party to arrive). `parties`, `party_lobby` and `join`
-refresh themselves on a `Timer` while visible. The parties list avoids full-screen assumptions: in the overworld it becomes a small in-game panel.
+The screens: `sign_in`, `world_picker`, `join` (ask to join a world), `world_hub` (the main menu), `character` (view), `character_creator`, `overworld`
+(the map and your party), `world_management` (the host's join requests), `settings` and `lobby` (waiting on the battle server for the party to arrive).
+`overworld` and `join` refresh themselves on a `Timer` while visible.
+
+The **overworld** (`overworld_screen.tscn`) has the map on the left (`MapCanvas`: a button per discovered node, a line per discovered route) and a side panel:
+your party (roster, leader tools, join requests, Leave), the place you picked (its activities, Start, Travel) and the other parties standing at your node (Ask
+to join). The leader travels the party and starts activities; the rest watch, and are taken into the battle when it starts. Node positions are not in the
+world template (that is game data); they live in `game/content/overworld/map_layout.tres` (a `MapLayout`, fractions of the map area). Nodes missing from it are
+spread around a ring, so a new template node always shows up. Why a button is disabled is written under it (`OverworldScreen.travel_problem` / `start_problem`).

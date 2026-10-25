@@ -7,9 +7,7 @@
 [ext_resource type="PackedScene" path="res://game/client/screens/world_hub_screen.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://game/client/screens/character_screen.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/client/screens/character_creator.tscn" id="7"]
-[ext_resource type="PackedScene" path="res://game/client/screens/parties_screen.tscn" id="8"]
-[ext_resource type="PackedScene" path="res://game/client/screens/create_party_screen.tscn" id="9"]
-[ext_resource type="PackedScene" path="res://game/client/screens/party_lobby_screen.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://game/client/screens/overworld_screen.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://game/client/screens/world_management_screen.tscn" id="11"]
 [ext_resource type="PackedScene" path="res://game/client/screens/settings_screen.tscn" id="12"]
 [ext_resource type="PackedScene" path="res://game/client/screens/lobby_screen.tscn" id="13"]
@@ -65,15 +63,7 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="PartiesScreen" parent="Layout" instance=ExtResource("8")]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="CreatePartyScreen" parent="Layout" instance=ExtResource("9")]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="PartyLobbyScreen" parent="Layout" instance=ExtResource("10")]
+[node name="OverworldScreen" parent="Layout" instance=ExtResource("10")]
 unique_name_in_owner = true
 layout_mode = 2
 

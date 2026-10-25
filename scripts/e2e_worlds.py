@@ -77,17 +77,19 @@ try:
     listing = {w["name"]: w for w in httpx.get(api + "/worlds/available", headers=h(users["a1"])).json()}
     assert listing["World a"]["status"] == "member" and listing["World b"]["status"] == "none", listing
 
-    # Each world's host starts a party; the second player asks to join and is let in; the host starts it.
+    # Each world's host leads a party of one; the second player asks to join and is let in; the host starts an activity.
     parties = {}
     for w in "ab":
         wid = worlds[w]["id"]
-        iid = httpx.post(f"{api}/worlds/{wid}/activities/training_skirmish/instances", headers=h(users[f"{w}1"])).json()["id"]
-        rid = httpx.post(f"{api}/instances/{iid}/requests", headers=h(users[f"{w}2"])).json()["id"]
-        assert httpx.post(f"{api}/instances/{iid}/requests/{rid}/approve", headers=h(users[f"{w}1"])).status_code == 200
-        assert httpx.post(f"{api}/instances/{iid}/start", headers=h(users[f"{w}1"])).status_code == 200
-        parties[w] = iid
+        pid = httpx.get(f"{api}/worlds/{wid}/parties/me", headers=h(users[f"{w}1"])).json()["id"]
+        rid = httpx.post(f"{api}/parties/{pid}/requests", headers=h(users[f"{w}2"])).json()["id"]
+        assert httpx.post(f"{api}/parties/{pid}/requests/{rid}/approve", headers=h(users[f"{w}1"])).status_code == 200
+        started = httpx.post(f"{api}/parties/{pid}/start", json={"activity_id": "training_skirmish"}, headers=h(users[f"{w}1"]))
+        assert started.status_code == 201, started.text
+        parties[w] = started.json()["id"]
     listing = httpx.get(f"{api}/worlds/{worlds['a']['id']}/parties", headers=h(users["a3"])).json()
-    assert [(p["status"], len(p["members"]), p["relation"]) for p in listing] == [("active", 2, "none")], listing
+    busy = [(p["instance"]["status"], len(p["members"]), p["relation"]) for p in listing if p["instance"]]
+    assert busy == [("active", 2, "none")], listing
 
     # One server, no --world-id: it serves any party in any world, each in its own room.
     start(["scripts/run_server.sh", f"--port={GAME_PORT}", "--seed=3", f"--api-url={api}",

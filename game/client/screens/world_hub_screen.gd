@@ -1,13 +1,13 @@
 class_name WorldHubScreen
 extends VBoxContainer
 ## The main menu of a world: where you go from here. Shows who you are, whether you are in a party, and the
-## doors to Parties, your Character, Settings and (for the host) World management.
+## doors to Overworld, your Character, Settings and (for the host) World management.
 
-signal parties_pressed
+signal overworld_pressed
 signal character_pressed
 signal management_pressed
 signal settings_pressed
-## Open your party's lobby, or rejoin its battle if it has started.
+## Rejoin the battle your party is fighting.
 signal resume_pressed
 signal switch_world_pressed
 
@@ -19,7 +19,7 @@ signal switch_world_pressed
 
 
 func _ready() -> void:
-	%PartiesButton.pressed.connect(func() -> void: parties_pressed.emit())
+	%OverworldButton.pressed.connect(func() -> void: overworld_pressed.emit())
 	%CharacterButton.pressed.connect(func() -> void: character_pressed.emit())
 	_manage.pressed.connect(func() -> void: management_pressed.emit())
 	%SettingsButton.pressed.connect(func() -> void: settings_pressed.emit())
@@ -50,14 +50,16 @@ func set_pending_count(count: int) -> void:
 	_manage.text = "World management (%d request%s)" % [count, "" if count == 1 else "s"] if count > 0 else "World management"
 
 
-## The party you are in (a party view from the API), or {} when you are in none.
+## The party you are in (a party view from the API; every character is in one).
 func show_party(party: Dictionary) -> void:
-	if party.is_empty():
-		_party.text = "You are not in a party."
-		_resume.hide()
-		return
-	var active: bool = party["status"] == "active"
-	_party.text = "Your party: %s (%s, %d/%d)" % [party["activity_name"], "battle in progress" if active else "gathering",
-		(party["members"] as Array).size(), party["max_players"]]
-	_resume.text = "Return to battle" if active else "Open party"
-	_resume.show()
+	var run: Variant = party["instance"]
+	var others := (party["members"] as Array).size() - 1
+	_party.text = "Your party: %s%s, at %s%s" % [_party_leader_name(party), "" if others == 0 else " +%d" % others, party["node_name"],
+		"" if run == null else " (in %s)" % run["activity_name"]]
+	_resume.text = "Return to battle"
+	_resume.visible = run != null and run["status"] == "active"
+
+
+func _party_leader_name(party: Dictionary) -> String:
+	var leader: Variant = party.get("leader")
+	return "you" if party["relation"] == "leader" else (leader["name"] if leader != null else "?")

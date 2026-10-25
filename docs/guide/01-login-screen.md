@@ -19,9 +19,7 @@ ClientMain  (client_main.tscn)         owns the battle UI and the connection to 
       ├─ WorldHubScreen      world_hub_screen.tscn      the main menu of a world
       ├─ CharacterScreen     character_screen.tscn
       ├─ CharacterCreator    character_creator.tscn
-      ├─ PartiesScreen       parties_screen.tscn
-      ├─ CreatePartyScreen   create_party_screen.tscn
-      ├─ PartyLobbyScreen    party_lobby_screen.tscn    (rows: ui/join_request_row.tscn)
+      ├─ OverworldScreen     overworld_screen.tscn      (map + party; rows: ui/join_request_row.tscn)
       ├─ WorldManagementScreen  world_management_screen.tscn  (rows: ui/join_request_row.tscn)
       ├─ SettingsScreen      settings_screen.tscn
       ├─ LobbyScreen         lobby_screen.tscn          waiting on the battle server
@@ -88,7 +86,7 @@ form and reporting input, it belongs in the screen.*
 | Show exactly one screen | `_show(screen)` and the `_screens` array | Loops the array and sets `visible`. Adding a screen means adding it to `_screens`. |
 | Talk to the API / Supabase | `_request()`, `api()`, `_auth_call()` | One `HTTPRequest` per call, `await`ed. Returns `{status, data, error}` so callers never touch raw responses. |
 | Keep the session | `sign_in()`, `_adopt_session()`, `_refresh()` | Details below. |
-| Decide where to go next | `_step_worlds()`, `_step_world()`, `_step_hub()`, `_step_parties()`, ... | The routing. Reads like a story: sign in → picker → membership check → hub (or the join screen) → parties → party lobby → battle. |
+| Decide where to go next | `_step_worlds()`, `_step_world()`, `_step_hub()`, `_step_overworld()`, ... | The routing. Reads like a story: sign in → picker → membership check → hub (or the join screen) → overworld → battle. |
 
 It exposes only a small surface to `ClientMain`: the signals `entered(server, token, name, world, party)`, `backed_out`, `token_refreshed`, and the methods `show_lobby()` and
 `return_to_menu()`. Everything else is internal.
@@ -125,7 +123,7 @@ variables *before* the node is ready crashes with "on a base object of type 'Nil
 **`class_name` as a typed handle.** `SignInScreen`, `CharacterCreator` and friends are global types. Typing the variable
 (`var _sign_in: SignInScreen`) gives you autocomplete, catches typos at parse time, and lets you call the screen's methods directly.
 
-**`@export var row_scene: PackedScene`.** `WorldManagementScreen` (and `PartyLobbyScreen`) do not hardcode which scene makes a row; you drag one into the Inspector. Code
+**`@export var row_scene: PackedScene`.** `WorldManagementScreen` (and `OverworldScreen`) do not hardcode which scene makes a row; you drag one into the Inspector. Code
 instances it with `row_scene.instantiate() as JoinRequestRow`. Use this whenever a script creates many copies of something a designer might restyle.
 
 **Instance overrides.** In `account_flow.tscn` each `[node name="SignInScreen" parent="Layout" instance=...]` also carries `layout_mode` and

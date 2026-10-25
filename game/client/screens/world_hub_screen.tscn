@@ -24,13 +24,13 @@ autowrap_mode = 3
 [node name="ResumeButton" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Open party"
+text = "Return to battle"
 visible = false
 
-[node name="PartiesButton" type="Button" parent="."]
+[node name="OverworldButton" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Parties"
+text = "Overworld"
 
 [node name="CharacterButton" type="Button" parent="."]
 unique_name_in_owner = true

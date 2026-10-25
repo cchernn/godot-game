@@ -28,25 +28,24 @@ var user_email: String = ""
 @onready var _hub: WorldHubScreen = %WorldHubScreen
 @onready var _character_screen: CharacterScreen = %CharacterScreen
 @onready var _creator: CharacterCreator = %CharacterCreator
-@onready var _parties_screen: PartiesScreen = %PartiesScreen
-@onready var _create_party: CreatePartyScreen = %CreatePartyScreen
-@onready var _party_lobby: PartyLobbyScreen = %PartyLobbyScreen
+@onready var _overworld: OverworldScreen = %OverworldScreen
 @onready var _management: WorldManagementScreen = %WorldManagementScreen
 @onready var _settings: SettingsScreen = %SettingsScreen
 @onready var _lobby: LobbyScreen = %LobbyScreen
 ## Every screen; exactly one is visible at a time.
 @onready var _screens: Array[Control] = [_sign_in, _worlds_screen, _join, _hub, _character_screen, _creator,
-	_parties_screen, _create_party, _party_lobby, _management, _settings, _lobby]
+	_overworld, _management, _settings, _lobby]
 
 var _refresh_token: String = ""
 var _world: Dictionary = {}
 var _character: Dictionary = {}
-## The party being looked at or entered, and the party this player last asked to join (so the flow can move on
-## by itself when the leader lets them in).
+## The player's own party (every character is in one), and the entry id of the battle being entered.
 var _party_id: String = ""
-var _asked_party_id: String = ""
-## Ids of the join requests currently listed in the party lobby, so the list is only rebuilt when it changes.
+## Ids of the join requests currently listed on the overworld, so the list is only rebuilt when it changes.
 var _shown_requests: Array = []
+## True once the overworld has seen the party idle since it opened. The player is only taken into a battle by
+## itself when it starts after that, never into one that was already running (or just ended) when they arrived.
+var _idle_seen: bool = false
 ## The user's standing in the current world: {world: {id, name}, status, is_host}.
 var _membership: Dictionary = {}
 
@@ -77,7 +76,7 @@ func _ready() -> void:
 	_join.check_pressed.connect(_check_membership)
 	_join.back_pressed.connect(_step_worlds)
 	_join.sign_out_pressed.connect(sign_out_and_show)
-	_hub.parties_pressed.connect(_step_parties)
+	_hub.overworld_pressed.connect(_step_overworld)
 	_hub.character_pressed.connect(_step_character_view)
 	_hub.management_pressed.connect(_step_management)
 	_hub.settings_pressed.connect(_step_settings)
@@ -88,24 +87,19 @@ func _ready() -> void:
 	_settings.sign_out_pressed.connect(sign_out_and_show)
 	_settings.change_password_requested.connect(_on_change_password_requested)
 	_character_screen.retire_requested.connect(_on_retire_requested)
-	_party_lobby.make_leader_requested.connect(_on_make_leader_requested)
 	_creator.create_requested.connect(_on_create_character_requested)
 	_creator.back_pressed.connect(_step_worlds)
 	_creator.message.connect(_say)
-	_parties_screen.request_join_requested.connect(_on_party_join_requested)
-	_parties_screen.cancel_request_requested.connect(_on_party_request_cancelled)
-	_parties_screen.open_party_requested.connect(func(p: Dictionary) -> void: _open_party(p))
-	_parties_screen.create_party_pressed.connect(_step_create_party)
-	_parties_screen.refresh_requested.connect(_refresh_parties)
-	_parties_screen.back_pressed.connect(_step_hub)
-	_create_party.create_requested.connect(_on_create_party_requested)
-	_create_party.back_pressed.connect(_step_parties)
-	_create_party.message.connect(_say)
-	_party_lobby.start_pressed.connect(_on_start_party_pressed)
-	_party_lobby.leave_pressed.connect(_on_leave_party_pressed)
-	_party_lobby.back_pressed.connect(_step_hub)
-	_party_lobby.refresh_requested.connect(_refresh_party)
-	_party_lobby.decision_made.connect(_decide_party_request)
+	_overworld.travel_requested.connect(_on_travel_requested)
+	_overworld.start_requested.connect(_on_start_requested)
+	_overworld.leave_requested.connect(_on_leave_party_pressed)
+	_overworld.make_leader_requested.connect(_on_make_leader_requested)
+	_overworld.join_requested.connect(_on_party_join_requested)
+	_overworld.cancel_join_requested.connect(_on_party_request_cancelled)
+	_overworld.decision_made.connect(_decide_party_request)
+	_overworld.resume_pressed.connect(_resume_party)
+	_overworld.refresh_requested.connect(_refresh_overworld)
+	_overworld.back_pressed.connect(_step_hub)
 	_management.decision_made.connect(_decide)
 	_management.rename_requested.connect(_on_rename_requested)
 	_management.remove_member_requested.connect(_on_remove_member_requested)
@@ -334,7 +328,6 @@ func _step_world(world: Dictionary) -> void:
 	_world = world
 	_character = {}
 	_party_id = ""
-	_asked_party_id = ""
 	status.text = "Opening %s…" % world["name"]
 	var m := await api(HTTPClient.METHOD_GET, "/worlds/%s/membership" % world["id"])
 	if m["status"] != 200:
@@ -367,21 +360,13 @@ func _step_hub() -> void:
 		return
 	_character = r["data"]
 	_hub.show_character(_character)
-	var p := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties" % _world["id"])
+	var p := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties/me" % _world["id"])
 	if _hub.is_visible_in_tree() and p["status"] == 200:
-		_hub.show_party(_my_party(p["data"]))
+		_hub.show_party(p["data"])
 	if _membership.get("is_host", false):
 		var pending := await api(HTTPClient.METHOD_GET, "/worlds/%s/requests" % _world["id"])
 		if _hub.is_visible_in_tree() and pending["status"] == 200:
 			_hub.set_pending_count((pending["data"] as Array).size())
-
-
-## The party this player is on, from a list of party views ({} if none).
-func _my_party(parties: Array) -> Dictionary:
-	for p: Dictionary in parties:
-		if p["relation"] == "leader" or p["relation"] == "member":
-			return p
-	return {}
 
 
 func _step_character_view() -> void:
@@ -539,186 +524,134 @@ func _decide(request_id: String, approve: bool, row: JoinRequestRow) -> void:
 		_management.row_failed(row)
 
 
-# ---------- Parties ----------
+# ---------- Overworld ----------
 
-func _step_parties() -> void:
+func _step_overworld() -> void:
 	status.text = ""
-	_show(_parties_screen)
-	_parties_screen.show_loading()
-	_refresh_parties()
-
-
-func _refresh_parties() -> void:
-	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties" % _world["id"])
-	if not _parties_screen.is_visible_in_tree():
-		return
-	if r["status"] != 200:
-		status.text = r["error"]
-		return
-	var parties: Array = r["data"]
-	_parties_screen.show_parties(parties)
-	for p: Dictionary in parties:
-		if p["relation"] == "pending":
-			_asked_party_id = str(p["id"])
-		elif str(p["id"]) == _asked_party_id and p["relation"] != "none":
-			_asked_party_id = "" # the leader let us in: carry on to the party
-			status.text = ""
-			_open_party(p)
-			return
-
-
-func _on_party_join_requested(party: Dictionary) -> void:
-	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/requests" % party["id"])
-	if r["status"] == 201:
-		_asked_party_id = str(party["id"])
-		status.text = "Request sent. The party leader decides."
-	else:
-		status.text = r["error"]
-	_refresh_parties()
-
-
-func _on_party_request_cancelled(party: Dictionary) -> void:
-	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/requests/cancel" % party["id"])
-	if r["status"] != 204 and r["status"] != 404: # 404: it was already decided
-		status.text = r["error"]
-	else:
-		status.text = ""
-		_asked_party_id = ""
-	_refresh_parties()
-
-
-func _step_create_party() -> void:
-	status.text = ""
-	_show(_create_party)
-	_create_party.show_loading()
-	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/overview" % _world["id"])
-	if r["status"] != 200:
-		status.text = r["error"]
-		return
-	_create_party.show_activities((r["data"] as Dictionary)["activities"])
-
-
-func _on_create_party_requested(activity_id: String) -> void:
-	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/activities/%s/instances" % [_world["id"], activity_id])
-	if r["status"] == 201:
-		status.text = ""
-		_step_party(str((r["data"] as Dictionary)["id"]))
-	else:
-		status.text = r["error"]
-
-
-# ---------- Party lobby ----------
-
-## A party view from the list: its lobby while it is gathering, its battle once it has started.
-func _open_party(party: Dictionary) -> void:
-	if party["status"] == "active":
-		_enter_battle(str(party["id"]))
-	else:
-		_step_party(str(party["id"]))
-
-
-func _resume_party() -> void:
-	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties" % _world["id"])
-	if r["status"] != 200:
-		status.text = r["error"]
-		return
-	var mine := _my_party(r["data"])
-	if mine.is_empty():
-		_step_hub() # it ended in the meantime
-	else:
-		_open_party(mine)
-
-
-func _step_party(party_id: String) -> void:
-	_party_id = party_id
+	_idle_seen = false
 	_shown_requests = []
-	status.text = ""
-	_show(_party_lobby)
-	_party_lobby.show_loading()
-	_refresh_party()
+	_show(_overworld)
+	_overworld.show_loading()
+	_refresh_overworld()
 
 
-## Re-reads the party (also asked for by the lobby's timer): the roster, the leader's requests, and whether
-## the leader has started the battle.
-func _refresh_party() -> void:
-	var r := await api(HTTPClient.METHOD_GET, "/instances/%s" % _party_id)
-	if not _party_lobby.is_visible_in_tree():
+## Re-reads the map and the parties (also asked for by the overworld's timer). When the party's leader starts an
+## activity, the other members are taken into the battle from here.
+func _refresh_overworld() -> void:
+	var ov := await api(HTTPClient.METHOD_GET, "/worlds/%s/overview" % _world["id"])
+	var ps := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties" % _world["id"])
+	if not _overworld.is_visible_in_tree():
 		return
-	if r["status"] != 200:
-		status.text = r["error"]
+	if ov["status"] != 200 or ps["status"] != 200:
+		status.text = ov["error"] if ov["status"] != 200 else ps["error"]
 		return
-	var party: Dictionary = r["data"]
-	if party["status"] == "active" and party["relation"] != "none":
-		_enter_battle(_party_id)
+	_overworld.show_world(ov["data"], ps["data"])
+	var mine := _my_party(ps["data"])
+	if mine.is_empty():
 		return
-	if party["status"] != "forming" or party["relation"] == "none":
-		status.text = "That party is no longer gathering."
-		_step_parties()
+	_party_id = str(mine["id"])
+	var run: Variant = mine["instance"]
+	if run == null:
+		_idle_seen = true
+	elif run["status"] == "active" and _idle_seen:
+		_enter_battle(str(run["id"]))
 		return
-	_party_lobby.show_party(party)
-	if party["relation"] != "leader":
-		_shown_requests = []
-	if party["relation"] == "leader":
-		var q := await api(HTTPClient.METHOD_GET, "/instances/%s/requests" % _party_id)
-		if q["status"] == 200 and _party_lobby.is_visible_in_tree():
+	if mine["relation"] == "leader" and run == null:
+		var q := await api(HTTPClient.METHOD_GET, "/parties/%s/requests" % _party_id)
+		if q["status"] == 200 and _overworld.is_visible_in_tree():
 			var ids: Array = (q["data"] as Array).map(func(x: Dictionary) -> String: return str(x["id"]))
 			if ids != _shown_requests:
 				_shown_requests = ids
-				_party_lobby.show_requests(q["data"])
+				_overworld.show_requests(q["data"])
+	else:
+		_shown_requests = []
+
+
+## Runs an action on the party and refreshes the map; a refusal is shown as the status line.
+func _party_action(path: String, expected: int, body: Dictionary = {}) -> Dictionary:
+	var r := await api(HTTPClient.METHOD_POST, path, body)
+	status.text = "" if r["status"] == expected else r["error"]
+	return r
+
+
+func _on_travel_requested(node_id: String) -> void:
+	await _party_action("/parties/%s/travel" % _party_id, 200, {"node_id": node_id})
+	_shown_requests = []
+	_refresh_overworld()
+
+
+func _on_start_requested(activity_id: String) -> void:
+	var r := await _party_action("/parties/%s/start" % _party_id, 201, {"activity_id": activity_id})
+	if r["status"] == 201:
+		_enter_battle(str((r["data"] as Dictionary)["id"]))
+	else:
+		_refresh_overworld()
+
+
+func _on_party_join_requested(party: Dictionary) -> void:
+	var r := await _party_action("/parties/%s/requests" % party["id"], 201)
+	if r["status"] == 201:
+		status.text = "Request sent. The party leader decides."
+	_refresh_overworld()
+
+
+func _on_party_request_cancelled(party: Dictionary) -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/parties/%s/requests/cancel" % party["id"])
+	status.text = "" if r["status"] == 204 or r["status"] == 404 else r["error"] # 404: it was already decided
+	_refresh_overworld()
 
 
 func _decide_party_request(request_id: String, approve: bool, row: JoinRequestRow) -> void:
 	row.set_busy(true)
-	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/requests/%s/%s" % [_party_id, request_id, "approve" if approve else "reject"])
+	var r := await _party_action("/parties/%s/requests/%s/%s" % [_party_id, request_id, "approve" if approve else "reject"], 200)
 	if r["status"] == 200:
-		status.text = ""
-		_party_lobby.finish_decision(row)
+		_overworld.finish_decision(row)
 		_shown_requests = []
 	else:
-		status.text = r["error"]
-		_party_lobby.row_failed(row)
-	_refresh_party()
+		_overworld.row_failed(row)
+	_refresh_overworld()
 
 
 func _on_make_leader_requested(character_id: String) -> void:
-	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/leader" % _party_id, {"character_id": character_id})
-	if r["status"] == 204:
-		status.text = ""
-		_shown_requests = []
-	else:
-		status.text = r["error"]
-	_refresh_party()
-
-
-func _on_start_party_pressed() -> void:
-	_party_lobby.set_start_busy(true)
-	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/start" % _party_id)
-	_party_lobby.set_start_busy(false)
-	if r["status"] == 200:
-		status.text = ""
-		_enter_battle(_party_id)
-	else:
-		status.text = r["error"]
+	await _party_action("/parties/%s/leader" % _party_id, 204, {"character_id": character_id})
+	_shown_requests = []
+	_refresh_overworld()
 
 
 func _on_leave_party_pressed() -> void:
-	var r := await api(HTTPClient.METHOD_POST, "/instances/%s/leave" % _party_id)
-	if r["status"] == 204:
-		status.text = ""
-		_party_id = ""
-		_step_hub()
-	else:
+	await _party_action("/parties/%s/leave" % _party_id, 204)
+	_shown_requests = []
+	_refresh_overworld()
+
+
+## The party this player is on, from a list of party views ({} if none).
+func _my_party(parties: Array) -> Dictionary:
+	for p: Dictionary in parties:
+		if p["relation"] == "leader" or p["relation"] == "member":
+			return p
+	return {}
+
+
+## Back into the battle the party is fighting (from the hub or the overworld).
+func _resume_party() -> void:
+	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties/me" % _world["id"])
+	if r["status"] != 200:
 		status.text = r["error"]
+		return
+	var run: Variant = (r["data"] as Dictionary)["instance"]
+	if run != null and run["status"] == "active":
+		_enter_battle(str(run["id"]))
+	else:
+		_step_hub() # it ended in the meantime
 
 
 # ---------- Battle server ----------
 
-## Connects to the battle server as this party's member. Also used to come back to a battle in progress.
-func _enter_battle(party_id: String) -> void:
-	_party_id = party_id
+## Connects to the battle server as a member of the party running this activity (the instance id). Also used to come back to a battle in progress.
+func _enter_battle(instance_id: String) -> void:
 	_lobby.show_connecting()
 	_show(_lobby)
-	entered.emit(_server_url(), access_token, str(_character.get("name", "")), str(_world["id"]), party_id)
+	entered.emit(_server_url(), access_token, str(_character.get("name", "")), str(_world["id"]), instance_id)
 
 
 ## The waiting room on the battle server: who has arrived and how many the party has. Called when the server sends it.

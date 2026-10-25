@@ -1,0 +1,137 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://game/client/screens/overworld_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://game/content/ui/join_request_row.tscn" id="2"]
+[ext_resource type="Script" path="res://game/client/screens/map_canvas.gd" id="3"]
+[ext_resource type="PackedScene" path="res://game/content/ui/map_node.tscn" id="4"]
+[ext_resource type="Resource" path="res://game/content/overworld/map_layout.tres" id="5"]
+
+[node name="OverworldScreen" type="HBoxContainer"]
+theme_override_constants/separation = 10
+script = ExtResource("1")
+row_scene = ExtResource("2")
+
+[node name="MapCanvas" type="Control" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 420)
+layout_mode = 2
+size_flags_horizontal = 3
+clip_contents = true
+script = ExtResource("3")
+layout = ExtResource("5")
+node_scene = ExtResource("4")
+
+[node name="SideScroll" type="ScrollContainer" parent="."]
+custom_minimum_size = Vector2(330, 420)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Side" type="VBoxContainer" parent="SideScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="PartyTitleLabel" type="Label" parent="SideScroll/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PartyStatusLabel" type="Label" parent="SideScroll/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="RosterList" type="ItemList" parent="SideScroll/Side"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+
+[node name="MakeLeaderButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+disabled = true
+text = "Make selected player the leader"
+
+[node name="PartyLeaveButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Leave party"
+
+[node name="ReturnButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Return to battle"
+
+[node name="RequestsBox" type="VBoxContainer" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RequestsLabel" type="Label" parent="SideScroll/Side/RequestsBox"]
+layout_mode = 2
+text = "Asking to join"
+
+[node name="PartyRequestRows" type="VBoxContainer" parent="SideScroll/Side/RequestsBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Separator1" type="HSeparator" parent="SideScroll/Side"]
+layout_mode = 2
+
+[node name="PlaceLabel" type="Label" parent="SideScroll/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="ActivityList" type="ItemList" parent="SideScroll/Side"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+
+[node name="StartButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Start the selected activity"
+
+[node name="TravelButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Travel"
+
+[node name="PlaceHintLabel" type="Label" parent="SideScroll/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="Separator2" type="HSeparator" parent="SideScroll/Side"]
+layout_mode = 2
+
+[node name="OthersLabel" type="Label" parent="SideScroll/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="OthersList" type="ItemList" parent="SideScroll/Side"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+
+[node name="AskButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Ask to join"
+
+[node name="OverworldBackButton" type="Button" parent="SideScroll/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Back to hub"
+
+[node name="OverworldTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 3.0

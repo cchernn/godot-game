@@ -28,9 +28,10 @@ and a running API); it is not part of `scripts/test.sh`.
 Open the page -> sign in or create an account (Supabase; new accounts confirm by email) -> **choose a world** from the list (every
 world is listed with your standing in it, even when there is only one) -> if you are not in it yet, **Request to
 join** and wait for the host (the host sees a pending count on **World management** in the hub and approves or rejects) -> create a
-character once -> you land on the **world hub** (Parties, Character, World management for the host, Settings) -> **Parties**: start a party for an
-activity (you lead it) or ask a leader to let you into one -> **party lobby** (the leader approves requests and presses **Start battle**) -> the battle server
-gathers the party -> plan and ready each round -> result screen (victory/defeat, XP) -> **Continue** back to the hub. A closed tab can come back to a battle in
+character once -> you land on the **world hub** (Overworld, Character, World management for the host, Settings) -> **Overworld**: the map and your party (every
+character is in one; alone it is a party of one). The party leader travels it along discovered routes and starts activities at the place it stands; players
+standing at the same place can ask a leader to let them in -> the battle server gathers the party -> plan and ready each round -> result screen
+(victory/defeat, XP) -> **Continue** back to the hub. A closed tab can come back to a battle in
 progress from the hub (**Return to battle**). Screens: `docs/editor-guide.md`; a real-browser test of this flow: `tests/browser/README.md`.
 One battle server hosts every party in every world, one room per party.
 

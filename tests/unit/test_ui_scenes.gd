@@ -197,7 +197,7 @@ func _flow() -> AccountFlow:
 
 func test_the_coordinator_shows_exactly_one_screen_at_a_time() -> void:
 	var f := _flow()
-	assert_eq(f._screens.size(), 12)
+	assert_eq(f._screens.size(), 10)
 	for pick: Control in f._screens:
 		f._show(pick)
 		for other: Control in f._screens:
@@ -228,9 +228,9 @@ func test_the_lobby_message_shows_the_lobby_screen_with_the_party() -> void:
 
 func test_the_coordinator_finds_your_party_in_the_list() -> void:
 	var f := _flow()
-	assert_eq(f._my_party([_party("a", "none"), _party("b", "pending")]), {})
-	assert_eq(f._my_party([_party("a", "none"), _party("b", "member")])["id"], "b")
-	assert_eq(f._my_party([_party("a", "leader")])["id"], "a")
+	assert_eq(f._my_party([_pview("none", 1, "hollowmere", null, "a"), _pview("pending", 1, "hollowmere", null, "b")]), {})
+	assert_eq(f._my_party([_pview("none", 1, "hollowmere", null, "a"), _pview("member", 1, "hollowmere", null, "b")])["id"], "b")
+	assert_eq(f._my_party([_pview("leader", 1, "hollowmere", null, "a")])["id"], "a")
 	assert_eq(f._my_party([]), {})
 	f.free()
 
@@ -481,7 +481,7 @@ func test_world_management_renames_removes_members_and_guards_delete() -> void:
 func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
 	var s := _screen("res://game/client/screens/world_hub_screen.tscn") as WorldHubScreen
 	var got: Array[String] = []
-	for sig in ["parties_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
+	for sig in ["overworld_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
 			"switch_world_pressed"]:
 		s.connect(sig, func() -> void: got.append(sig))
 	s.show_loading("Hollow")
@@ -489,16 +489,14 @@ func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
 	assert_true(not (s.get_node("%ManagementButton") as Control).visible and not (s.get_node("%ResumeButton") as Control).visible)
 	s.show_character({"name": "Aldric", "level": 2, "class": "warrior"})
 	assert_eq((s.get_node("%HubCharacterLabel") as Label).text, "Aldric, level 2 warrior")
-	s.show_party({})
-	assert_eq((s.get_node("%HubPartyLabel") as Label).text, "You are not in a party.")
+	var party := {"relation": "leader", "leader": {"name": "Aldric"}, "members": [{}, {}], "node_name": "Hollowmere", "instance": null}
+	s.show_party(party)
+	assert_eq((s.get_node("%HubPartyLabel") as Label).text, "Your party: you +1, at Hollowmere")
 	assert_true(not (s.get_node("%ResumeButton") as Control).visible)
-	var party := {"activity_name": "Training skirmish", "status": "forming", "members": [{}, {}], "max_players": 4}
+	party["instance"] = {"activity_name": "Training skirmish", "status": "active"}
 	s.show_party(party)
-	assert_eq((s.get_node("%HubPartyLabel") as Label).text, "Your party: Training skirmish (gathering, 2/4)")
-	assert_eq((s.get_node("%ResumeButton") as Button).text, "Open party")
-	party["status"] = "active"
-	s.show_party(party)
-	assert_eq((s.get_node("%ResumeButton") as Button).text, "Return to battle", "a started party is rejoined, not opened")
+	assert_eq((s.get_node("%ResumeButton") as Button).text, "Return to battle")
+	assert_true((s.get_node("%ResumeButton") as Control).visible)
 	s.set_host(true)
 	assert_true((s.get_node("%ManagementButton") as Control).visible)
 	s.set_pending_count(3)
@@ -507,9 +505,9 @@ func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management (1 request)")
 	s.set_pending_count(0)
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management")
-	for b in ["PartiesButton", "CharacterButton", "ManagementButton", "SettingsButton", "ResumeButton", "SwitchWorldButton"]:
+	for b in ["OverworldButton", "CharacterButton", "ManagementButton", "SettingsButton", "ResumeButton", "SwitchWorldButton"]:
 		_press(s, b)
-	assert_eq(got, ["parties_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
+	assert_eq(got, ["overworld_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
 		"switch_world_pressed"] as Array[String])
 	s.free()
 
@@ -532,140 +530,150 @@ func test_settings_screen_shows_the_account_and_announces_its_actions() -> void:
 	s.free()
 
 
-func _party(id: String, relation: String, status: String = "forming", members: int = 2, open: bool = true) -> Dictionary:
+func _pview(relation: String, members: int = 1, node: String = "hollowmere", instance: Variant = null, id: String = "p1") -> Dictionary:
 	var m: Array = []
 	for i in members:
 		m.append({"id": "c%d" % i, "name": "Hero%d" % i, "class": "warrior"})
-	return {"id": id, "activity_id": "training_skirmish", "activity_name": "Training skirmish", "kind": "minor",
-		"status": status, "max_players": 4, "leader": m[0], "members": m, "relation": relation, "open": open}
+	return {"id": id, "node_id": node, "node_name": node.capitalize(), "leader": m[0], "members": m, "relation": relation,
+		"max_size": 4, "instance": instance, "here": true, "open": instance == null and members < 4}
 
 
-func test_parties_screen_lists_parties_and_offers_the_right_action() -> void:
-	var s := _screen("res://game/client/screens/parties_screen.tscn") as PartiesScreen
+func _overview() -> Dictionary:
+	return {"nodes": [{"id": "hollowmere", "name": "Hollowmere", "kind": "settlement"}, {"id": "blackwood", "name": "The Blackwood", "kind": "wilderness"},
+			{"id": "ashen_keep", "name": "Ashen Keep", "kind": "dungeon"}],
+		"routes": [{"id": "road", "from": "hollowmere", "to": "blackwood", "travel_days": 2}],
+		"activities": [{"id": "cellar_rats", "node": "hollowmere", "name": "Clear the cellar", "kind": "minor", "available": true, "max_players": 4},
+			{"id": "wolf_hunt", "node": "blackwood", "name": "Thin the wolf pack", "kind": "minor", "available": true, "max_players": 4}]}
+
+
+func test_overworld_rules_say_why_travel_and_start_are_not_possible() -> void:
+	var ov := _overview()
+	var lead := _pview("leader", 2)
+	assert_eq(OverworldScreen.travel_problem(lead, ov, "blackwood"), "")
+	assert_eq(OverworldScreen.travel_problem(lead, ov, "hollowmere"), "Your party is here.")
+	assert_eq(OverworldScreen.travel_problem(lead, ov, "ashen_keep"), "There is no known route from here.")
+	assert_eq(OverworldScreen.travel_problem(_pview("member", 2), ov, "blackwood"), "Only the party leader can travel.")
+	assert_eq(OverworldScreen.travel_problem(_pview("leader", 1, "hollowmere", {"id": "i"}), ov, "blackwood"), "Your party is in the middle of an activity.")
+	var rats: Dictionary = ov["activities"][0]
+	assert_eq(OverworldScreen.start_problem(lead, rats), "")
+	assert_eq(OverworldScreen.start_problem(lead, ov["activities"][1]), "Your party must be here to start this.")
+	assert_eq(OverworldScreen.start_problem(_pview("member", 2), rats), "Only the party leader can start an activity.")
+	assert_eq(OverworldScreen.start_problem(_pview("leader", 5), rats), "Your party is too big (max 4).")
+	rats["available"] = false
+	assert_eq(OverworldScreen.start_problem(lead, rats), "This is no longer available.")
+
+
+func test_overworld_screen_shows_the_map_and_reports_what_the_leader_asks() -> void:
+	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
 	var got: Array = []
-	s.request_join_requested.connect(func(p: Dictionary) -> void: got.append(["join", p["id"]]))
-	s.cancel_request_requested.connect(func(p: Dictionary) -> void: got.append(["cancel", p["id"]]))
-	s.open_party_requested.connect(func(p: Dictionary) -> void: got.append(["open", p["id"]]))
-	s.create_party_pressed.connect(func() -> void: got.append(["create"]))
-	var list := s.get_node("%PartyList") as ItemList
-	var action := s.get_node("%PartyActionButton") as Button
-	s.show_parties([])
-	assert_eq((s.get_node("%PartiesLabel") as Label).text, "No parties are forming. Start one.")
-	s.show_parties([_party("a", "none"), _party("b", "pending"), _party("c", "member"), _party("d", "leader", "active"),
-			_party("e", "none", "forming", 4, false)])
-	assert_eq(list.item_count, 5)
-	assert_eq(list.get_item_text(0), "Training skirmish - led by Hero0 - 2/4 - gathering")
-	assert_true(list.get_item_text(1).ends_with("[request sent]") and list.get_item_text(2).ends_with("[your party]"))
-	assert_true(list.get_item_text(3).contains("in battle"))
-	assert_true(action.disabled, "nothing selected")
-	var expect := [["Request to join", false], ["Cancel request", false], ["Open party", false], ["Return to battle", false],
-		["Request to join", true]]
-	for i in 5:
-		list.select(i)
-		list.item_selected.emit(i)
-		assert_eq([action.text, action.disabled], expect[i], "row %d" % i)
-		if not action.disabled:
-			action.pressed.emit()
-	assert_eq(got, [["join", "a"], ["cancel", "b"], ["open", "c"], ["open", "d"]])
-	list.select(4)
-	action.pressed.emit()
-	assert_eq(got.size(), 4, "a full party cannot be asked")
-	list.select(1)
-	s.show_parties([_party("a", "none"), _party("b", "pending")])
-	assert_eq(list.get_selected_items(), PackedInt32Array([1]), "the selected party stays selected across a refresh")
-	_press(s, "CreatePartyButton")
-	assert_eq(got.back(), ["create"])
-	s.free()
-
-
-func test_parties_screen_refreshes_on_a_timer_only_while_visible() -> void:
-	var s := _screen("res://game/client/screens/parties_screen.tscn") as PartiesScreen
-	var asked: Array[bool] = []
-	s.refresh_requested.connect(func() -> void: asked.append(true))
+	s.travel_requested.connect(func(n: String) -> void: got.append(["travel", n]))
+	s.start_requested.connect(func(a: String) -> void: got.append(["start", a]))
+	s.leave_requested.connect(func() -> void: got.append(["leave"]))
+	s.make_leader_requested.connect(func(c: String) -> void: got.append(["leader", c]))
+	s.join_requested.connect(func(p: Dictionary) -> void: got.append(["join", p["id"]]))
+	s.cancel_join_requested.connect(func(p: Dictionary) -> void: got.append(["cancel", p["id"]]))
 	s.show_loading()
-	var timer := s.get_node("%PartiesTimer") as Timer
-	assert_true(not timer.is_stopped())
-	timer.timeout.emit()
-	assert_eq(asked.size(), 1)
-	s.hide()
-	assert_true(timer.is_stopped(), "a hidden screen stops polling")
-	s.free()
-
-
-func test_create_party_screen_offers_only_runnable_activities() -> void:
-	var s := _screen("res://game/client/screens/create_party_screen.tscn") as CreatePartyScreen
-	var made: Array[String] = []
-	var messages: Array[String] = []
-	s.create_requested.connect(func(id: String) -> void: made.append(id))
-	s.message.connect(func(t: String) -> void: messages.append(t))
-	s.show_activities([
-		{"id": "training_skirmish", "name": "Training skirmish", "kind": "minor", "available": true, "max_players": 4},
-		{"id": "ashen_keep_siege", "name": "Break the siege", "kind": "major", "available": false, "max_players": 4},
-		{"id": "wolf_hunt", "name": "Thin the wolf pack", "kind": "major", "available": true, "max_players": 6}])
-	var list := s.get_node("%ActivityList") as ItemList
-	assert_eq(list.item_count, 2, "a completed one-time activity is hidden")
-	assert_eq(list.get_item_text(0), "Training skirmish - up to 4 players")
-	assert_eq(list.get_item_text(1), "Thin the wolf pack [major] - up to 6 players")
-	_press(s, "StartPartyButton")
-	assert_eq(messages, ["Select an activity first"] as Array[String])
-	list.select(1)
-	_press(s, "StartPartyButton")
-	assert_eq(made, ["wolf_hunt"] as Array[String])
-	s.free()
-
-
-func test_party_lobby_shows_the_roster_and_only_the_leader_gets_controls() -> void:
-	var s := _screen("res://game/client/screens/party_lobby_screen.tscn") as PartyLobbyScreen
-	var got: Array = []
-	s.start_pressed.connect(func() -> void: got.append("start"))
-	s.leave_pressed.connect(func() -> void: got.append("leave"))
-	s.back_pressed.connect(func() -> void: got.append("back"))
-	s.decision_made.connect(func(id: String, ok: bool, _row: JoinRequestRow) -> void: got.append([id, ok]))
-	var start := s.get_node("%StartButton") as Button
-	s.show_party(_party("a", "member"))
-	assert_eq((s.get_node("%PartyTitleLabel") as Label).text, "Training skirmish (2/4)")
-	var roster := s.get_node("%RosterList") as ItemList
-	assert_eq(roster.get_item_text(0), "Hero0 - warrior (leader)")
-	assert_eq(roster.get_item_text(1), "Hero1 - warrior")
-	assert_true(not start.visible and not (s.get_node("%RequestsBox") as Control).visible, "members cannot start or decide")
-	assert_eq((s.get_node("%PartyHintLabel") as Label).text, "Waiting for Hero0 to start the battle.")
-	s.show_party(_party("a", "leader"))
-	assert_true(start.visible and (s.get_node("%RequestsBox") as Control).visible)
-	s.show_requests([{"id": "q1", "name": "Mira", "class": "rogue"}, {"id": "q2", "name": "Orrin", "class": "cleric"}])
-	var rows := s.get_node("%PartyRequestRows") as VBoxContainer
-	assert_eq(rows.get_child_count(), 2)
-	assert_eq(((rows.get_child(0) as JoinRequestRow).get_node("%NameLabel") as Label).text, "Mira (rogue)")
-	((rows.get_child(0) as JoinRequestRow).get_node("%ApproveButton") as Button).pressed.emit()
-	((rows.get_child(1) as JoinRequestRow).get_node("%RejectButton") as Button).pressed.emit()
+	s.show_world(_overview(), [_pview("leader", 2)])
+	var map := s.get_node("%MapCanvas") as MapCanvas
+	assert_true(map.button_for("hollowmere") != null and map.button_for("blackwood") != null, "a button per known place")
+	assert_true(map.button_for("hollowmere").text.begins_with("*"), "the party's place is marked")
+	assert_eq((s.get_node("%PartyTitleLabel") as Label).text, "Your party (2/4)")
+	assert_eq((s.get_node("%RosterList") as ItemList).item_count, 2)
+	assert_eq((s.get_node("%ActivityList") as ItemList).item_count, 1, "only this place's activities")
+	assert_true(not (s.get_node("%TravelButton") as Control).visible, "no Travel to where you already are")
+	# start the selected activity
+	assert_true((s.get_node("%StartButton") as Button).disabled, "nothing picked yet")
+	(s.get_node("%ActivityList") as ItemList).select(0)
+	(s.get_node("%ActivityList") as ItemList).item_selected.emit(0)
+	assert_true(not (s.get_node("%StartButton") as Button).disabled)
 	_press(s, "StartButton")
-	_press(s, "PartyLeaveButton")
-	_press(s, "PartyBackButton")
-	assert_eq(got, [["q1", true], ["q2", false], "start", "leave", "back"])
-	s.set_start_busy(true)
-	assert_true(start.disabled)
-	s.show_party(_party("a", "member")) # leadership handed over to someone else: the controls go away
-	assert_true(not start.visible)
-	s.free()
-
-
-func test_party_lobby_leader_can_hand_over_and_the_pick_survives_a_refresh() -> void:
-	var s := _screen("res://game/client/screens/party_lobby_screen.tscn") as PartyLobbyScreen
-	var got: Array[String] = []
-	s.make_leader_requested.connect(func(id: String) -> void: got.append(id))
-	var btn := s.get_node("%MakeLeaderButton") as Button
+	# look at another place and travel there
+	map.button_for("blackwood").pressed.emit()
+	assert_eq((s.get_node("%TravelButton") as Button).text, "Travel to The Blackwood")
+	assert_true(not (s.get_node("%TravelButton") as Button).disabled)
+	_press(s, "TravelButton")
+	map.button_for("ashen_keep").pressed.emit()
+	assert_true((s.get_node("%TravelButton") as Button).disabled, "no route")
+	assert_eq((s.get_node("%PlaceHintLabel") as Label).text, "There is no known route from here.")
+	# leader tools
 	var roster := s.get_node("%RosterList") as ItemList
-	s.show_party(_party("a", "member"))
-	assert_true(not btn.visible, "members cannot hand over")
-	s.show_party(_party("a", "leader"))
-	assert_true(btn.visible and btn.disabled, "nothing picked yet")
+	assert_true((s.get_node("%MakeLeaderButton") as Button).disabled)
 	roster.select(1)
 	roster.item_selected.emit(1)
-	assert_true(not btn.disabled)
-	s.show_party(_party("a", "leader")) # the 3-second refresh rebuilds the list
-	assert_eq(roster.get_selected_items(), PackedInt32Array([1]))
-	btn.pressed.emit()
-	assert_eq(got, ["c1"] as Array[String])
+	_press(s, "MakeLeaderButton")
+	_press(s, "PartyLeaveButton")
+	assert_eq(got, [["start", "cellar_rats"], ["travel", "blackwood"], ["leader", "c1"], ["leave"]])
 	s.free()
+
+
+func test_overworld_members_cannot_act_and_other_parties_can_be_asked() -> void:
+	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
+	var got: Array = []
+	s.join_requested.connect(func(p: Dictionary) -> void: got.append(["join", p["id"]]))
+	s.cancel_join_requested.connect(func(p: Dictionary) -> void: got.append(["cancel", p["id"]]))
+	var other := _pview("none", 1, "hollowmere", null, "p2")
+	s.show_world(_overview(), [_pview("member", 2), other])
+	assert_true(not (s.get_node("%MakeLeaderButton") as Control).visible, "only the leader hands over")
+	(s.get_node("%ActivityList") as ItemList).select(0)
+	(s.get_node("%ActivityList") as ItemList).item_selected.emit(0)
+	assert_true((s.get_node("%StartButton") as Button).disabled)
+	assert_eq((s.get_node("%PlaceHintLabel") as Label).text, "Only the party leader can start an activity.")
+	# a member of a group has to leave before asking another party
+	var others := s.get_node("%OthersList") as ItemList
+	assert_eq(others.item_count, 1)
+	others.select(0)
+	others.item_selected.emit(0)
+	assert_true((s.get_node("%AskButton") as Button).disabled)
+	# a lone character can ask, and cancel
+	s.show_world(_overview(), [_pview("leader", 1), other])
+	others.select(0)
+	others.item_selected.emit(0)
+	assert_true(not (s.get_node("%AskButton") as Button).disabled)
+	_press(s, "AskButton")
+	other["relation"] = "pending"
+	s.show_world(_overview(), [_pview("leader", 1), other])
+	others.select(0)
+	others.item_selected.emit(0)
+	assert_eq((s.get_node("%AskButton") as Button).text, "Cancel request")
+	_press(s, "AskButton")
+	assert_eq(got, [["join", "p2"], ["cancel", "p2"]])
+	s.free()
+
+
+func test_overworld_party_in_an_activity_offers_return_and_hides_the_tools() -> void:
+	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
+	var returned: Array[bool] = []
+	s.resume_pressed.connect(func() -> void: returned.append(true))
+	s.show_world(_overview(), [_pview("leader", 2, "hollowmere", {"id": "i1", "activity_name": "Clear the cellar", "status": "active"})])
+	assert_true((s.get_node("%ReturnButton") as Control).visible)
+	assert_true(not (s.get_node("%PartyLeaveButton") as Control).visible and not (s.get_node("%MakeLeaderButton") as Control).visible)
+	assert_true(not (s.get_node("%RequestsBox") as Control).visible)
+	assert_eq((s.get_node("%PartyStatusLabel") as Label).text, "In an activity: Clear the cellar")
+	_press(s, "ReturnButton")
+	assert_eq(returned, [true] as Array[bool])
+	s.free()
+
+
+func test_overworld_lists_join_requests_for_the_leader() -> void:
+	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
+	var got: Array = []
+	s.decision_made.connect(func(id: String, ok: bool, _row: JoinRequestRow) -> void: got.append([id, ok]))
+	s.show_world(_overview(), [_pview("leader", 1)])
+	assert_true(not (s.get_node("%RequestsBox") as Control).visible, "nothing to decide yet")
+	s.show_requests([{"id": "r1", "name": "Tessa", "class": "rogue"}])
+	assert_true((s.get_node("%RequestsBox") as Control).visible)
+	var rows := s.get_node("%PartyRequestRows") as VBoxContainer
+	assert_eq(rows.get_child_count(), 1)
+	(rows.get_child(0) as JoinRequestRow).approved.emit()
+	assert_eq(got, [["r1", true]])
+	s.free()
+
+
+func test_map_layout_places_known_nodes_and_rings_the_rest() -> void:
+	var l := load("res://game/content/overworld/map_layout.tres") as MapLayout
+	assert_eq(l.position_of("hollowmere", 0, 5), l.positions["hollowmere"])
+	var ring := l.position_of("brand_new_node", 1, 4)
+	assert_true(ring.x >= 0.0 and ring.x <= 1.0 and ring.y >= 0.0 and ring.y <= 1.0, "inside the map")
 
 
 func test_lobby_screen_lists_the_party_and_can_be_left() -> void:

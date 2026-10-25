@@ -174,7 +174,7 @@ def test_discovery_scopes_and_revision_rules(client):
     assert reveal(client, w["id"], "node", "old_shrine", "character", str(uuid.uuid4())).status_code == 422
 
 
-# ---------- activities and parties ----------
+# ---------- parties, travel and activities ----------
 
 def party(client, pool, n=2):
     w, host, _ = make_world(client)
@@ -183,196 +183,257 @@ def party(client, pool, n=2):
     return w, toks, chars
 
 
+def my_party(client, wid, tok):
+    r = client.get(f"/worlds/{wid}/parties/me", headers=auth(tok))
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
 def new_party(client, wid, tok, activity="cellar_rats"):
-    r = client.post(f"/worlds/{wid}/activities/{activity}/instances", headers=auth(tok))
+    """Starts an activity from the player's own party and returns the run's id (it is active at once)."""
+    pid = my_party(client, wid, tok)["id"]
+    r = client.post(f"/parties/{pid}/start", json={"activity_id": activity}, headers=auth(tok))
     assert r.status_code == 201, r.text
     return r.json()["id"]
 
 
-def join_party(client, iid, leader_tok, tok):
+def join_party(client, pid, leader_tok, tok):
     """The player asks, the leader approves."""
-    req = client.post(f"/instances/{iid}/requests", headers=auth(tok))
+    req = client.post(f"/parties/{pid}/requests", headers=auth(tok))
     assert req.status_code == 201, req.text
-    ok = client.post(f"/instances/{iid}/requests/{req.json()['id']}/approve", headers=auth(leader_tok))
+    ok = client.post(f"/parties/{pid}/requests/{req.json()['id']}/approve", headers=auth(leader_tok))
     assert ok.status_code == 200, ok.text
 
 
-def test_instances_require_discovery_and_membership(client, pool):
+def start(client, pid, tok, activity="cellar_rats"):
+    return client.post(f"/parties/{pid}/start", json={"activity_id": activity}, headers=auth(tok))
+
+
+def test_every_character_starts_in_a_party_of_one_at_the_start_node(client, pool):
     w, [t1, t2], [c1, c2] = party(client, pool)
-    url = f"/worlds/{w['id']}/activities/ashen_keep_siege/instances"
-    assert client.post(url, headers=auth(t1)).status_code == 403, "location not discovered"
+    p = my_party(client, w["id"], t1)
+    assert (p["node_id"], p["relation"], p["leader"]["name"], [m["name"] for m in p["members"]]) == ("hollowmere", "leader", "C0", ["C0"])
+    assert p["instance"] is None and p["open"] and p["here"]
+    assert my_party(client, w["id"], t1)["id"] == p["id"], "asking again does not make another"
+    assert my_party(client, w["id"], t2)["id"] != p["id"]
+
+
+def test_legacy_characters_get_a_party_when_first_asked(client, pool):
+    w, host, _ = make_world(client)
+    c = char(client, w["id"], host)
+    with pool.connection() as conn:  # a character from before parties existed
+        conn.execute("delete from party_members where character_id=%s", (c["id"],))
+        conn.execute("update characters set node_id=null where id=%s", (c["id"],))
+    p = my_party(client, w["id"], host)
+    assert p["node_id"] == "hollowmere" and [m["name"] for m in p["members"]] == ["Hero"]
+
+
+def test_starting_needs_discovery_leadership_and_the_right_place(client, pool):
+    w, [t1, t2], [c1, c2] = party(client, pool)
+    p1, p2 = my_party(client, w["id"], t1)["id"], my_party(client, w["id"], t2)["id"]
+    assert start(client, p1, t1, "ashen_keep_siege").status_code == 403, "location not discovered"
     reveal(client, w["id"], "node", "ashen_keep", "world")
+    assert start(client, p1, t1, "ashen_keep_siege").status_code == 403, "the party is not at the keep"
+    assert start(client, p1, t1, "wolf_hunt").status_code == 403, "wolf_hunt is in the Blackwood"
+    assert start(client, p1, t2).status_code == 403, "only the leader starts"
+    assert start(client, p1, t1, "no_such_thing").status_code == 404
     outsider, _ = new_user()
-    assert client.post(url, headers=auth(outsider)).status_code == 403
-    assert client.post(url, headers=auth(t1)).status_code == 201, "the template does not require presence yet"
+    assert start(client, p1, outsider).status_code == 403
+    assert start(client, p1, t1).status_code == 201
+    assert start(client, p1, t1).status_code == 409, "already playing"
+    assert start(client, p2, t2, "training_skirmish").status_code == 201, "another party may play at once"
 
 
-def test_presence_is_enforced_when_the_template_requires_it(pool, tmp_path):
-    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
-    d["rules"]["require_location"] = True
-    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
-    c = TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
-    w, [t1, t2], [c1, c2] = party(c, pool)
-    set_node(pool, c1["id"], "blackwood")
-    assert c.post(f"/worlds/{w['id']}/activities/cellar_rats/instances", headers=auth(t1)).status_code == 403
-    set_node(pool, c1["id"], "hollowmere")
-    iid = new_party(c, w["id"], t1)
-    set_node(pool, c2["id"], "blackwood")
-    assert c.post(f"/instances/{iid}/requests", headers=auth(t2)).status_code == 403, "must be present to ask"
+def test_the_leader_travels_the_party_along_discovered_routes(client, pool):
+    w, [t1, t2, t3], [c1, c2, c3] = party(client, pool, 3)
+    p1 = my_party(client, w["id"], t1)["id"]
+    join_party(client, p1, t1, t2)
+    travel = lambda tok, node, pid=p1: client.post(f"/parties/{pid}/travel", json={"node_id": node}, headers=auth(tok))
+    assert travel(t2, "blackwood").status_code == 403, "only the leader travels"
+    assert travel(t1, "hollowmere").status_code == 409, "already there"
+    assert travel(t1, "atlantis").status_code == 422
+    assert travel(t1, "ashen_keep").status_code == 403, "not discovered"
+    reveal(client, w["id"], "node", "ashen_keep", "world")
+    assert travel(t1, "ashen_keep").status_code == 409, "no route from here"
+    moved = travel(t1, "blackwood")
+    assert moved.status_code == 200 and moved.json()["node_id"] == "blackwood"
+    assert overview(client, w["id"], t1)["location"] == "blackwood" and overview(client, w["id"], t2)["location"] == "blackwood"
+    assert overview(client, w["id"], t3)["location"] == "hollowmere", "other parties stay put"
+    assert my_party(client, w["id"], t2)["here"] is True and client.get(f"/parties/{p1}", headers=auth(t3)).json()["here"] is False
+    assert start(client, p1, t1, "wolf_hunt").status_code == 201, "now the party is where the hunt is"
+    assert travel(t1, "hollowmere").status_code == 409, "not in the middle of an activity"
+
+
+def test_joining_needs_the_same_place_and_a_lone_character(client, pool):
+    w, [t1, t2, t3], [c1, c2, c3] = party(client, pool, 3)
+    p1 = my_party(client, w["id"], t1)["id"]
+    client.post(f"/parties/{p1}/travel", json={"node_id": "blackwood"}, headers=auth(t1))
+    assert client.post(f"/parties/{p1}/requests", headers=auth(t2)).status_code == 403, "must be there to ask"
+    client.post(f"/parties/{my_party(client, w['id'], t2)['id']}/travel", json={"node_id": "blackwood"}, headers=auth(t2))
+    join_party(client, p1, t1, t2)
+    p3 = my_party(client, w["id"], t3)["id"]
+    assert client.post(f"/parties/{p3}/requests", headers=auth(t1)).status_code == 409, "leave your party first"
+    assert client.post(f"/parties/{p1}/requests", headers=auth(t1)).status_code == 409, "already in this party"
 
 
 def test_concurrent_major_instances_are_prevented_atomically_but_minor_parties_run_side_by_side(client, pool):
     w, toks, chars = party(client, pool, 3)
     reveal(client, w["id"], "node", "ashen_keep", "world")
-    url = f"/worlds/{w['id']}/activities/ashen_keep_siege/instances"
+    for t, c in zip(toks, chars):
+        set_node(pool, c["id"], "ashen_keep")
+        with pool.connection() as conn:
+            conn.execute("update parties set node_id='ashen_keep' where id=%s", (my_party(client, w["id"], t)["id"],))
+    pids = [my_party(client, w["id"], t)["id"] for t in toks]
     with ThreadPoolExecutor(3) as ex:
-        results = list(ex.map(lambda t: (t, client.post(url, headers=auth(t)).status_code), toks))
+        results = list(ex.map(lambda pt: (pt[0], start(client, pt[1], pt[0], "ashen_keep_siege").status_code), zip(toks, pids)))
     assert sorted(code for _, code in results) == [201, 409, 409], "exactly one major reservation wins"
-    # a minor activity can run in several parties at once, alongside the major one
-    losers = [t for t, code in results if code == 409]
-    a = new_party(client, w["id"], losers[0])
-    b = new_party(client, w["id"], losers[1])
-    assert a != b, "several parties may run the same activity"
+    a, b = (my_party(client, w["id"], t)["id"] for t in toks[:2])
+    assert a != b, "parties are separate"
 
 
-def test_a_character_is_in_one_party_at_a_time(client, pool):
+def test_a_party_in_an_activity_is_held_in_place(client, pool):
     w, [t1, t2], _ = party(client, pool)
+    p1 = my_party(client, w["id"], t1)["id"]
     new_party(client, w["id"], t1)
-    assert client.post(f"/worlds/{w['id']}/activities/wolf_hunt/instances", headers=auth(t1)).status_code == 409
-    other = new_party(client, w["id"], t2, "wolf_hunt")
-    assert client.post(f"/instances/{other}/requests", headers=auth(t1)).status_code == 409, "already in a party"
+    assert my_party(client, w["id"], t1)["instance"]["activity_name"] == "Clear the cellar"
+    assert client.post(f"/parties/{p1}/requests", headers=auth(t2)).status_code == 409, "cannot join mid-activity"
+    assert start(client, p1, t1, "training_skirmish").status_code == 409
 
 
 def test_party_requests_are_decided_by_the_leader(client, pool):
     w, [t1, t2, t3], [c1, c2, c3] = party(client, pool, 3)
-    iid = new_party(client, w["id"], t1)
-    req = client.post(f"/instances/{iid}/requests", headers=auth(t2))
+    pid = my_party(client, w["id"], t1)["id"]
+    req = client.post(f"/parties/{pid}/requests", headers=auth(t2))
     assert req.status_code == 201
-    assert client.post(f"/instances/{iid}/requests", headers=auth(t2)).status_code == 409, "one pending ask at a time"
-    assert client.get(f"/instances/{iid}/requests", headers=auth(t2)).status_code == 403, "only the leader sees requests"
-    pending = client.get(f"/instances/{iid}/requests", headers=auth(t1)).json()
+    assert client.post(f"/parties/{pid}/requests", headers=auth(t2)).status_code == 409, "one pending ask at a time"
+    assert client.get(f"/parties/{pid}/requests", headers=auth(t2)).status_code == 403, "only the leader sees requests"
+    pending = client.get(f"/parties/{pid}/requests", headers=auth(t1)).json()
     assert [(p["name"], p["class"]) for p in pending] == [("C1", "warrior")]
     rid = req.json()["id"]
-    assert client.post(f"/instances/{iid}/requests/{rid}/approve", headers=auth(t2)).status_code == 403
-    assert client.post(f"/instances/{iid}/requests/{rid}/approve", headers=auth(t1)).status_code == 200
-    assert client.post(f"/instances/{iid}/requests/{rid}/reject", headers=auth(t1)).status_code == 409, "already decided"
-    assert [m["name"] for m in client.get(f"/instances/{iid}", headers=auth(t3)).json()["members"]] == ["C0", "C1"]
+    assert client.post(f"/parties/{pid}/requests/{rid}/approve", headers=auth(t2)).status_code == 403
+    assert client.post(f"/parties/{pid}/requests/{rid}/approve", headers=auth(t1)).status_code == 200
+    assert client.post(f"/parties/{pid}/requests/{rid}/reject", headers=auth(t1)).status_code == 409, "already decided"
+    assert [m["name"] for m in client.get(f"/parties/{pid}", headers=auth(t3)).json()["members"]] == ["C0", "C1"]
+    assert my_party(client, w["id"], t2)["id"] == pid, "their old party of one is gone"
     # a rejected ask grants nothing, and a player can cancel their own ask
-    r3 = client.post(f"/instances/{iid}/requests", headers=auth(t3)).json()["id"]
-    assert client.post(f"/instances/{iid}/requests/{r3}/reject", headers=auth(t1)).status_code == 200
-    assert len(client.get(f"/instances/{iid}", headers=auth(t3)).json()["members"]) == 2
-    client.post(f"/instances/{iid}/requests", headers=auth(t3))
-    assert client.post(f"/instances/{iid}/requests/cancel", headers=auth(t3)).status_code == 204
-    assert client.post(f"/instances/{iid}/requests/cancel", headers=auth(t3)).status_code == 404
-    assert client.get(f"/instances/{iid}/requests", headers=auth(t1)).json() == []
+    r3 = client.post(f"/parties/{pid}/requests", headers=auth(t3)).json()["id"]
+    assert client.post(f"/parties/{pid}/requests/{r3}/reject", headers=auth(t1)).status_code == 200
+    assert len(client.get(f"/parties/{pid}", headers=auth(t3)).json()["members"]) == 2
+    client.post(f"/parties/{pid}/requests", headers=auth(t3))
+    assert client.post(f"/parties/{pid}/requests/cancel", headers=auth(t3)).status_code == 204
+    assert client.post(f"/parties/{pid}/requests/cancel", headers=auth(t3)).status_code == 404
+    assert client.get(f"/parties/{pid}/requests", headers=auth(t1)).json() == []
 
 
 def test_joining_somewhere_cancels_the_other_pending_asks(client, pool):
     w, [t1, t2, t3], _ = party(client, pool, 3)
-    a, b = new_party(client, w["id"], t1), new_party(client, w["id"], t2, "wolf_hunt")
-    ra = client.post(f"/instances/{a}/requests", headers=auth(t3)).json()["id"]
-    client.post(f"/instances/{b}/requests", headers=auth(t3))
-    client.post(f"/instances/{a}/requests/{ra}/approve", headers=auth(t1))
-    assert client.get(f"/instances/{b}/requests", headers=auth(t2)).json() == [], "the ask to the second party was withdrawn"
+    a, b = my_party(client, w["id"], t1)["id"], my_party(client, w["id"], t2)["id"]
+    ra = client.post(f"/parties/{a}/requests", headers=auth(t3)).json()["id"]
+    client.post(f"/parties/{b}/requests", headers=auth(t3))
+    client.post(f"/parties/{a}/requests/{ra}/approve", headers=auth(t1))
+    assert client.get(f"/parties/{b}/requests", headers=auth(t2)).json() == [], "the ask to the second party was withdrawn"
 
 
-def test_roster_rules_leader_decisions_and_locking(client, pool):
+def test_the_run_takes_the_roster_and_locks_it(client, pool):
     w, [t1, t2], _ = party(client, pool)
-    iid = new_party(client, w["id"], t1)
-    join_party(client, iid, t1, t2)
-    assert client.post(f"/instances/{iid}/start", headers=auth(t2)).status_code == 403, "only the leader starts"
-    assert client.post(f"/instances/{iid}/leave", headers=auth(t2)).status_code == 204
-    join_party(client, iid, t1, t2)
-    assert client.post(f"/instances/{iid}/start", headers=auth(t1)).json()["status"] == "active"
-    assert client.post(f"/instances/{iid}/leave", headers=auth(t2)).status_code == 409, "no voluntary departure after start"
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    assert start(client, pid, t2).status_code == 403, "only the leader starts"
+    iid = start(client, pid, t1).json()["id"]
+    assert client.post(f"/parties/{pid}/leave", headers=auth(t2)).status_code == 409, "no departure mid-activity"
     other, _ = join(client, w["id"], t1)
     char(client, w["id"], other, "Late")
-    assert client.post(f"/instances/{iid}/requests", headers=auth(other)).status_code == 409, "roster locked"
+    assert client.post(f"/parties/{pid}/requests", headers=auth(other)).status_code == 409, "roster locked"
     inst = client.get(f"/internal/instances/{iid}", headers=SERVER).json()
     assert [r["name"] for r in inst["roster"]] == ["C0", "C1"]
     assert (inst["encounter"], inst["max_players"], inst["activity_name"]) == ("prototype", 4, "Clear the cellar")
 
 
-def test_asks_made_before_the_start_are_withdrawn(client, pool):
+def test_asks_pending_at_the_start_are_withdrawn(client, pool):
     w, [t1, t2], _ = party(client, pool)
-    iid = new_party(client, w["id"], t1)
-    client.post(f"/instances/{iid}/requests", headers=auth(t2))
-    client.post(f"/instances/{iid}/start", headers=auth(t1))
+    pid = my_party(client, w["id"], t1)["id"]
+    client.post(f"/parties/{pid}/requests", headers=auth(t2))
+    start(client, pid, t1)
     with pool.connection() as c:
-        assert c.execute("select count(*) n from instance_join_requests where status='pending'").fetchone()["n"] == 0
+        assert c.execute("select count(*) n from party_join_requests where status='pending'").fetchone()["n"] == 0
 
 
 def test_leader_leaving_hands_over_to_the_longest_standing_member(client, pool):
     w, [t1, t2, t3], _ = party(client, pool, 3)
-    iid = new_party(client, w["id"], t1)
-    join_party(client, iid, t1, t2)
-    join_party(client, iid, t1, t3)
-    assert client.post(f"/instances/{iid}/leave", headers=auth(t1)).status_code == 204
-    p = client.get(f"/instances/{iid}", headers=auth(t3)).json()
-    assert p["leader"]["name"] == "C1" and p["status"] == "forming"
-    assert (client.get(f"/instances/{iid}", headers=auth(t2)).json()["relation"],
-            client.get(f"/instances/{iid}", headers=auth(t3)).json()["relation"]) == ("leader", "member")
-    assert client.post(f"/instances/{iid}/start", headers=auth(t2)).status_code == 200, "the new leader can start"
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    join_party(client, pid, t1, t3)
+    assert client.post(f"/parties/{pid}/leave", headers=auth(t1)).status_code == 204
+    p = client.get(f"/parties/{pid}", headers=auth(t3)).json()
+    assert p["leader"]["name"] == "C1" and [m["name"] for m in p["members"]] == ["C1", "C2"]
+    assert (client.get(f"/parties/{pid}", headers=auth(t2)).json()["relation"],
+            client.get(f"/parties/{pid}", headers=auth(t3)).json()["relation"]) == ("leader", "member")
+    assert start(client, pid, t2).status_code == 201, "the new leader can start"
+    alone = my_party(client, w["id"], t1)
+    assert alone["id"] != pid and [m["name"] for m in alone["members"]] == ["C0"], "the one who left is on their own"
 
 
-def test_the_last_member_leaving_cancels_the_party(client, pool):
+def test_a_lone_character_cannot_leave_and_empty_parties_disappear(client, pool):
     w, [t1, t2], _ = party(client, pool)
-    iid = new_party(client, w["id"], t1)
-    assert client.post(f"/instances/{iid}/leave", headers=auth(t1)).status_code == 204
-    assert client.get(f"/instances/{iid}", headers=auth(t1)).json()["status"] == "cancelled"
-    assert client.get(f"/worlds/{w['id']}/parties", headers=auth(t1)).json() == []
-    assert new_party(client, w["id"], t1) != iid, "they are free to start another"
+    solo = my_party(client, w["id"], t1)["id"]
+    assert client.post(f"/parties/{solo}/leave", headers=auth(t1)).status_code == 409
+    other = my_party(client, w["id"], t2)["id"]
+    join_party(client, solo, t1, t2)
+    assert client.get(f"/parties/{other}", headers=auth(t1)).status_code == 404, "an emptied party is closed"
+    assert {p["id"] for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t1)).json()} == {solo}
 
 
-def test_party_list_shows_every_live_party_and_my_relation(client, pool):
+def test_party_list_shows_every_party_and_my_relation(client, pool):
     w, [t1, t2, t3], _ = party(client, pool, 3)
-    a, b = new_party(client, w["id"], t1), new_party(client, w["id"], t2, "wolf_hunt")
-    client.post(f"/instances/{a}/requests", headers=auth(t3))
+    a, b = my_party(client, w["id"], t1)["id"], my_party(client, w["id"], t2)["id"]
+    client.post(f"/parties/{a}/requests", headers=auth(t3))
     rows = {p["id"]: p for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t3)).json()}
-    assert set(rows) == {a, b}
-    assert (rows[a]["relation"], rows[a]["activity_name"], rows[a]["leader"]["name"]) == ("pending", "Clear the cellar", "C0")
-    assert (rows[b]["relation"], rows[b]["open"], rows[b]["max_players"]) == ("none", True, 4)
+    assert a in rows and b in rows and len(rows) == 3
+    assert (rows[a]["relation"], rows[a]["leader"]["name"], rows[a]["node_name"], rows[a]["here"]) == ("pending", "C0", "Hollowmere", True)
+    assert (rows[b]["relation"], rows[b]["open"], rows[b]["max_size"]) == ("none", True, 4)
     mine = {p["id"]: p["relation"] for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t1)).json()}
-    assert mine == {a: "leader", b: "none"}
-    client.post(f"/instances/{b}/start", headers=auth(t2))
+    assert mine[a] == "leader" and mine[b] == "none"
+    start(client, b, t2, "training_skirmish")
     started = {p["id"]: p for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t3)).json()}
-    assert started[b]["status"] == "active" and started[b]["open"] is False
+    assert started[b]["instance"]["status"] == "active" and started[b]["open"] is False
     outsider, _ = new_user()
     assert client.get(f"/worlds/{w['id']}/parties", headers=auth(outsider)).status_code == 403
-    assert client.get(f"/instances/{a}", headers=auth(outsider)).status_code == 403
+    assert client.get(f"/parties/{a}", headers=auth(outsider)).status_code == 403
 
 
-def test_roster_capacity(client, pool):
+def test_party_capacity(client, pool):
     w, toks, chars = party(client, pool, 5)
-    iid = new_party(client, w["id"], toks[0])
+    pid = my_party(client, w["id"], toks[0])["id"]
     for t in toks[1:4]:
-        join_party(client, iid, toks[0], t)
-    assert client.post(f"/instances/{iid}/requests", headers=auth(toks[4])).status_code == 409, "cellar_rats allows 4 players"
+        join_party(client, pid, toks[0], t)
+    assert client.post(f"/parties/{pid}/requests", headers=auth(toks[4])).status_code == 409, "the party holds 4"
 
 
 def test_game_server_checks_the_roster_when_a_player_enters_a_battle(client, pool):
     w, [t1, t2, t3], _ = party(client, pool, 3)
-    iid = new_party(client, w["id"], t1)
-    join_party(client, iid, t1, t2)
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    iid = start(client, pid, t1).json()["id"]
 
     def seat(tok):
         return client.post("/internal/auth/session", headers=SERVER,
                            json={"token": tok, "world_id": w["id"], "instance_id": iid})
-    assert seat(t1).status_code == 409, "not started yet"
-    client.post(f"/instances/{iid}/start", headers=auth(t1))
     ok = seat(t2).json()
     assert ok["character"]["name"] == "C1" and ok["instance"]["encounter"] == "prototype"
     assert seat(t3).status_code == 403, "a member who is not on the roster is refused"
     client.post(f"/internal/instances/{iid}/complete", headers=SERVER)
-    assert seat(t1).status_code == 409, "a finished party cannot be entered"
+    assert seat(t1).status_code == 409, "a finished run cannot be entered"
+    assert my_party(client, w["id"], t1)["instance"] is None, "the party is idle again"
 
 
 def test_one_time_major_completion_changes_the_world_atomically(client, pool):
     w, [t1, t2], [c1, c2] = party(client, pool)
     reveal(client, w["id"], "node", "ashen_keep", "world")  # revision 1
+    for c in (c1, c2):
+        set_node(pool, c["id"], "ashen_keep")
+    with pool.connection() as conn:
+        conn.execute("update parties set node_id='ashen_keep' where world_id=%s", (w["id"],))
     iid = new_party(client, w["id"], t1, "ashen_keep_siege")
-    assert client.post(f"/internal/instances/{iid}/complete", headers=SERVER).status_code == 409, "must be started first"
-    client.post(f"/instances/{iid}/start", headers=auth(t1))
     done = client.post(f"/internal/instances/{iid}/complete", headers=SERVER).json()
     assert done["world_changed"] and done["state_revision"] == 2 and not done["duplicate"]
     replay = client.post(f"/internal/instances/{iid}/complete", headers=SERVER).json()
@@ -383,25 +444,32 @@ def test_one_time_major_completion_changes_the_world_atomically(client, pool):
     siege = next(a for a in ov["activities"] if a["id"] == "ashen_keep_siege")
     assert siege["available"] is False
     # the one-time activity is unavailable to new participants
-    r = client.post(f"/worlds/{w['id']}/activities/ashen_keep_siege/instances", headers=auth(t1))
+    r = start(client, my_party(client, w["id"], t1)["id"], t1, "ashen_keep_siege")
     assert r.status_code == 409 and "no longer available" in r.json()["detail"]
+
+
+def test_a_run_must_be_started_to_be_completed(client, pool):
+    w, [t1, _], _ = party(client, pool)
+    iid = new_party(client, w["id"], t1)
+    client.post(f"/internal/instances/{iid}/cancel", headers=SERVER)
+    assert client.post(f"/internal/instances/{iid}/complete", headers=SERVER).status_code == 409
 
 
 def test_minor_completion_without_world_effects_keeps_revision(client, pool):
     w, [t1, _], [c1, _] = party(client, pool)
-    iid = client.post(f"/worlds/{w['id']}/activities/cellar_rats/instances", headers=auth(t1)).json()["id"]
-    client.post(f"/instances/{iid}/start", headers=auth(t1))
+    iid = new_party(client, w["id"], t1)
     done = client.post(f"/internal/instances/{iid}/complete", headers=SERVER).json()
     assert not done["world_changed"] and done["state_revision"] == 0
-    again = client.post(f"/worlds/{w['id']}/activities/cellar_rats/instances", headers=auth(t1))
-    assert again.status_code == 201, "repeatable activities can run again"
+    assert start(client, my_party(client, w["id"], t1)["id"], t1).status_code == 201, "repeatable activities can run again"
 
 
 def test_failed_completion_does_not_advance_revision_or_state(client, pool):
     w, [t1, _], [c1, _] = party(client, pool)
     reveal(client, w["id"], "node", "ashen_keep", "world")
+    set_node(pool, c1["id"], "ashen_keep")
+    with pool.connection() as conn:
+        conn.execute("update parties set node_id='ashen_keep' where world_id=%s and leader_character_id=%s", (w["id"], c1["id"]))
     iid = new_party(client, w["id"], t1, "ashen_keep_siege")
-    client.post(f"/instances/{iid}/start", headers=auth(t1))
     with pool.connection() as c:  # simulate another path already completing it
         c.execute("update world_activities set status='completed' where world_id=%s", (w["id"],))
     assert client.post(f"/internal/instances/{iid}/complete", headers=SERVER).status_code == 409
@@ -411,13 +479,12 @@ def test_failed_completion_does_not_advance_revision_or_state(client, pool):
         assert c.execute("select status from activity_instances where id=%s", (iid,)).fetchone()["status"] == "active"
 
 
-def test_cancelled_instance_frees_the_reservation(client, pool):
+def test_cancelled_run_frees_the_party_and_the_reservation(client, pool):
     w, [t1, t2], [c1, c2] = party(client, pool)
-    url = f"/worlds/{w['id']}/activities/cellar_rats/instances"
-    iid = client.post(url, headers=auth(t1)).json()["id"]
-    assert client.post(f"/instances/{iid}/cancel", headers=auth(t2)).status_code == 403
-    assert client.post(f"/instances/{iid}/cancel", headers=auth(t1)).json()["status"] == "cancelled"
-    assert client.post(url, headers=auth(t2)).status_code == 201
+    iid = new_party(client, w["id"], t1)
+    assert client.post(f"/internal/instances/{iid}/cancel", headers=SERVER).json()["status"] == "cancelled"
+    assert my_party(client, w["id"], t1)["instance"] is None
+    assert start(client, my_party(client, w["id"], t1)["id"], t1).status_code == 201
 
 
 def test_membership_status_follows_the_join_flow(client):
@@ -530,13 +597,13 @@ def test_deleting_a_world_is_permanent_and_guarded(client, pool):
     assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(tok)).status_code == 403
     assert client.post(f"/worlds/{wid}/delete", json=body("doomed"), headers=auth(host)).status_code == 422
     p = new_party(client, wid, host, "training_skirmish")
-    assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(host)).status_code == 409, "live party blocks it"
-    client.post(f"/instances/{p}/leave", headers=auth(host))
+    assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(host)).status_code == 409, "a running activity blocks it"
+    client.post(f"/internal/instances/{p}/cancel", headers=SERVER)
     assert client.post(f"/worlds/{wid}/delete", json=body("Doomed"), headers=auth(host)).status_code == 204
     assert client.get("/worlds", headers=auth(host)).json() == []
     assert client.get(f"/worlds/{wid}/membership", headers=auth(tok)).status_code == 404
     with pool.connection() as c:
-        for t in ("characters", "activity_instances", "world_members", "combat_results"):
+        for t in ("characters", "activity_instances", "world_members", "combat_results", "parties"):
             assert c.execute(f"select count(*) as n from {t} where world_id=%s", (wid,)).fetchone()["n"] == 0
 
 
@@ -579,13 +646,18 @@ def test_battle_history_and_the_xp_reset_rule(client):
     assert client.get(f"/worlds/{w['id']}/characters/me/battles", headers=auth(new_user()[0])).status_code in (403, 404)
 
 
-def test_a_character_in_a_live_party_cannot_retire(client):
+def test_a_character_in_an_activity_cannot_retire_and_retiring_leaves_the_party(client):
     w, host, _ = make_world(client)
-    c = char(client, w["id"], host)
-    p = new_party(client, w["id"], host, "training_skirmish")
+    tok, _uid = join(client, w["id"], host)
+    c, other = char(client, w["id"], host), char(client, w["id"], tok, "Other")
+    pid = my_party(client, w["id"], host)["id"]
+    join_party(client, pid, host, tok)
+    run = new_party(client, w["id"], host, "training_skirmish")
     assert client.post(f"/characters/{c['id']}/retire", headers=auth(host)).status_code == 409
-    client.post(f"/instances/{p}/leave", headers=auth(host))
+    client.post(f"/internal/instances/{run}/cancel", headers=SERVER)
     assert client.post(f"/characters/{c['id']}/retire", headers=auth(host)).status_code == 200
+    p = client.get(f"/parties/{pid}", headers=auth(tok)).json()
+    assert [m["name"] for m in p["members"]] == ["Other"] and p["leader"]["id"] == other["id"]
 
 
 def test_world_info_is_for_the_host(client):
@@ -601,13 +673,13 @@ def test_world_info_is_for_the_host(client):
 
 def test_leader_hands_the_party_to_a_member(client, pool):
     w, [t1, t2, t3], [c1, c2, c3] = party(client, pool, 3)
-    iid = new_party(client, w["id"], t1, "training_skirmish")
+    iid = my_party(client, w["id"], t1)["id"]
     join_party(client, iid, t1, t2)
     body = lambda c: {"character_id": c["id"]}
-    assert client.post(f"/instances/{iid}/leader", json=body(c2), headers=auth(t2)).status_code == 403, "only the leader"
-    assert client.post(f"/instances/{iid}/leader", json=body(c3), headers=auth(t1)).status_code == 404, "must be on the roster"
-    assert client.post(f"/instances/{iid}/leader", json=body(c2), headers=auth(t1)).status_code == 204
-    assert client.get(f"/instances/{iid}", headers=auth(t1)).json()["leader"]["id"] == c2["id"]
-    assert client.post(f"/instances/{iid}/leader", json=body(c1), headers=auth(t1)).status_code == 403, "no longer the leader"
-    client.post(f"/instances/{iid}/start", headers=auth(t2))
-    assert client.post(f"/instances/{iid}/leader", json=body(c1), headers=auth(t2)).status_code == 409, "not after the start"
+    assert client.post(f"/parties/{iid}/leader", json=body(c2), headers=auth(t2)).status_code == 403, "only the leader"
+    assert client.post(f"/parties/{iid}/leader", json=body(c3), headers=auth(t1)).status_code == 404, "must be on the roster"
+    assert client.post(f"/parties/{iid}/leader", json=body(c2), headers=auth(t1)).status_code == 204
+    assert client.get(f"/parties/{iid}", headers=auth(t1)).json()["leader"]["id"] == c2["id"]
+    assert client.post(f"/parties/{iid}/leader", json=body(c1), headers=auth(t1)).status_code == 403, "no longer the leader"
+    start(client, iid, t2)
+    assert client.post(f"/parties/{iid}/leader", json=body(c1), headers=auth(t2)).status_code == 409, "not mid-activity"

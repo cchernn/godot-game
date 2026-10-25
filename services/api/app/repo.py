@@ -8,6 +8,7 @@ from psycopg_pool import ConnectionPool
 
 from .errors import Conflict, Forbidden, Invalid, NotFound, RepoError  # noqa: F401
 from .templates import TemplateError, TemplateStore
+from .party_repo import PartyMixin
 from .world_repo import WorldMixin
 
 
@@ -17,7 +18,7 @@ def _row(r: dict | None) -> dict | None:
     return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in r.items()}
 
 
-class Repository(WorldMixin):
+class Repository(PartyMixin, WorldMixin):
     """All durable reads/writes. Gameplay rules never live here."""
 
     def __init__(self, pool: ConnectionPool, templates: TemplateStore | None = None):
@@ -69,6 +70,7 @@ class Repository(WorldMixin):
                 r = conn.execute(
                     "insert into characters (world_id, user_id, name, class, node_id) values (%s,%s,%s,%s,%s) returning *",
                     (world_id, user_id, name, cls, start_node)).fetchone()
+                self._party_of(conn, r)  # every character starts in a party of one
         except psycopg.errors.UniqueViolation as e:
             raise Conflict("You already have an active character in this world") from e
         return _row(r)
@@ -86,7 +88,8 @@ class Repository(WorldMixin):
             if r["status"] == "retired":
                 return _row(r)
             if self._live_party_of(conn, r["id"]):
-                raise Conflict("Leave your party before retiring this character")
+                raise Conflict("Finish the activity before retiring this character")
+            self._detach(conn, r["id"])
             # TODO(phase 6): refuse while committed to travel.
             r = conn.execute("update characters set status='retired', retired_at=now() where id=%s returning *", (character_id,)).fetchone()
         return _row(r)

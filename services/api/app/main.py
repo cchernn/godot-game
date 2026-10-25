@@ -25,6 +25,14 @@ class LeaderIn(BaseModel):
     character_id: uuid.UUID
 
 
+class TravelIn(BaseModel):
+    node_id: str = Field(min_length=1, max_length=64)
+
+
+class StartActivityIn(BaseModel):
+    activity_id: str = Field(min_length=1, max_length=64)
+
+
 class WorldRenameIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
 
@@ -246,51 +254,50 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def overview(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
         return r.overview(world_id, user.user_id)
 
-    @app.post("/worlds/{world_id}/activities/{activity_id}/instances", status_code=201)
-    def start_instance(world_id: uuid.UUID, activity_id: str, user: Identity = Depends(current_user),
-                       r: Repository = Depends(repo)) -> dict:
-        return r.start_instance(world_id, user.user_id, activity_id)
-
     @app.get("/worlds/{world_id}/parties")
     def list_parties(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
         return r.list_parties(world_id, user.user_id)
 
-    @app.get("/instances/{instance_id}")
-    def get_party(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.get_party(instance_id, user.user_id)
+    @app.get("/worlds/{world_id}/parties/me")
+    def my_party(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.my_party(world_id, user.user_id)
 
-    @app.post("/instances/{instance_id}/requests", status_code=201)
-    def request_party(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.request_party(instance_id, user.user_id)
+    @app.get("/parties/{party_id}")
+    def get_party(party_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.get_party(party_id, user.user_id)
 
-    @app.post("/instances/{instance_id}/requests/cancel", status_code=204)
-    def cancel_party_request(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
-        r.cancel_party_request(instance_id, user.user_id)
+    @app.post("/parties/{party_id}/requests", status_code=201)
+    def request_party(party_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.request_party(party_id, user.user_id)
 
-    @app.get("/instances/{instance_id}/requests")
-    def list_party_requests(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
-        return r.list_party_requests(instance_id, user.user_id)
+    @app.post("/parties/{party_id}/requests/cancel", status_code=204)
+    def cancel_party_request(party_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.cancel_party_request(party_id, user.user_id)
 
-    @app.post("/instances/{instance_id}/requests/{request_id}/{decision}")
-    def decide_party_request(instance_id: uuid.UUID, request_id: uuid.UUID, decision: Literal["approve", "reject"],
+    @app.get("/parties/{party_id}/requests")
+    def list_party_requests(party_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
+        return r.list_party_requests(party_id, user.user_id)
+
+    @app.post("/parties/{party_id}/requests/{request_id}/{decision}")
+    def decide_party_request(party_id: uuid.UUID, request_id: uuid.UUID, decision: Literal["approve", "reject"],
                              user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.decide_party_request(instance_id, user.user_id, request_id, decision == "approve")
+        return r.decide_party_request(party_id, user.user_id, request_id, decision == "approve")
 
-    @app.post("/instances/{instance_id}/leader", status_code=204)
-    def set_leader(instance_id: uuid.UUID, body: LeaderIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
-        r.set_party_leader(instance_id, user.user_id, body.character_id)
+    @app.post("/parties/{party_id}/leader", status_code=204)
+    def set_leader(party_id: uuid.UUID, body: LeaderIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.set_party_leader(party_id, user.user_id, body.character_id)
 
-    @app.post("/instances/{instance_id}/leave", status_code=204)
-    def leave_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
-        r.leave_instance(instance_id, user.user_id)
+    @app.post("/parties/{party_id}/leave", status_code=204)
+    def leave_party(party_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
+        r.leave_party(party_id, user.user_id)
 
-    @app.post("/instances/{instance_id}/start")
-    def lock_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.lock_and_start_instance(instance_id, user.user_id)
+    @app.post("/parties/{party_id}/travel")
+    def travel_party(party_id: uuid.UUID, body: TravelIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.travel_party(party_id, user.user_id, body.node_id)
 
-    @app.post("/instances/{instance_id}/cancel")
-    def cancel_instance(instance_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
-        return r.cancel_instance(instance_id, user.user_id)
+    @app.post("/parties/{party_id}/start", status_code=201)
+    def start_activity(party_id: uuid.UUID, body: StartActivityIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.start_instance(party_id, user.user_id, body.activity_id)
 
     # ---- service-to-service: world changes ----
 

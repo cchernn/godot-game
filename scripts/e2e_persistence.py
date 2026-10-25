@@ -71,11 +71,18 @@ try:
     svc = {"Authorization": "Bearer " + SERVER_KEY}
     assert httpx.post(f"{api}/internal/worlds/{world['id']}/reveal", headers=svc,
                       json={"kind": "node", "target_id": "ashen_keep", "scope": "world"}).json()["revision"] == 1
-    inst = httpx.post(f"{api}/worlds/{world['id']}/activities/ashen_keep_siege/instances", headers=h(users[0])).json()
+    pid = httpx.get(f"{api}/worlds/{world['id']}/parties/me", headers=h(users[0])).json()["id"]
     for u in users[1:3]:  # the party leader lets the others in
-        rid = httpx.post(f"{api}/instances/{inst['id']}/requests", headers=h(u)).json()["id"]
-        assert httpx.post(f"{api}/instances/{inst['id']}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
-    assert httpx.post(f"{api}/instances/{inst['id']}/start", headers=h(users[0])).json()["status"] == "active"
+        rid = httpx.post(f"{api}/parties/{pid}/requests", headers=h(u)).json()["id"]
+        assert httpx.post(f"{api}/parties/{pid}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
+    # The route to the keep is found too (a second world-wide reveal), then the party walks there: Hollowmere -> Blackwood -> Ashen Keep.
+    assert httpx.post(f"{api}/internal/worlds/{world['id']}/reveal", headers=svc,
+                      json={"kind": "route", "target_id": "trail_bw_ak", "scope": "world"}).json()["revision"] == 2
+    for node in ("blackwood", "ashen_keep"):
+        r = httpx.post(f"{api}/parties/{pid}/travel", json={"node_id": node}, headers=h(users[0]))
+        assert r.status_code == 200, r.text
+    inst = httpx.post(f"{api}/parties/{pid}/start", json={"activity_id": "ashen_keep_siege"}, headers=h(users[0])).json()
+    assert inst["status"] == "active"
 
     start(["scripts/run_server.sh", f"--port={GAME_PORT}", "--seed=3", f"--api-url={api}",
            "--set=combat.beat_delay_ms=30", "--set=combat.planning_timeout_seconds=20"],
@@ -124,7 +131,7 @@ try:
         revision = c.execute("select state_revision from worlds where id=%s", (world["id"],)).fetchone()["state_revision"]
         crypt = c.execute("select count(*) n from world_discoveries where target_id='sunken_crypt'").fetchone()["n"]
     win = res["outcome"] == "players_win"
-    if (istate, revision, crypt) != (("finished", 2, 1) if win else ("cancelled", 1, 0)):
+    if (istate, revision, crypt) != (("finished", 3, 1) if win else ("cancelled", 2, 0)):
         fail(f"unexpected world state after {res['outcome']}: instance={istate} revision={revision} crypt={crypt}")
     print(f"E2E OK: instance={istate} revision={revision} crypt_revealed={crypt}; outcome={res['outcome']} xp={xps} (one committed result, bad token refused)")
 finally:
