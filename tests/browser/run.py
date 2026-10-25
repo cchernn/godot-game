@@ -7,6 +7,12 @@ from playwright.sync_api import sync_playwright
 
 OUT = "/out"
 W, H = 1280, 720
+# Overworld side panel, with a party of one at Hollowmere (set from the screenshots in tests/browser/README.md)
+OTHERS = (950, 513)    # first row of "Other parties here"
+ASK = (950, 585)       # Ask to join
+APPROVE = (1020, 299)  # Approve on the first join request
+ACTIVITY = (950, 394)  # first activity at the party's place
+START = (950, 477)     # Start the selected activity
 URL = os.environ.get("URL", "http://localhost:8080")
 STAGE = os.environ.get("STAGE", "party")
 LOGS = []
@@ -83,52 +89,47 @@ def tour(b):
 
 
 def party_flow(b):
-    """Host starts a party; the tester asks to join; the host lets them in and starts; the tester drops out and
-    comes back to the battle; both play to the result and return to the hub. Needs no live parties to start with
-    (tests/browser/parties.py lists them)."""
+    """The host (a party of one at Hollowmere) and the tester meet on the overworld: the tester asks the host's party to
+    let them in, the host approves and starts an activity, the tester is taken into the battle by itself, drops out and
+    comes back, and both play to the result and return to the hub. Needs both accounts to be members of the world with
+    a character each, both parties idle at the same place (tests/browser/parties.py lists them)."""
     host = Player(b, "host")
     tester = Player(b, "tester")
     host.sign_in(os.environ["HOST_EMAIL"], os.environ["HOST_PASSWORD"])
-    host.click(640, 268, wait=1)              # "Test World" (second row for the host)
+    host.click(640, 238, wait=1)              # "Test World" (the host's only world)
     host.click(640, 353, wait=4)              # Open selected world
     host.shot("01_hub")
-    host.click(640, 306, wait=3)              # Parties
-    host.shot("02_parties_empty")
-    host.click(640, 427, wait=3)              # Start a party
-    host.shot("03_create_party")
-    host.click(640, 300, wait=1)              # first activity (Training skirmish)
-    host.click(640, 415, wait=3)              # Start party
-    host.shot("04_party_lobby_alone")
+    host.click(640, 327, wait=3)              # Overworld
+    host.shot("02_overworld_alone")
     tester.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
-    tester.click(640, 252, wait=1)            # "Test World" (joined worlds sort first)
-    tester.click(640, 368, wait=4)            # Open selected world
-    tester.shot("01_hub")
-    tester.click(640, 326, wait=3)            # Parties
-    tester.click(640, 248, wait=1)            # the party
-    tester.click(640, 385, wait=3)            # Request to join
+    tester.click(640, 238, wait=1)            # "Test World"
+    tester.click(640, 353, wait=4)            # Open selected world
+    tester.click(640, 348, wait=3)            # Overworld (no World management button for a member, so a row lower)
+    tester.shot("01_overworld")
+    tester.click(OTHERS[0], OTHERS[1], wait=1)    # the host's party in "Other parties here"
+    tester.click(ASK[0], ASK[1], wait=3)          # Ask to join
     tester.shot("02_requested")
     time.sleep(5)
-    host.shot("05_lobby_with_request")
-    host.click(806, 401, wait=3)              # Approve
-    host.shot("06_lobby_two")
-    time.sleep(6)                             # the tester's parties list notices on its own
-    tester.shot("03_party_lobby")
-    host.click(640, 424, wait=1)              # Start battle
-    state(host, "lobby", 40)
-    state(tester, "lobby", 40)
-    state(host, "battle", 60)
-    state(tester, "battle", 60)
-    host.shot("07_battle")
+    host.shot("03_request_arrived")
+    host.click(APPROVE[0], APPROVE[1], wait=3)    # Approve
+    host.shot("04_party_of_two")
+    time.sleep(6)                             # the tester's overworld notices on its own
+    tester.shot("03_in_the_party")
+    host.click(ACTIVITY[0], ACTIVITY[1], wait=1)  # Training skirmish
+    host.click(START[0], START[1], wait=2)        # Start
+    state(host, "battle", 90)                 # (the gather lobby can be over before a screen can see it)
+    state(tester, "battle", 90)
+    host.shot("05_battle")
     tester.page.reload()                      # the tester's tab dies mid-battle...
     time.sleep(float(os.environ.get("WAIT", "18")))
     tester.shot("04_after_reload")
-    tester.click(640, 252, wait=1)            # ...they sign back in (the session is restored) and pick the world
-    tester.click(640, 368, wait=4)
+    tester.click(640, 238, wait=1)            # ...they sign back in (the session is restored) and pick the world
+    tester.click(640, 353, wait=9)            # (the hub fills in the party line a moment after it opens)
     tester.shot("05_hub_with_battle")
-    tester.click(640, 306, wait=1)            # Return to battle
+    tester.click(640, 327, wait=1)            # Return to battle
     state(tester, "battle", 60)
     tester.shot("06_back_in_battle")
-    deadline = time.time() + 300
+    deadline = time.time() + 720
     while time.time() < deadline:
         if host.page.evaluate("window.unnamedState") == "result" and tester.page.evaluate("window.unnamedState") == "result":
             break

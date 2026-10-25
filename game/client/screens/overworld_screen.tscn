@@ -13,7 +13,7 @@ row_scene = ExtResource("2")
 
 [node name="MapCanvas" type="Control" parent="."]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 420)
+custom_minimum_size = Vector2(560, 520)
 layout_mode = 2
 size_flags_horizontal = 3
 clip_contents = true
@@ -22,7 +22,7 @@ layout = ExtResource("5")
 node_scene = ExtResource("4")
 
 [node name="SideScroll" type="ScrollContainer" parent="."]
-custom_minimum_size = Vector2(330, 420)
+custom_minimum_size = Vector2(330, 520)
 layout_mode = 2
 horizontal_scroll_mode = 0
 

@@ -15,6 +15,7 @@ signal backed_out
 const ENV_PATH := "res://game/client/client_env.json"
 const SESSION_PATH := "user://account.cfg"
 const REFRESH_MARGIN_S := 120
+const REQUEST_SENT := "Request sent. The party leader decides."
 
 var env: Dictionary = {}
 var access_token: String = ""
@@ -556,6 +557,8 @@ func _refresh_overworld() -> void:
 	elif run["status"] == "active" and _idle_seen:
 		_enter_battle(str(run["id"]))
 		return
+	if status.text == REQUEST_SENT and not ps["data"].any(func(p: Dictionary) -> bool: return p["relation"] == "pending"):
+		status.text = "" # the ask was answered (let in, turned down, or withdrawn)
 	if mine["relation"] == "leader" and run == null:
 		var q := await api(HTTPClient.METHOD_GET, "/parties/%s/requests" % _party_id)
 		if q["status"] == 200 and _overworld.is_visible_in_tree():
@@ -591,7 +594,7 @@ func _on_start_requested(activity_id: String) -> void:
 func _on_party_join_requested(party: Dictionary) -> void:
 	var r := await _party_action("/parties/%s/requests" % party["id"], 201)
 	if r["status"] == 201:
-		status.text = "Request sent. The party leader decides."
+		status.text = REQUEST_SENT
 	_refresh_overworld()
 
 
@@ -606,7 +609,7 @@ func _decide_party_request(request_id: String, approve: bool, row: JoinRequestRo
 	var r := await _party_action("/parties/%s/requests/%s/%s" % [_party_id, request_id, "approve" if approve else "reject"], 200)
 	if r["status"] == 200:
 		_overworld.finish_decision(row)
-		_shown_requests = []
+		_shown_requests = [""] # differs from any real list, so the next refresh redraws it (and hides the box when empty)
 	else:
 		_overworld.row_failed(row)
 	_refresh_overworld()

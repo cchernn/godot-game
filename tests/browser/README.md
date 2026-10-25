@@ -12,7 +12,13 @@ docker run --rm --add-host host.docker.internal:host-gateway \
   -v "$PWD/render_out/browser:/out" \
   -e STAGE=party -e HOST_EMAIL=you@example.com -e HOST_PASSWORD=... unnamed-browser-test
 ```
-- `STAGE=party`: host starts a party, the tester asks to join, the host approves and starts, the tester reloads their tab mid-battle and returns from the hub, both play to the result and Continue. Start from no live parties: `uv run --project services/api python tests/browser/parties.py <email> <password> [--cancel]` lists them (and cancels the ones the account leads).
+- `STAGE=party`: the host and the tester (both members of Test World with a character, each a party of one at Hollowmere) meet on the overworld. The tester
+  asks to join the host's party, the host approves and starts Training skirmish, the tester is taken into the battle, reloads their tab mid-battle and returns
+  from the hub, both play to the result (a defeat is fine) and Continue. It takes up to about 12 minutes. **Start clean**: both parties idle at the same place,
+  no pending asks, the tester not in the host's party. `uv run --project services/api python tests/browser/parties.py <email> <password> [--clean]` lists the
+  parties and, with `--clean`, withdraws that account's pending asks and leaves a party it is only a member of (run it for the tester before every run). A battle
+  nobody is connected to is cancelled by the game server after its 5-minute grace, so after a failed run wait that long. The click positions of the
+  overworld side panel are the constants at the top of `run.py`; they move when the panel's content changes (a party of two is taller).
 - `STAGE=tour`: the host opens Test World and clicks through `CLICKS="x,y,label;..."`, with a screenshot after each. For looking at screens (character page, settings, world management) without a scripted flow.
 - `STAGE=pending`: the tester opens a world where their join request is still pending; the join screen waits and can go back. (Needs a pending request; the one-time stages that created the tester's membership and character are in the git history.)
 - The container forwards localhost:8080-8082 to the host, because those are the addresses baked into the web build.

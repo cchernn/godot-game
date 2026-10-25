@@ -226,6 +226,10 @@ def test_legacy_characters_get_a_party_when_first_asked(client, pool):
         conn.execute("update characters set node_id=null where id=%s", (c["id"],))
     p = my_party(client, w["id"], host)
     assert p["node_id"] == "hollowmere" and [m["name"] for m in p["members"]] == ["Hero"]
+    with pool.connection() as conn:
+        conn.execute("delete from party_members where character_id=%s", (c["id"],))
+    listed = client.get(f"/worlds/{w['id']}/parties", headers=auth(host)).json()
+    assert [(x["relation"], x["node_id"]) for x in listed if x["relation"] == "leader"] == [("leader", "hollowmere")], "listing makes the caller's party"
 
 
 def test_starting_needs_discovery_leadership_and_the_right_place(client, pool):

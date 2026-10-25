@@ -279,6 +279,9 @@ class PartyMixin:
         if not self.is_member(world_id, user_id):
             raise Forbidden("Not a member of this world")
         with self.pool.connection() as conn:
+            char = conn.execute("select * from characters where world_id=%s and user_id=%s and status='active' for update", (world_id, user_id)).fetchone()
+            if char is not None:
+                self._party_of(conn, char)  # the caller's own party exists before they look at the list
             rows = conn.execute("select * from parties where world_id=%s and status='open' order by created_at", (world_id,)).fetchall()
             return self._party_rows(conn, rows, world_id, user_id)
 
