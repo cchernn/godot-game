@@ -23,7 +23,7 @@ static func battle(rows: Array, units: Array, seed: int = 1) -> Battle:
 		c.dexterity = u.get("dex", 8)
 		c.power = u.get("power", 0)
 		c.armor = u.get("armor", 0)
-		c.skills.assign(u.get("skills", ["move", "strike", "power_strike", "bolt", "disrupt", "revive"]))
+		c.skills.assign(u.get("skills", ["move", "strike", "power_strike", "bolt", "disrupt", "revive", "defend"]))
 		b.add_combatant(c)
 	b.start()
 	return b

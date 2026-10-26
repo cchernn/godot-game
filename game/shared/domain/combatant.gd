@@ -11,6 +11,8 @@ var cell: Vector2i
 var facing: int = Enums.Facing.SOUTH
 var max_hp: int = 20
 var hp: int = 20
+## Soaks damage after armor, before HP; cleared at the end of every round.
+var shield: int = 0
 var dexterity: int = 8
 var power: int = 0
 var armor: int = 0

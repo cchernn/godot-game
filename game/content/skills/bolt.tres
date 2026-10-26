@@ -1,19 +1,29 @@
 [gd_resource type="Resource" script_class="SkillDef" format=3]
 
-[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_noe8t"]
-[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_vb24b"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/interrupt_effect.gd" id="5_def"]
 
-[sub_resource type="Resource" id="Resource_dsmt5"]
-script = ExtResource("2_vb24b")
+[sub_resource type="Resource" id="Damage_bolt"]
+script = ExtResource("4_def")
+base = 5
+
+[sub_resource type="Resource" id="Interrupt_bolt"]
+script = ExtResource("5_def")
+points = 1
+
+[sub_resource type="Resource" id="Stage_bolt"]
+script = ExtResource("2_def")
 stage_name = "bolt"
-damage = 5
-interrupt = 1
+effects = Array[ExtResource("3_def")]([SubResource("Damage_bolt"), SubResource("Interrupt_bolt")])
 
 [resource]
-script = ExtResource("1_noe8t")
+script = ExtResource("1_def")
 id = "bolt"
 display_name = "Bolt"
 hint = "Click a tile (it hits whoever stands there)"
 targeting = 2
 attack_range = 5
-stage_defs = Array[ExtResource("2_vb24b")]([SubResource("Resource_dsmt5")])
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_bolt")])

@@ -99,18 +99,18 @@ func _stage_problem(c: Combatant, a: PlannedAction, sk: SkillDef, stage_index: i
 	if a.reserved_left < (sk.stages[stage_index]["ap"] as int):
 		return "not enough AP"
 	match sk.kind:
-		Enums.SkillKind.ATTACK, Enums.SkillKind.REVIVE:
+		Enums.SkillKind.ATTACK, Enums.SkillKind.REVIVE, Enums.SkillKind.SUPPORT:
+			if sk.targeting == Enums.Targeting.SELF:
+				return ""
 			var from := c.cell
 			var to: Vector2i
 			if sk.targeting == Enums.Targeting.CHARACTER:
 				var t := b.state.get_c(a.target_id)
-				if t == null or not t.is_present() or t == c:
+				if t == null or not t.is_present():
 					return "target gone"
 				if sk.kind == Enums.SkillKind.REVIVE:
-					if t.team != c.team or t.life_state != Enums.LifeState.DOWNED or t.revived_this_encounter:
+					if t.life_state != Enums.LifeState.DOWNED or t.revived_this_encounter:
 						return "target cannot be revived"
-				elif t.team == c.team:
-					return "invalid target"
 				elif not b.team_can_see_combatant(c.team, t):
 					return "target out of sight"
 				to = t.cell
@@ -139,8 +139,8 @@ func _run_stage(c: Combatant) -> void:
 	var stage: Dictionary = sk.stages[c.current_stage]
 	_spend(c, a, stage["ap"] as int)
 	match sk.kind:
-		Enums.SkillKind.ATTACK:
-			_attack_stage(c, a, sk, stage)
+		Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT:
+			_run_effects(c, a, sk, stage)
 		Enums.SkillKind.REVIVE:
 			_revive(c, a)
 		Enums.SkillKind.REACTION:
@@ -191,58 +191,109 @@ func _move_step(c: Combatant, a: PlannedAction) -> void:
 		c.current = null
 
 
-func _attack_stage(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionary) -> void:
+## Runs a stage's effects, in order, on whoever it is aimed at (and `on = CASTER` effects on the caster). Anyone can be the
+## target, friend or foe, and the caster too. A stage with no effects is only a preparation step.
+func _run_effects(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionary) -> void:
 	var victim: Combatant = null
-	var aim := a.target_cell
-	if sk.targeting == Enums.Targeting.CHARACTER:
-		victim = b.state.get_c(a.target_id)
-		aim = victim.cell
-	else:
-		var occ := b.state.at_cell(a.target_cell)
-		if occ != null and occ != c and occ.team != c.team:
-			victim = occ
+	var aim := c.cell
+	match sk.targeting:
+		Enums.Targeting.CHARACTER:
+			victim = b.state.get_c(a.target_id)
+			aim = victim.cell
+		Enums.Targeting.TILE:
+			aim = a.target_cell
+			victim = b.state.at_cell(a.target_cell)
+		Enums.Targeting.SELF:
+			victim = c
 	if aim != c.cell:
 		c.facing = Enums.facing_from_delta(aim - c.cell)
-	var base: int = stage.get("damage", 0)
-	if base <= 0:
+	var effects: Array = stage.get("effects", [])
+	if effects.is_empty():
 		b.emit("windup", "{a} begins %s%s." % [sk.display_name, " on {t}" if victim else ""],
 			c.id, victim.id if victim else "")
 		return
-	if victim == null:
-		b.emit("miss", "{a}'s %s strikes empty ground." % sk.display_name, c.id)
-		return
-	_hit(c, sk, stage, victim)
+	var landed := true
+	var aimed_at_someone := false
+	for e: Dictionary in effects:
+		var on_caster := (e["on"] as int) == SkillEffect.On.CASTER
+		var who: Combatant = c if on_caster else victim
+		if who == null:
+			continue
+		aimed_at_someone = aimed_at_someone or not on_caster
+		match e["type"] as String:
+			"damage":
+				landed = _damage(c, sk, e, who)
+			"heal":
+				_heal(c, sk, e, who)
+			"shield":
+				_shield(c, sk, e, who)
+			"interrupt":
+				if landed and who.life_state == Enums.LifeState.ALIVE:
+					_add_interrupt(who, e["points"] as int)
+	if victim == null and sk.targeting == Enums.Targeting.TILE:
+		var hurts := effects.any(func(e: Dictionary) -> bool: return e["type"] == "damage")
+		b.emit("miss", "{a}'s %s %s." % [sk.display_name, "strikes empty ground" if hurts else "finds no one there"], c.id)
 
 
-func _hit(c: Combatant, sk: SkillDef, stage: Dictionary, victim: Combatant) -> void:
+## Returns true when the damage connected (a miss returns false, so a following interrupt effect does not land).
+func _damage(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> bool:
 	if victim.life_state == Enums.LifeState.DOWNED:
 		b.emit("hit", "{a}'s %s finishes {t}." % sk.display_name, c.id, victim.id)
 		_defeat(victim)
-		return
-	var per: float = b.cfg.get_value("combat", "accuracy_per_point")
-	var chance := clampf((b.cfg.get_value("combat", "base_hit_chance") as float) + (c.accuracy - victim.evasion) * per, 0.05, 1.0)
-	if b.rng.randf() >= chance:
-		b.emit("miss", "{a}'s %s misses {t}." % sk.display_name, c.id, victim.id)
-		return
+		return true
+	if not victim.is_present() or victim.life_state != Enums.LifeState.ALIVE:
+		return false
+	if e["can_miss"] as bool:
+		var per: float = b.cfg.get_value("combat", "accuracy_per_point")
+		var chance := clampf((b.cfg.get_value("combat", "base_hit_chance") as float) + (c.accuracy - victim.evasion) * per, 0.05, 1.0)
+		if b.rng.randf() >= chance:
+			b.emit("miss", "{a}'s %s misses {t}." % sk.display_name, c.id, victim.id)
+			return false
 	var mult := 1.0
 	var note := ""
-	var rel := _relative_facing(c, victim)
-	if rel == 2:
-		mult *= b.cfg.get_value("combat", "rear_multiplier") as float
-		note = " (rear attack)"
-	elif rel == 1:
-		mult *= b.cfg.get_value("combat", "side_multiplier") as float
-		note = " (flanking)"
-	if b.rng.randf() < (b.cfg.get_value("combat", "crit_chance") as float):
-		mult *= b.cfg.get_value("combat", "crit_multiplier") as float
-		note += " CRITICAL"
-	var dmg := maxi(1, roundi(((stage["damage"] as int) + c.power) * mult) - victim.armor)
-	victim.hp = maxi(0, victim.hp - dmg)
-	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [sk.display_name, dmg, note], c.id, victim.id)
+	if e["can_crit"] as bool:
+		if victim != c:
+			var rel := _relative_facing(c, victim)
+			if rel == 2:
+				mult *= b.cfg.get_value("combat", "rear_multiplier") as float
+				note = " (rear attack)"
+			elif rel == 1:
+				mult *= b.cfg.get_value("combat", "side_multiplier") as float
+				note = " (flanking)"
+		if b.rng.randf() < (b.cfg.get_value("combat", "crit_chance") as float):
+			mult *= b.cfg.get_value("combat", "crit_multiplier") as float
+			note += " CRITICAL"
+	var raw: int = e["base"] as int
+	if e["uses_power"] as bool:
+		raw += c.power
+	var dmg := maxi(1, roundi(raw * mult) - victim.armor)
+	var absorbed := mini(victim.shield, dmg)
+	victim.shield -= absorbed
+	victim.hp = maxi(0, victim.hp - (dmg - absorbed))
+	if absorbed > 0:
+		note += " (%d absorbed by the shield)" % absorbed
+	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [sk.display_name, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed})
 	if victim.hp == 0:
 		_defeat(victim)
-	else:
-		_add_interrupt(victim, stage.get("interrupt", 0))
+		return false # nothing left to interrupt
+	return true
+
+
+func _heal(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> void:
+	if victim.life_state != Enums.LifeState.ALIVE:
+		b.emit("no_effect", "{a}'s %s has no effect on {t}." % sk.display_name, c.id, victim.id)
+		return
+	var gained := mini(e["amount"] as int, victim.max_hp - victim.hp)
+	victim.hp += gained
+	b.emit("heal", "{a}'s %s heals {t} for %d." % [sk.display_name, gained], c.id, victim.id, {"amount": gained})
+
+
+func _shield(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> void:
+	if victim.life_state != Enums.LifeState.ALIVE:
+		b.emit("no_effect", "{a}'s %s has no effect on {t}." % sk.display_name, c.id, victim.id)
+		return
+	victim.shield = maxi(victim.shield, e["amount"] as int) # does not stack: only a higher shield replaces it
+	b.emit("shield", "{a}'s %s shields {t} (%d)." % [sk.display_name, victim.shield], c.id, victim.id, {"amount": victim.shield})
 
 
 ## 0 = front, 1 = side, 2 = rear.
@@ -266,6 +317,7 @@ func _revive(c: Combatant, a: PlannedAction) -> void:
 
 func _defeat(v: Combatant) -> void:
 	clear_queue(v)
+	v.shield = 0
 	if v.team == Enums.Team.ENEMIES or v.life_state == Enums.LifeState.DOWNED or v.revived_this_encounter:
 		v.life_state = Enums.LifeState.ELIMINATED
 		v.hp = 0

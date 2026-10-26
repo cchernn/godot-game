@@ -149,6 +149,12 @@ classes and the enemy roster. `Encounter.build` validates them (unknown skills, 
 markers. `tools/generate_stats.gd` produced the first files from the numbers that used to be in `encounter.gd`, and `tests/unit/test_stats.gd` pins them to
 those original numbers. 
 
+## Effects and targeting (Phase 1 of `docs/plan-combat-framework.md`)
+A skill stage is a list of `SkillEffect` resources (`DamageEffect`, `HealEffect`, `ShieldEffect`, `InterruptEffect`; `on` = target or caster). `BeatResolver._run_effects` runs them in order.
+No rule distinguishes friend from foe: any skill can target any visible combatant, the caster included (`Targeting.SELF` needs no click); revive only needs a downed target. `CHARACTER`
+skills follow the target and check range when they land; `TILE` skills hit whoever is on the tile then. `Combatant.shield` soaks damage after armor and before HP and is cleared when a round
+begins; the snapshot carries it. `SkillKind.SUPPORT` and `SkillDef.action_slot` (Attack, Move, Defend) place skills on the client's action bar.
+
 ## Skills as resources
 Each skill is a `SkillDef` resource (`game/content/skills`, with `SkillStage` sub-resources) listed in `skill_set.tres`; units reference the resources directly.
 `SkillDef` still exposes `stages` (array of dictionaries), `reaction` and `total_ap()`, so the battle rules did not change. `SkillDb.load_file()` returns deep copies

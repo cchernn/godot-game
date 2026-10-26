@@ -30,6 +30,7 @@ var _in_battle: bool = false
 var _selftest: bool = false
 var _selftest_round: int = -1
 var _skill_buttons: Dictionary = {}
+var _skill_ids: Array = []
 ## Escape asks twice (a second press within this many seconds confirms), so a stray click cannot abandon the fight.
 @export var escape_confirm_seconds: float = 4.0
 var _escape_armed_until_ms: int = 0
@@ -50,7 +51,10 @@ var _preview_sig: int = 0
 @onready var skill_box: VBoxContainer = %SkillBox
 @onready var queue_list: ItemList = %QueueList
 @onready var ready_btn: Button = %ReadyButton
-@onready var escape_btn: Button = %EscapeButton
+@onready var escape_btn: Button = %RetreatButton
+@onready var move_btn: Button = %MoveButton
+@onready var attack_btn: Button = %AttackButton
+@onready var defend_btn: Button = %DefendButton
 @onready var error_label: Label = %ErrorLabel
 @onready var log_view: RichTextLabel = %LogView
 @onready var board_holder: Control = %BoardHolder
@@ -135,6 +139,9 @@ func _wire_ui() -> void:
 	%ClearButton.pressed.connect(_clear_plan)
 	ready_btn.toggled.connect(_on_ready_toggled)
 	escape_btn.pressed.connect(_on_escape_pressed)
+	move_btn.pressed.connect(func() -> void: _on_skill_pressed(_slot_skill(Enums.ActionSlot.MOVE)))
+	defend_btn.pressed.connect(func() -> void: _on_skill_pressed(_slot_skill(Enums.ActionSlot.DEFEND)))
+	attack_btn.toggled.connect(func(_on: bool) -> void: _refresh())
 	%ConnectButton.pressed.connect(_connect)
 	%ContinueButton.pressed.connect(_on_continue_pressed)
 	_set_battle_view(false)
@@ -230,7 +237,8 @@ func _on_events(list: Array) -> void:
 			"hit", "eliminated", "downed": col = "#ff7b6b"
 			"miss", "skip", "cancel", "move_stop": col = "#9a9a9a"
 			"interrupt", "reaction", "reaction_ready": col = "#ffcf5a"
-			"revived": col = "#7be08a"
+			"revived", "heal": col = "#7be08a"
+			"shield": col = "#7fd6ff"
 			"round_start", "resolution_start": col = "#7fb2ff"
 			"victory": col = "#ffffff"
 		if "unseen" in String(e["text"]):
@@ -241,7 +249,7 @@ func _on_events(list: Array) -> void:
 ## One line summing up the round that just resolved, from the event types seen since the last recap.
 func _append_recap() -> void:
 	var parts: Array[String] = []
-	for t: String in ["hit", "miss", "downed", "eliminated", "revived", "interrupt"]:
+	for t: String in ["hit", "miss", "downed", "eliminated", "revived", "heal", "shield", "interrupt"]:
 		var n: int = _round_tally.get(t, 0)
 		if n > 0:
 			parts.append("%d %s" % [n, t])
@@ -306,6 +314,7 @@ func _on_continue_pressed() -> void:
 	_plan_round = -1
 	_in_battle = false
 	_skill_buttons.clear()
+	_skill_ids = []
 	for ch in skill_box.get_children():
 		ch.queue_free()
 	log_view.clear()
@@ -371,7 +380,7 @@ func _update_preview() -> void:
 	board.range_cells.clear()
 	board.valid_cells.clear()
 	var sk: SkillDef = skills.get_skill(mode) if mode != "" else null
-	if sk == null or not _can_edit() or sk.kind == Enums.SkillKind.REACTION:
+	if sk == null or not _can_edit() or sk.kind == Enums.SkillKind.REACTION or sk.targeting == Enums.Targeting.SELF:
 		_update_hover_text()
 		return
 	var from := _predicted_cell()
@@ -465,14 +474,26 @@ func _on_skill_pressed(id: String) -> void:
 	if not _can_edit():
 		return
 	var sk := skills.get_skill(id)
-	if sk.kind == Enums.SkillKind.REACTION:
+	if sk == null:
+		return
+	if sk.kind == Enums.SkillKind.REACTION or sk.targeting == Enums.Targeting.SELF: # nothing to aim: queued at once
 		_prev_plan = plan.duplicate(true)
 		plan.append({"skill": id})
 		_push_plan()
 		return
 	mode = id
+	attack_btn.set_pressed_no_signal(sk.slot() == Enums.ActionSlot.ATTACK)
 	error_label.text = sk.hint
 	_refresh()
+
+
+## The id of the first of your skills in an action-bar slot ("" if you have none).
+func _slot_skill(slot: int) -> String:
+	for id: String in me.get("skills", []):
+		var sk := skills.get_skill(id)
+		if sk != null and sk.slot() == slot:
+			return id
+	return ""
 
 
 func _set_last_move_facing(f: int) -> void:
@@ -513,7 +534,7 @@ func _on_escape_pressed() -> void:
 		return
 	if Time.get_ticks_msec() > _escape_armed_until_ms:
 		_escape_armed_until_ms = Time.get_ticks_msec() + int(escape_confirm_seconds * 1000)
-		error_label.text = "Press Escape again to leave the fight. You will keep watching."
+		error_label.text = "Press Retreat again to leave the fight. You will keep watching."
 		_refresh()
 		return
 	_escape_armed_until_ms = 0
@@ -604,10 +625,17 @@ func _refresh() -> void:
 	ready_btn.text = "Withdraw Ready" if ready_btn.button_pressed else "Ready"
 	var armed := Time.get_ticks_msec() <= _escape_armed_until_ms
 	escape_btn.disabled = not _can_escape()
-	escape_btn.text = "Escaping…" if me.get("escaping", false) else ("Really escape?" if armed else "Escape")
+	escape_btn.text = "Retreating…" if me.get("escaping", false) else ("Really retreat?" if armed else "Retreat")
 	for id: String in _skill_buttons:
 		(_skill_buttons[id] as Button).disabled = not can
 		(_skill_buttons[id] as Button).set_pressed_no_signal(id == mode)
+	var move_id := _slot_skill(Enums.ActionSlot.MOVE)
+	var defend_id := _slot_skill(Enums.ActionSlot.DEFEND)
+	move_btn.disabled = not can or move_id == ""
+	move_btn.set_pressed_no_signal(move_id != "" and mode == move_id)
+	defend_btn.disabled = not can or defend_id == ""
+	attack_btn.disabled = not can or _skill_buttons.is_empty()
+	skill_box.visible = attack_btn.button_pressed and not attack_btn.disabled
 
 
 ## One card per visible unit, reused between snapshots: allies (you first) in the party row, enemies in sight above it.
@@ -648,26 +676,34 @@ func _fill_cards(row: HBoxContainer, units: Array[Dictionary]) -> void:
 
 func _rebuild_skill_buttons() -> void:
 	var ids: Array = me.get("skills", [])
-	if ids.hash() == _skill_buttons.keys().hash() and not _skill_buttons.is_empty():
+	if ids.hash() == _skill_ids.hash() and not _skill_ids.is_empty():
 		return
+	_skill_ids = ids.duplicate()
 	for ch in skill_box.get_children():
 		ch.queue_free()
 	_skill_buttons.clear()
 	for id: String in ids:
 		var sk := skills.get_skill(id)
+		if sk.slot() != Enums.ActionSlot.ATTACK:
+			continue # Move and Defend have their own buttons on the action bar
 		var b := skill_button_scene.instantiate() as Button
-		b.text = "%s  (%d AP)" % [sk.display_name, sk.total_ap()] if sk.kind != Enums.SkillKind.MOVE else "Move  (1 AP per %d tile(s))" % me["tiles_per_ap"]
+		b.text = "%s  (%d AP)" % [sk.display_name, sk.total_ap()]
 		b.tooltip_text = sk.hint
 		b.pressed.connect(_on_skill_pressed.bind(id))
 		skill_box.add_child(b)
 		_skill_buttons[id] = b
+	var mv := skills.get_skill(_slot_skill(Enums.ActionSlot.MOVE))
+	move_btn.text = "Move" if mv == null else "Move (1 AP / %d)" % me["tiles_per_ap"]
+	move_btn.tooltip_text = "" if mv == null else mv.hint
+	var df := skills.get_skill(_slot_skill(Enums.ActionSlot.DEFEND))
+	defend_btn.tooltip_text = "" if df == null else df.hint
 
 
 func _process(_delta: float) -> void:
 	if board.hover != _last_hover:
 		_last_hover = board.hover
 		_update_hover_text()
-	if not snap.is_empty() and (snap.get("timer_ms", -1) >= 0 or (escape_btn.text == "Really escape?" and Time.get_ticks_msec() > _escape_armed_until_ms)):
+	if not snap.is_empty() and (snap.get("timer_ms", -1) >= 0 or (escape_btn.text == "Really retreat?" and Time.get_ticks_msec() > _escape_armed_until_ms)):
 		_refresh()
 
 

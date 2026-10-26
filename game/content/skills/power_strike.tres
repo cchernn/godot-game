@@ -1,24 +1,34 @@
 [gd_resource type="Resource" script_class="SkillDef" format=3]
 
-[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_odacf"]
-[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_bbg4j"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/interrupt_effect.gd" id="5_def"]
 
-[sub_resource type="Resource" id="Resource_t4q13"]
-script = ExtResource("2_bbg4j")
+[sub_resource type="Resource" id="Stage_windup"]
+script = ExtResource("2_def")
 stage_name = "wind-up"
 
-[sub_resource type="Resource" id="Resource_3ha1t"]
-script = ExtResource("2_bbg4j")
+[sub_resource type="Resource" id="Damage_smash"]
+script = ExtResource("4_def")
+base = 12
+
+[sub_resource type="Resource" id="Interrupt_smash"]
+script = ExtResource("5_def")
+points = 2
+
+[sub_resource type="Resource" id="Stage_smash"]
+script = ExtResource("2_def")
 stage_name = "smash"
-damage = 12
-interrupt = 2
+effects = Array[ExtResource("3_def")]([SubResource("Damage_smash"), SubResource("Interrupt_smash")])
 
 [resource]
-script = ExtResource("1_odacf")
+script = ExtResource("1_def")
 id = "power_strike"
 display_name = "Power Strike"
-hint = "Click an enemy (2 stages)"
+hint = "Click a character (2 stages)"
 targeting = 1
 speed = 4
 stability = 2
-stage_defs = Array[ExtResource("2_bbg4j")]([SubResource("Resource_t4q13"), SubResource("Resource_3ha1t")])
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_windup"), SubResource("Stage_smash")])

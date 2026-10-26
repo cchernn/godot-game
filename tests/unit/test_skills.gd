@@ -16,6 +16,8 @@ const ORIGINAL := {
 		"stability": 1, "stages": [["bolt", 1, 5, 1]], "reaction": {}},
 	"disrupt": {"name": "Disrupt", "kind": KIND.REACTION, "targeting": TARGET.NONE, "range": 1, "speed": 7, "freq": FREQ.ONCE_PER_TURN,
 		"stability": 1, "stages": [["ready", 1, 0, 0]], "reaction": {"range": 3, "duration_beats": 6, "interrupt": 2}},
+	"defend": {"name": "Defend", "kind": KIND.SUPPORT, "targeting": TARGET.SELF, "range": 1, "speed": 8, "freq": FREQ.ONCE_PER_TURN,
+		"stability": 1, "stages": [["brace", 1, 0, 0]], "reaction": {}},
 	"revive": {"name": "Revive", "kind": KIND.REVIVE, "targeting": TARGET.CHARACTER, "range": 1, "speed": 5, "freq": FREQ.ONCE_PER_TURN,
 		"stability": 1, "stages": [["revive", 2, 0, 0]], "reaction": {}},
 }
@@ -64,7 +66,9 @@ func test_the_views_the_rules_read_have_the_expected_shape() -> void:
 	var ps := db.get_skill("power_strike")
 	assert_eq(ps.total_ap(), 2)
 	assert_true(ps.is_multistage())
-	assert_eq(ps.stages[1], {"name": "smash", "ap": 1, "damage": 12, "interrupt": 2})
+	var smash := ps.stages[1]
+	assert_eq([smash["name"], smash["ap"], smash["damage"], smash["interrupt"]], ["smash", 1, 12, 2])
+	assert_eq((smash["effects"] as Array).size(), 2, "a damage effect and an interrupt effect")
 	assert_true(not db.get_skill("strike").is_multistage())
 	assert_eq(db.get_skill("strike").reaction, {}, "only reactions have reaction data")
 	assert_eq(db.get_skill("disrupt").reaction["duration_beats"], 6)
@@ -74,7 +78,7 @@ func test_each_load_hands_out_independent_copies() -> void:
 	var a := SkillDb.load_file()
 	var b := SkillDb.load_file()
 	a.get_skill("strike").speed = 99
-	a.get_skill("strike").stage_defs[0].damage = 500
+	(a.get_skill("strike").stage_defs[0].effects[0] as DamageEffect).base = 500
 	assert_eq(b.get_skill("strike").speed, 6)
 	assert_eq(b.get_skill("strike").stages[0]["damage"], 6)
 	assert_eq(SkillDb.load_file().get_skill("strike").speed, 6, "the shared resource is untouched")

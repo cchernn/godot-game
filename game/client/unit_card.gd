@@ -21,6 +21,8 @@ func show_unit(u: Dictionary, phase: int, is_you: bool) -> void:
 	_bar.max_value = maxi(1, int(u["max_hp"]))
 	_bar.value = int(u["hp"])
 	_hp.text = "HP %d/%d" % [u["hp"], u["max_hp"]]
+	if int(u.get("shield", 0)) > 0:
+		_hp.text += "  +%d shield" % u["shield"]
 	var parts: Array[String] = []
 	if u.has("ap_capacity"):
 		var ap := "AP %d" % u["ap_capacity"]

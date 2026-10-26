@@ -42,10 +42,7 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 			_:
 				if sk.targeting == Enums.Targeting.CHARACTER:
 					var t := battle.state.get_c(a.target_id)
-					if t == null or t == c or not battle.team_can_see_combatant(c.team, t):
-						return _fail("Invalid target")
-					var friendly := sk.kind == Enums.SkillKind.REVIVE
-					if friendly != (t.team == c.team):
+					if t == null or not battle.team_can_see_combatant(c.team, t): # anyone visible, friend or foe, even yourself
 						return _fail("Invalid target")
 				elif sk.targeting == Enums.Targeting.TILE:
 					if not a.has_cell or not bf.in_bounds(a.target_cell):

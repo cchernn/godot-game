@@ -61,6 +61,7 @@ func _begin_planning() -> void:
 		c.interrupt_points = 0
 		c.skills_used = {}
 		c.reaction = {}
+		c.shield = 0 # a shield lasts until the end of the round (PROVISIONAL)
 	emit("round_start", "Round %d begins. Planning." % state.round_number)
 	# AI plans simultaneously with the players, under the same rules; hidden until execution.
 	for c: Combatant in state.team_members(Enums.Team.ENEMIES):
@@ -307,7 +308,7 @@ func snapshot_for(cid: String) -> Dictionary:
 		if c.life_state == Enums.LifeState.ELIMINATED or c.life_state == Enums.LifeState.ESCAPED:
 			continue
 		var u := {"id": c.id, "name": c.display_name, "visual": c.visual, "team": c.team, "cell": c.cell, "facing": c.facing,
-			"hp": c.hp, "max_hp": c.max_hp, "life": c.life_state, "ready": c.ready,
+			"hp": c.hp, "max_hp": c.max_hp, "shield": c.shield, "life": c.life_state, "ready": c.ready,
 			"active": c.is_active(state.round_number), "revived": c.revived_this_encounter}
 		if own:
 			u["skills"] = c.skills

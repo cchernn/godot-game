@@ -96,7 +96,9 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 - **Move, resize, restyle anything**: containers, margins, fonts, colours, icons, extra decoration labels or images.
 - **Keep the node names that have a `%` marker** (shown as a green percent badge in the Scene tree). The code finds them by name.
   Renaming or deleting one breaks that part of the screen; moving it elsewhere in the tree is fine.
-- **Skill buttons** are made from `ui/skill_button.tscn` (one per skill, filled in by the code). Restyle that scene.
+- **Action bar** (`ActionBar`): Move, Attack, Defend, Item, Retreat, Context. Move and Defend queue the unit's skill in that slot; Attack opens `SkillBox`, the list of its other skills;
+  Retreat is the old Escape; Item and Context are disabled until they exist.
+- **Skill buttons** (the Attack list) are made from `ui/skill_button.tscn` (one per skill, filled in by the code). Restyle that scene.
 - **One look for everything:** `ui/theme.tres` is applied on the root; edit it in the Theme editor (default font size, panel style, button styles).
 - The 3D board area is the `BoardHolder` node; its width is set by `SidePanel`'s left offset (360 px), so resize both together.
 - To preview the screens without a server, press **F6** on `client_main.tscn` (guest connect panel). The battle panel fills in once connected.
@@ -138,15 +140,24 @@ there in the Inspector.
 
 ## Skills (Inspector)
 Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tres`); `skills/skill_set.tres` is the list of all of them. Open one:
-- **Identity:** id (the file name), display name, **hint** (the tooltip and the line shown when you pick the skill), and **kind**
-  (move, attack, reaction, revive; the kind decides how the rules treat it).
-- **Targeting:** what the player clicks (character, tile, or nothing) and the reach in tiles. Hidden for moves and reactions.
+- **Identity:** id (the file name), display name, **hint** (the tooltip and the line shown when you pick the skill), the **action slot** (which button of the
+  battle's action bar it belongs to: *Attack* skills are listed under the Attack button; *Defend* is the Defend button; moves always sit on Move) and **kind**
+  (move, attack, reaction, revive, support; the kind decides how the rules treat it).
+- **Targeting:** what the player clicks (a character, a tile, yourself, or nothing) and the reach in tiles. Hidden for moves and reactions. **Anyone can be aimed at**,
+  friend or foe, and you too: a heal on an enemy heals it, a strike on an ally hurts it. *Character* skills follow the target and are checked when they land (still in range = hit);
+  *tile* skills hit whoever stands on the tile when they land (so they are usually given more damage).
 - **Timing:** speed (higher resolves first in a beat), frequency (once per turn or unlimited) and stability (interruption points that cancel it).
-- **Stages:** the steps of the skill, each with its own **AP**, **damage** and **interrupt** points. Power Strike has two: a wind-up (no damage) and a smash.
+- **Stages:** the steps of the skill, each with its own **AP** and a list of **effects** (below). Power Strike has two stages: a wind-up (no effects) and a smash (damage and an interrupt).
+- **Effects** (`SkillStage > Effects`, pick the type, then fill it in; every effect has *On*: the skill's target, or the caster):
+  - **Damage:** base damage, whether it can miss, whether it can crit/flank, whether the attacker's power is added. Order: hit roll, bonuses, minus armor, then the target's shield, then HP.
+  - **Heal:** HP restored, never above the maximum. Does nothing to a downed unit (use a revive skill).
+  - **Shield:** points that absorb damage after armor and before HP, until the end of the round. They do not stack: a new shield only replaces a lower one.
+  - **Interrupt:** points against the skill the target is in the middle of. Only lands if the damage in the same stage connected.
+  A skill that does two things (an attack that also shields its user) is just two effects, the second one *On = Caster*.
 - **Reaction:** range, duration and interrupt. Only shown when the kind is *reaction*.
-- **A new attack skill needs no code:** create a `SkillDef` resource (right-click `skills` > New Resource > SkillDef), save it as `<id>.tres`, set the
+- **A new skill needs no code:** create a `SkillDef` resource (right-click `skills` > New Resource > SkillDef), save it as `<id>.tres`, set the
   fields, add it to `skill_set.tres`, and add it to a unit's **Skills** list. The skill button, planning and AI pick it up from the data. A new
-  *kind* of skill (not move/attack/reaction/revive) is new game logic and is code.
+  *kind* of skill or a new *effect type* is new game logic and is code.
 - Edits need `scripts/stack.sh up game web` to reach the running game (the server resolves skills; the web client lists them).
 
 ## Things that are still code (for now)

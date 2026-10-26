@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/shield_effect.gd" id="4_def"]
+
+[sub_resource type="Resource" id="Shield_defend"]
+script = ExtResource("4_def")
+amount = 4
+
+[sub_resource type="Resource" id="Stage_defend"]
+script = ExtResource("2_def")
+stage_name = "brace"
+effects = Array[ExtResource("3_def")]([SubResource("Shield_defend")])
+
+[resource]
+script = ExtResource("1_def")
+id = "defend"
+display_name = "Defend"
+hint = "Brace: a small shield until the end of the round (provisional)"
+action_slot = 2
+kind = 4
+targeting = 3
+speed = 8
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_defend")])

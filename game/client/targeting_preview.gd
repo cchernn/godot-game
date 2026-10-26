@@ -31,20 +31,13 @@ static func tiles_in_range(bf: Battlefield, from: Vector2i, reach: int) -> Array
 	return out
 
 
-## Why the skill cannot target this unit from `from`; "" when it can. `me` is the player's own unit.
-static func target_problem(bf: Battlefield, me: Dictionary, u: Dictionary, sk: SkillDef, from: Vector2i) -> String:
-	if u["id"] == me["id"]:
-		return "you cannot target yourself"
-	var friendly: bool = u["team"] == me["team"]
+## Why the skill cannot target this unit from `from`; "" when it can. Anyone can be targeted, friend or foe, and so can you.
+static func target_problem(bf: Battlefield, _me: Dictionary, u: Dictionary, sk: SkillDef, from: Vector2i) -> String:
 	if sk.kind == Enums.SkillKind.REVIVE:
-		if not friendly:
-			return "revive targets an ally"
 		if u["life"] != Enums.LifeState.DOWNED:
-			return "that ally is not downed"
+			return "that unit is not downed"
 		if u.get("revived", false):
 			return "already revived once"
-	elif friendly:
-		return "that is an ally"
 	var d := Enums.manhattan(from, u["cell"])
 	if d > sk.attack_range:
 		return "out of range (%d tiles, reach %d)" % [d, sk.attack_range]

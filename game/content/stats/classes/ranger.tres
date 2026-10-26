@@ -6,6 +6,7 @@
 [ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
 [ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
 [ext_resource type="Resource" path="res://game/content/skills/disrupt.tres" id="s_disrupt"]
+[ext_resource type="Resource" path="res://game/content/skills/defend.tres" id="s_defend"]
 
 [resource]
 script = ExtResource("1_q7u1k")
@@ -16,4 +17,4 @@ dexterity = 12
 power = 1
 accuracy = 2
 evasion = 1
-skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_bolt"), ExtResource("s_disrupt")])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_bolt"), ExtResource("s_disrupt"), ExtResource("s_defend")])

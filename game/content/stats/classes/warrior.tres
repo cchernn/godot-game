@@ -6,6 +6,7 @@
 [ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
 [ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="s_power_strike"]
 [ext_resource type="Resource" path="res://game/content/skills/disrupt.tres" id="s_disrupt"]
+[ext_resource type="Resource" path="res://game/content/skills/defend.tres" id="s_defend"]
 
 [resource]
 script = ExtResource("1_q6e1f")
@@ -14,4 +15,4 @@ display_name = "Warrior"
 max_hp = 40
 power = 3
 armor = 2
-skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_power_strike"), ExtResource("s_disrupt")])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_power_strike"), ExtResource("s_disrupt"), ExtResource("s_defend")])

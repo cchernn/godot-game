@@ -5,7 +5,8 @@ const ACCOUNT := "res://game/client/account_flow.tscn"
 const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "FaceSouth", "FaceWest", "QueueList",
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
-	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel"]
+	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel",
+	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton"]
 
 
 func _client() -> Control:
@@ -43,9 +44,10 @@ func test_a_snapshot_fills_the_panel_and_builds_skill_buttons() -> void:
 	assert_true((c.get_node("%StatusLabel") as Label).text.begins_with("Round 1"))
 	assert_true((c.get_node("%ApLabel") as Label).text.begins_with("AP: 0 planned"))
 	var box := c.get_node("%SkillBox") as VBoxContainer
-	assert_eq(box.get_child_count(), 4, "warrior has move, strike, power strike, disrupt")
+	assert_eq(box.get_child_count(), 3, "the Attack list: strike, power strike, disrupt (Move and Defend have their own buttons)")
 	var first := box.get_child(0) as Button
-	assert_true(first.toggle_mode and first.text.begins_with("Move"))
+	assert_true(first.toggle_mode and first.text.begins_with("Strike"))
+	assert_true((c.get_node("%MoveButton") as Button).text.begins_with("Move"))
 	assert_true(not (c.get_node("%ReadyButton") as Button).disabled)
 	c.free()
 
@@ -117,7 +119,7 @@ func test_pressing_a_skill_and_clicking_a_tile_queues_a_plan() -> void:
 	c._on_skill_pressed("move")
 	assert_eq(c.mode, "move")
 	assert_eq((c.get_node("%ErrorLabel") as Label).text, c.skills.get_skill("move").hint, "the skill's hint is shown")
-	assert_eq(((c.get_node("%SkillBox") as VBoxContainer).get_child(0) as Button).tooltip_text, c.skills.get_skill("move").hint)
+	assert_eq((c.get_node("%MoveButton") as Button).tooltip_text, c.skills.get_skill("move").hint)
 	c._on_cell_clicked(Vector2i(1, 2), "")
 	assert_eq((c.plan as Array).size(), 1)
 	assert_eq((c.get_node("%QueueList") as ItemList).item_count, 1)
@@ -834,3 +836,38 @@ func test_menu_background_plays_in_the_menus_and_pauses_in_a_battle() -> void:
 	s.set_playing(true)
 	assert_true(s.visible and anim.is_playing())
 	s.free()
+
+
+func test_the_action_bar_has_move_attack_defend_item_retreat_and_context() -> void:
+	var c := _client()
+	c._on_snapshot(_snapshot())
+	var attack := c.get_node("%AttackButton") as Button
+	assert_true(not (c.get_node("%SkillBox") as Control).visible, "the Attack list is closed until you open it")
+	attack.button_pressed = true
+	assert_true((c.get_node("%SkillBox") as Control).visible)
+	assert_true((c.get_node("%ItemButton") as Button).disabled, "Item waits for its phase")
+	assert_true((c.get_node("%ContextButton") as Button).disabled, "Context waits for its phase")
+	assert_eq((c.get_node("%RetreatButton") as Button).text, "Retreat")
+	# Defend aims at nothing, so it is queued at once
+	(c.get_node("%DefendButton") as Button).pressed.emit()
+	assert_eq((c.plan as Array).size(), 1)
+	assert_eq(c.plan[0]["skill"], "defend")
+	assert_eq(c.mode, "", "no aiming mode is left on")
+	# Move is a mode, and the Attack list does not stay on for it
+	(c.get_node("%MoveButton") as Button).pressed.emit()
+	assert_eq(c.mode, "move")
+	assert_true(not attack.button_pressed)
+	c.free()
+
+
+func test_a_unit_card_shows_its_shield() -> void:
+	var card := (load("res://game/content/ui/unit_card.tscn") as PackedScene).instantiate() as UnitCard
+	(Engine.get_main_loop() as SceneTree).root.add_child(card)
+	var u := {"id": "a", "name": "A", "visual": "warrior", "team": Enums.Team.PLAYERS, "hp": 10, "max_hp": 20, "shield": 4,
+		"life": Enums.LifeState.ALIVE, "active": true, "ready": false}
+	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
+	assert_true("+4 shield" in (card.get_node("%HpLabel") as Label).text)
+	u["shield"] = 0
+	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
+	assert_true(not "shield" in (card.get_node("%HpLabel") as Label).text)
+	card.free()

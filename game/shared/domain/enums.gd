@@ -9,8 +9,12 @@ enum LifeState { ALIVE, DOWNED, ELIMINATED, ESCAPED }
 enum RoundPhase { PLANNING, RESOLVING, FINISHED }
 enum Frequency { ONCE_PER_TURN, UNLIMITED }
 enum TerrainKind { NORMAL, DIFFICULT, BLOCKED }
-enum SkillKind { MOVE, ATTACK, REACTION, REVIVE }
-enum Targeting { NONE, CHARACTER, TILE }
+## SUPPORT: heals, shields and the like. Like ATTACK, it can be aimed at anyone; the kind only says what the skill is for.
+enum SkillKind { MOVE, ATTACK, REACTION, REVIVE, SUPPORT }
+## SELF: no click, the caster is the target.
+## Which slot of the action bar a skill sits in: Attack opens a list, Move and Defend are one button each.
+enum ActionSlot { ATTACK, MOVE, DEFEND }
+enum Targeting { NONE, CHARACTER, TILE, SELF }
 ## ESCAPED: nobody is left standing and at least one character got away.
 enum Outcome { NONE, PLAYERS_WIN, PLAYERS_LOSE, DRAW, ESCAPED }
 

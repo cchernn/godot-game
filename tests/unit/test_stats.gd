@@ -2,10 +2,10 @@ extends TestCase
 
 ## The numbers as they were typed into encounter.gd before they became resources.
 const ORIGINAL := {
-	"warrior": {"name": "Warrior", "hp": 40, "dex": 8, "power": 3, "armor": 2, "acc": 0, "eva": 0, "skills": ["move", "strike", "power_strike", "disrupt"]},
-	"ranger": {"name": "Ranger", "hp": 28, "dex": 12, "power": 1, "armor": 0, "acc": 2, "eva": 1, "skills": ["move", "strike", "bolt", "disrupt"]},
-	"cleric": {"name": "Cleric", "hp": 30, "dex": 10, "power": 1, "armor": 1, "acc": 0, "eva": 0, "skills": ["move", "strike", "bolt", "revive"]},
-	"rogue": {"name": "Rogue", "hp": 26, "dex": 16, "power": 2, "armor": 0, "acc": 3, "eva": 3, "skills": ["move", "strike", "bolt"]},
+	"warrior": {"name": "Warrior", "hp": 40, "dex": 8, "power": 3, "armor": 2, "acc": 0, "eva": 0, "skills": ["move", "strike", "power_strike", "disrupt", "defend"]},
+	"ranger": {"name": "Ranger", "hp": 28, "dex": 12, "power": 1, "armor": 0, "acc": 2, "eva": 1, "skills": ["move", "strike", "bolt", "disrupt", "defend"]},
+	"cleric": {"name": "Cleric", "hp": 30, "dex": 10, "power": 1, "armor": 1, "acc": 0, "eva": 0, "skills": ["move", "strike", "bolt", "revive", "defend"]},
+	"rogue": {"name": "Rogue", "hp": 26, "dex": 16, "power": 2, "armor": 0, "acc": 3, "eva": 3, "skills": ["move", "strike", "bolt", "defend"]},
 	"ghoul": {"name": "Ghoul", "hp": 30, "dex": 8, "power": 2, "armor": 1, "acc": 0, "eva": 0, "skills": ["move", "strike", "power_strike"]},
 	"cultist": {"name": "Cultist", "hp": 20, "dex": 10, "power": 1, "armor": 0, "acc": 1, "eva": 0, "skills": ["move", "bolt", "strike"]},
 }

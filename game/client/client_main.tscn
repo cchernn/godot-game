@@ -102,6 +102,55 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 
+[node name="ActionBar" type="GridContainer" parent="SidePanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 3
+
+[node name="MoveButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Move"
+
+[node name="AttackButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+tooltip_text = "Pick one of your attacks and skills"
+text = "Attack"
+
+[node name="DefendButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Defend"
+
+[node name="ItemButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+tooltip_text = "Items are not in the game yet."
+text = "Item"
+
+[node name="RetreatButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "Leave the fight. You keep watching until it ends."
+text = "Retreat"
+
+[node name="ContextButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+tooltip_text = "Actions for what is around you, like opening a chest. Not in the game yet."
+text = "Context"
+
 [node name="SkillBox" type="VBoxContainer" parent="SidePanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -165,12 +214,6 @@ unique_name_in_owner = true
 layout_mode = 2
 toggle_mode = true
 text = "Ready"
-
-[node name="EscapeButton" type="Button" parent="SidePanel/Layout/ButtonRow"]
-unique_name_in_owner = true
-layout_mode = 2
-tooltip_text = "Leave the fight. You keep watching until it ends."
-text = "Escape"
 
 [node name="ErrorLabel" type="Label" parent="SidePanel/Layout"]
 unique_name_in_owner = true

@@ -7,12 +7,34 @@ extends Resource
 @export var stage_name: String = ""
 ## Action points this stage costs.
 @export_range(0, 9) var ap: int = 1
-## Damage dealt when this stage lands (before the unit's power, armor and the hit roll). 0 = no damage.
-@export_range(0, 999) var damage: int = 0
-## Interruption points this stage adds to a victim it hits (see the target's skill "stability").
-@export_range(0, 99) var interrupt: int = 0
+## What happens when this stage lands, in order. Empty = a preparation step (a wind-up).
+@export var effects: Array[SkillEffect] = []
 
 
-## The shape the battle rules read (kept so the rules code does not depend on resources).
+## The shape the battle rules read (kept so the rules code does not depend on resources). `damage` and `interrupt` are the
+## sums of the damage and interrupt effects aimed at the target, for the AI and quick checks.
 func to_dict() -> Dictionary:
-	return {"name": stage_name, "ap": ap, "damage": damage, "interrupt": interrupt}
+	var fx: Array[Dictionary] = []
+	var damage := 0
+	var interrupt := 0
+	for e in effects:
+		if e == null:
+			continue
+		var d := e.to_dict()
+		fx.append(d)
+		if e.on == SkillEffect.On.TARGET:
+			if e is DamageEffect:
+				damage += (e as DamageEffect).base
+			elif e is InterruptEffect:
+				interrupt += (e as InterruptEffect).points
+	return {"name": stage_name, "ap": ap, "damage": damage, "interrupt": interrupt, "effects": fx}
+
+
+func problems() -> Array[String]:
+	var out: Array[String] = []
+	for e in effects:
+		if e == null:
+			out.append("an effect slot is empty")
+		else:
+			out.append_array(e.problems())
+	return out

@@ -11,13 +11,16 @@ extends Resource
 @export var display_name: String = ""
 ## One line shown as the button tooltip and under the skill list when the skill is picked.
 @export var hint: String = ""
+## Where it sits in the action bar. Moves always sit on Move; most skills are in the Attack list; the default Defend sits on Defend.
+@export var action_slot: Enums.ActionSlot = Enums.ActionSlot.ATTACK
 @export var kind: Enums.SkillKind = Enums.SkillKind.ATTACK:
 	set(v):
 		kind = v
 		notify_property_list_changed()
 
 @export_group("Targeting")
-## What the player clicks: a character, a tile, or nothing (moves, reactions).
+## What the player clicks: a character (the skill follows them), a tile (it hits whatever is there when it lands),
+## yourself (no click), or nothing (moves, reactions). Anyone can be aimed at, friend or foe.
 @export var targeting: Enums.Targeting = Enums.Targeting.NONE
 ## Reach in tiles (Manhattan distance) for attacks and revives.
 @export_range(0, 20) var attack_range: int = 1
@@ -57,6 +60,11 @@ func _validate_property(property: Dictionary) -> void:
 
 
 # ---- views the battle rules read ----
+
+func slot() -> Enums.ActionSlot:
+	return Enums.ActionSlot.MOVE if kind == Enums.SkillKind.MOVE else action_slot
+
+
 
 ## Each stage as {name, ap, damage, interrupt}.
 var stages: Array[Dictionary]:
@@ -99,8 +107,12 @@ func problems() -> Array[String]:
 	for s in stage_defs:
 		if s == null:
 			out.append("%s: a stage slot is empty" % id)
-	if kind == Enums.SkillKind.ATTACK and targeting == Enums.Targeting.NONE:
-		out.append("%s: an attack needs a target type (character or tile)" % id)
+	for s in stage_defs:
+		if s != null:
+			for p in s.problems():
+				out.append("%s: %s" % [id, p])
+	if kind in [Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT] and targeting == Enums.Targeting.NONE:
+		out.append("%s: needs a target type (character, tile or self)" % id)
 	if kind == Enums.SkillKind.REVIVE and targeting != Enums.Targeting.CHARACTER:
 		out.append("%s: a revive targets a character" % id)
 	if kind == Enums.SkillKind.REACTION and (reaction_duration_beats < 1 or reaction_range < 1):

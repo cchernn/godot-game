@@ -52,14 +52,15 @@ func test_valid_targets_and_the_reason_when_a_target_is_not_valid() -> void:
 	var far := _foe("far", Vector2i(5, 0))
 	var ally := {"id": "b", "name": "Brea", "team": Enums.Team.PLAYERS, "cell": Vector2i(0, 1), "life": Enums.LifeState.ALIVE}
 	var units := [_me(), near, far, ally]
-	assert_eq(TargetingPreview.valid_targets(bf, units, _me(), strike, Vector2i(0, 0)), ["near"] as Array[String])
+	assert_eq(TargetingPreview.valid_targets(bf, units, _me(), strike, Vector2i(0, 0)), ["a", "near", "b"] as Array[String], "anyone in reach, friend, foe or yourself")
 	assert_true(TargetingPreview.target_problem(bf, _me(), far, strike, Vector2i(0, 0)).begins_with("out of range"))
-	assert_eq(TargetingPreview.target_problem(bf, _me(), ally, strike, Vector2i(0, 0)), "that is an ally")
+	assert_eq(TargetingPreview.target_problem(bf, _me(), ally, strike, Vector2i(0, 0)), "", "an ally can be struck")
 	var revive := _skill("revive")
-	assert_eq(TargetingPreview.target_problem(bf, _me(), ally, revive, Vector2i(0, 0)), "that ally is not downed")
+	assert_eq(TargetingPreview.target_problem(bf, _me(), ally, revive, Vector2i(0, 0)), "that unit is not downed")
 	ally["life"] = Enums.LifeState.DOWNED
 	assert_eq(TargetingPreview.target_problem(bf, _me(), ally, revive, Vector2i(0, 0)), "")
-	assert_eq(TargetingPreview.target_problem(bf, _me(), near, revive, Vector2i(0, 0)), "revive targets an ally")
+	near["life"] = Enums.LifeState.DOWNED
+	assert_eq(TargetingPreview.target_problem(bf, _me(), near, revive, Vector2i(0, 0)), "", "an enemy that is downed can be revived too")
 
 
 func test_hover_text_for_walks_and_targets() -> void:
