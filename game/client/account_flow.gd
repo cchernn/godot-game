@@ -91,6 +91,7 @@ func _ready() -> void:
 	_settings.back_pressed.connect(_step_hub)
 	_settings.sign_out_pressed.connect(sign_out_and_show)
 	_settings.change_password_requested.connect(_on_change_password_requested)
+	_settings.display_name_requested.connect(_on_display_name_requested)
 	_character_screen.retire_requested.connect(_on_retire_requested)
 	_creator.create_requested.connect(_on_create_character_requested)
 	_creator.back_pressed.connect(_step_worlds)
@@ -411,6 +412,19 @@ func _step_settings() -> void:
 	status.text = ""
 	_settings.show_account(user_email)
 	_show(_settings)
+	var p := await api(HTTPClient.METHOD_GET, "/me/profile")
+	if _settings.visible and p["status"] == 200:
+		var chosen: Variant = (p["data"] as Dictionary).get("display_name")
+		_settings.show_display_name(str(chosen) if chosen != null else "")
+
+
+func _on_display_name_requested(display_name: String) -> void:
+	var r := await api(HTTPClient.METHOD_PUT, "/me/profile", {"display_name": display_name})
+	if r["status"] == 200:
+		_settings.show_display_name(str(r["data"]["display_name"]))
+		status.text = "Name saved."
+	else:
+		status.text = "Enter a name of 1 to 24 characters" if r["status"] == 422 else r["error"]
 
 
 func _on_change_password_requested(new_password: String) -> void:

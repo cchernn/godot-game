@@ -12,7 +12,7 @@
 - **Open verification (Phase 2/5):** web export + WebSocket behaviour on 4.7.2; Supabase JWT validation approach (JWKS vs. legacy shared secret).
 
 ## Provisional values
-All in `game/shared/config/balance.json` (AP thresholds, movement bonus, beats per round, timeouts, AI weights). They are placeholders, not confirmed design.
+All in `game/shared/config/balance.json` (AP thresholds, movement bonus, beats per round, timeouts, AI weights). They are placeholders, not confirmed design. The full list, including the world rules and the rules still in code, is `docs/provisional-values.md`.
 
 ## Combat architecture (Phases 2–4)
 
@@ -70,6 +70,8 @@ party playing one activity; the battle server runs it, and when it ends the part
 - **Joining a party:** `POST /parties/{id}/requests`; the **leader** approves or rejects (`/parties/{id}/requests/{rid}/approve|reject`), the player can cancel
   (`/requests/cancel`). Joining only works from the party's own node, for a character who is on their own (leave a group first), while the party is idle
   and under `max_party_size`. Approval moves the character out of their party of one and withdraws their other pending asks. There is no direct join.
+- **Display name:** `GET/PUT /me/profile` (`profiles`, 1 to 24 printable characters, set on the Settings screen). Other players see it instead of the email prefix: the owner column of
+  the character list and the members list. The host's join-request list shows "Name (email)", so the host still knows who is asking.
 - **Presence:** the client sends `POST /worlds/{id}/presence` every 10 s while it is inside a world (hub, map and battle alike; the `PresenceTimer` in
   `account_flow.tscn`). A player counts as online for `presence_seconds` (30, PROVISIONAL, `GAME_API_PRESENCE_SECONDS`) after the last one. A player who comes back after
   a longer gap is on a new session: if nobody else in their idle party is online, they leave it and are alone, at the same node. Listing the world's parties disbands
@@ -133,6 +135,7 @@ hovering one says so, and events about an unseen enemy are tinted purple in the 
 - After sign-in the client always shows a world picker (`GET /worlds/available`: every world, its player count and the caller's standing; no member identities).
   Opening a world runs the membership flow (member -> the world hub, otherwise request to join). The hub (parties, character, world management for the host,
   settings) is the main menu; a player without a character is sent to the character creator from there.
+- `scripts/e2e_edge.py` checks three awkward situations end to end: a party member who never connects (their seat is played by timeouts and they are stored), the battle server restarting mid-battle (the players reconnect and the party's battle ends once; the new room replays the battle from the start), and a player escaping in round 1 (stored as `escaped` with participation XP).
 - The battle server is not bound to a world. `--world-id` optionally restricts a server to one world. `scripts/e2e_worlds.py` runs two parties in two worlds at
   once on one server.
 

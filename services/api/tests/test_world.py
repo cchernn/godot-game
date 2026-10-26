@@ -766,3 +766,30 @@ def test_presence_needs_membership(client, pool):
     w, [t1], _ = party(client, pool, 1)
     stranger, _ = new_user()
     assert client.post(f"/worlds/{w['id']}/presence", headers=auth(stranger)).status_code == 403
+
+
+def test_a_display_name_replaces_the_email_prefix_for_other_players(client):
+    w, host, _ = make_world(client)
+    mail_tok, _ = token_for(email="mira.k@example.com")
+    rid = client.post(f"/worlds/{w['id']}/requests", headers=auth(mail_tok)).json()["id"]
+    assert client.get("/me/profile", headers=auth(mail_tok)).json() == {"display_name": None}
+    assert [r["display_name"] for r in client.get(f"/worlds/{w['id']}/requests", headers=auth(host)).json()] == [None]
+    assert client.put("/me/profile", json={"display_name": "  Mira \n the  Grey "}, headers=auth(mail_tok)).json() == {"display_name": "Mira the Grey"}
+    reqs = client.get(f"/worlds/{w['id']}/requests", headers=auth(host)).json()
+    assert (reqs[0]["display_name"], reqs[0]["requester_label"]) == ("Mira the Grey", "mira.k@example.com"), "the host still sees the email"
+    client.post(f"/worlds/{w['id']}/requests/{rid}/approve", headers=auth(host))
+    char(client, w["id"], mail_tok, "Mira")
+    owners = {r["name"]: r["owner"] for r in client.get(f"/worlds/{w['id']}/characters", headers=auth(host)).json()}
+    assert owners["Mira"] == "Mira the Grey"
+    members = client.get(f"/worlds/{w['id']}/members", headers=auth(host)).json()
+    assert "Mira the Grey" in [m["display_name"] for m in members]
+
+
+def test_display_names_are_validated_and_belong_to_the_caller(client):
+    tok, _ = new_user()
+    for bad in ["", "   ", "x" * 25, "bell\x07"]:
+        assert client.put("/me/profile", json={"display_name": bad}, headers=auth(tok)).status_code == 422, bad
+    assert client.put("/me/profile", json={"display_name": "Ok"}, headers=auth(tok)).status_code == 200
+    other, _ = new_user()
+    assert client.get("/me/profile", headers=auth(other)).json() == {"display_name": None}
+    assert client.get("/me/profile").status_code == 401

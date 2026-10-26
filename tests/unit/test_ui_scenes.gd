@@ -512,19 +512,31 @@ func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
 	s.free()
 
 
+func test_join_requests_show_the_chosen_name_with_the_email() -> void:
+	var t := func(req: Dictionary) -> String: return WorldManagementScreen._requester_text(req)
+	assert_eq(t.call({"user_id": "11111111-aaaa", "requester_label": "a@x.io", "display_name": "Mira"}), "Mira (a@x.io)")
+	assert_eq(t.call({"user_id": "11111111-aaaa", "requester_label": "a@x.io", "display_name": null}), "a@x.io")
+	assert_eq(t.call({"user_id": "11111111-aaaa", "requester_label": null, "display_name": null}), "Player 11111111")
+
+
 func test_settings_screen_shows_the_account_and_announces_its_actions() -> void:
 	var s := _screen("res://game/client/screens/settings_screen.tscn") as SettingsScreen
 	var got: Array = []
 	s.back_pressed.connect(func() -> void: got.append("back"))
 	s.sign_out_pressed.connect(func() -> void: got.append("out"))
 	s.change_password_requested.connect(func(p: String) -> void: got.append(p))
+	s.display_name_requested.connect(func(n: String) -> void: got.append("name:" + n))
 	s.show_account("a@example.com")
+	s.show_display_name("Mira")
+	assert_eq((s.get_node("%DisplayNameEdit") as LineEdit).text, "Mira")
+	(s.get_node("%DisplayNameEdit") as LineEdit).text = "Mira K"
+	_press(s, "SaveNameButton")
 	assert_eq((s.get_node("%AccountEmailLabel") as Label).text, "Signed in as a@example.com")
 	(s.get_node("%NewPasswordEdit") as LineEdit).text = "hunter22"
 	_press(s, "ChangePasswordButton")
 	_press(s, "SettingsSignOutButton")
 	_press(s, "SettingsBackButton")
-	assert_eq(got, ["hunter22", "out", "back"])
+	assert_eq(got, ["name:Mira K", "hunter22", "out", "back"])
 	s.show_account("a@example.com")
 	assert_eq((s.get_node("%NewPasswordEdit") as LineEdit).text, "", "the typed password is cleared")
 	s.free()

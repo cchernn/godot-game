@@ -99,7 +99,8 @@ class WorldMixin:
         if not self.is_host(world_id, host_id):
             raise Forbidden("Only the host can see requests")
         with self.pool.connection() as conn:
-            rows = conn.execute("select * from world_join_requests where world_id=%s and status='pending' order by created_at", (world_id,)).fetchall()
+            rows = conn.execute("select q.*, p.display_name from world_join_requests q left join profiles p on p.user_id = q.user_id "
+                                "where q.world_id=%s and q.status='pending' order by q.created_at", (world_id,)).fetchall()
         return [_row(r) for r in rows]
 
     def decide_request(self, world_id: uuid.UUID, host_id: uuid.UUID, request_id: uuid.UUID, approve: bool) -> dict:
@@ -143,7 +144,8 @@ class WorldMixin:
                 "select m.user_id, m.role, "
                 "  (select c.name from characters c where c.world_id = m.world_id and c.user_id = m.user_id and c.status = 'active') as character_name, "
                 "  (select r.requester_label from world_join_requests r where r.world_id = m.world_id and r.user_id = m.user_id "
-                "     and r.requester_label is not null order by r.created_at desc limit 1) as label "
+                "     and r.requester_label is not null order by r.created_at desc limit 1) as label, "
+                "  (select p.display_name from profiles p where p.user_id = m.user_id) as display_name "
                 "from world_members m where m.world_id = %s and m.status = 'active' order by (m.role = 'host') desc, m.joined_at",
                 (world_id,)).fetchall()
         return [_row(r) for r in rows]

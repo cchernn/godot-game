@@ -95,6 +95,17 @@ class Repository(PartyMixin, WorldMixin):
             r = conn.execute("update characters set status='retired', retired_at=now() where id=%s returning *", (character_id,)).fetchone()
         return _row(r)
 
+    def get_profile(self, user_id: uuid.UUID) -> dict:
+        with self.pool.connection() as conn:
+            row = conn.execute("select display_name from profiles where user_id=%s", (user_id,)).fetchone()
+        return {"display_name": row["display_name"] if row else None}
+
+    def set_profile(self, user_id: uuid.UUID, display_name: str) -> dict:
+        with self.pool.connection() as conn:
+            conn.execute("insert into profiles (user_id, display_name) values (%s,%s) "
+                         "on conflict (user_id) do update set display_name=excluded.display_name, updated_at=now()", (user_id, display_name))
+        return {"display_name": display_name}
+
     def list_characters(self, world_id: uuid.UUID, user_id: uuid.UUID) -> list[dict]:
         """Every character in the world, active first, with the account that owns it (the join label, else a short id)."""
         if not self.is_member(world_id, user_id):
@@ -103,12 +114,14 @@ class Repository(PartyMixin, WorldMixin):
             rows = conn.execute(
                 "select c.id, c.user_id, c.name, c.class, c.level, c.status, c.retired_at, m.role, "
                 "  (select r.requester_label from world_join_requests r where r.world_id = c.world_id and r.user_id = c.user_id "
-                "     and r.requester_label is not null order by r.created_at desc limit 1) as label "
+                "     and r.requester_label is not null order by r.created_at desc limit 1) as label, "
+                "  (select p.display_name from profiles p where p.user_id = c.user_id) as display_name "
                 "from characters c join world_members m on m.world_id = c.world_id and m.user_id = c.user_id "
                 "where c.world_id = %s order by (c.status = 'active') desc, c.created_at", (world_id,)).fetchall()
         out = []
         for r in rows:
-            owner = r["label"].split("@")[0] if r["label"] else ("Host" if r["role"] == "host" else "Player %s" % str(r["user_id"])[:8])
+            owner = r["display_name"] or (r["label"].split("@")[0] if r["label"] else
+                                          "Host" if r["role"] == "host" else "Player %s" % str(r["user_id"])[:8])
             out.append({"id": str(r["id"]), "name": r["name"], "class": r["class"], "level": r["level"],
                         "status": r["status"], "owner": owner, "mine": r["user_id"] == user_id})
         return out

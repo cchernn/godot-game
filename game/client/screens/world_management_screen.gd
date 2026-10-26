@@ -55,10 +55,20 @@ func show_requests(requests: Array) -> void:
 	for req: Dictionary in requests:
 		var row := row_scene.instantiate() as JoinRequestRow
 		_rows.add_child(row)
-		var who: Variant = req.get("requester_label")
-		row.setup(str(who) if who != null and str(who) != "" else "Player %s" % str(req["user_id"]).left(8))
+		row.setup(_requester_text(req))
 		row.approved.connect(func() -> void: decision_made.emit(str(req["id"]), true, row))
 		row.rejected.connect(func() -> void: decision_made.emit(str(req["id"]), false, row))
+
+
+## "Name (email)" when the player has chosen a name (the email stays so the host knows who is asking), else the email.
+static func _requester_text(req: Dictionary) -> String:
+	var email := str(req.get("requester_label", "")) if req.get("requester_label") != null else ""
+	var chosen := str(req.get("display_name", "")) if req.get("display_name") != null else ""
+	if chosen != "" and email != "":
+		return "%s (%s)" % [chosen, email]
+	if chosen != "" or email != "":
+		return chosen if chosen != "" else email
+	return "Player %s" % str(req["user_id"]).left(8)
 
 
 ## The decision was stored: remove the row.
@@ -94,6 +104,8 @@ func show_members(members: Array) -> void:
 	_remove.disabled = true
 	for m: Dictionary in members:
 		var who: Variant = m.get("character_name")
+		if who == null or str(who) == "":
+			who = m.get("display_name")
 		if who == null or str(who) == "":
 			who = m.get("label")
 		var text := str(who) if who != null and str(who) != "" else "Player %s" % str(m["user_id"]).left(8)

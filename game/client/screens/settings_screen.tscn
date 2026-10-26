@@ -19,6 +19,17 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
+[node name="DisplayNameEdit" type="LineEdit" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Name other players see (1 to 24 characters)"
+max_length = 24
+
+[node name="SaveNameButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Save name"
+
 [node name="NewPasswordEdit" type="LineEdit" parent="."]
 unique_name_in_owner = true
 layout_mode = 2

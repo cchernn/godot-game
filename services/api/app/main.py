@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 import jwt
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from . import rules
 from .auth import AuthError, Identity, TokenVerifier, server_key_ok
@@ -57,6 +57,18 @@ class SessionIn(BaseModel):
     token: str = Field(max_length=4096)
     world_id: uuid.UUID
     instance_id: uuid.UUID | None = None  # set when entering a party's battle: the roster is checked too
+
+
+class ProfileIn(BaseModel):
+    display_name: str
+
+    @field_validator("display_name")
+    @classmethod
+    def _clean(cls, v: str) -> str:
+        v = " ".join(v.split())  # trims and collapses whitespace, including tabs and newlines
+        if not 1 <= len(v) <= 24 or not v.isprintable():
+            raise ValueError("A name is 1 to 24 characters")
+        return v
 
 
 class ParticipantIn(BaseModel):
@@ -146,6 +158,14 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     @app.post("/worlds", status_code=201)
     def create_world(body: WorldIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
         return r.create_world(user.user_id, body.name, body.template_id)
+
+    @app.get("/me/profile")
+    def get_profile(user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.get_profile(user.user_id)
+
+    @app.put("/me/profile")
+    def set_profile(body: ProfileIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.set_profile(user.user_id, body.display_name)
 
     @app.get("/worlds")
     def list_worlds(user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> list[dict]:
