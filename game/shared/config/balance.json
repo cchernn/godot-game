@@ -47,6 +47,10 @@
     "players_required": 2,
     "gather_seconds": 30
   },
+  "items": {
+    "_note": "PROVISIONAL: how many different kinds of item a character brings into a battle.",
+    "battle_slots": 4
+  },
   "rewards": {
     "_note": "PROVISIONAL XP: participation plus a victory bonus.",
     "xp_participation": 20,

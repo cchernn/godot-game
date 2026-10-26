@@ -19,6 +19,10 @@ var armor: int = 0
 var accuracy: int = 0
 var evasion: int = 0
 var skills: Array[String] = []
+## What this combatant carries into the battle: item id -> copies. Enemies carry nothing.
+var items: Dictionary = {}
+## Copies used up so far (an item is used up when its skill begins), reported with the result.
+var items_used: Dictionary = {}
 ## Active statuses: {id, def (StatusDef.to_dict()), turns_left, stacks}. Counted in turns, cleared when the combatant is defeated.
 var statuses: Array[Dictionary] = []
 

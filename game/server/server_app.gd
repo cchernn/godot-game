@@ -396,6 +396,7 @@ func _start_battle(room: Room) -> void:
 		rec.sent_seq = 0
 		var c := room.battle.state.get_c(rec.combatant_id)
 		c.controller = rec.player_id
+		c.items = _loadout(rec.character)
 		c.display_name = rec.display_name if persistence != null else "%s (%s)" % [c.display_name, rec.display_name]
 		i += 1
 	room.planning_deadline = Time.get_ticks_msec() + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
@@ -406,6 +407,17 @@ func _start_battle(room: Room) -> void:
 		if rec.peer_id != -1:
 			Gateway.s_welcome.rpc_id(rec.peer_id, _welcome_info(rec, room))
 	_push_all(room)
+
+
+## The items a character takes into the battle: the first `items.battle_slots` kinds the API listed (in item id order) that the game knows.
+func _loadout(character: Dictionary) -> Dictionary:
+	var slots: int = cfg.get_value("items", "battle_slots")
+	var out := {}
+	for it: Dictionary in character.get("items", []):
+		var id := str(it.get("item_id", ""))
+		if out.size() < slots and skills.items.has(id) and int(it.get("quantity", 0)) > 0:
+			out[id] = int(it["quantity"])
+	return out
 
 
 ## A party's battle has a seat for every roster member, in roster order, whether or not they have arrived;
@@ -617,7 +629,8 @@ func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	var participants: Array = []
 	for rec in _members(room):
 		var c := battle.state.get_c(rec.combatant_id)
-		participants.append({"character_id": rec.character["id"], "outcome": _fate(c), "xp": _xp_for(battle, c)})
+		participants.append({"character_id": rec.character["id"], "outcome": _fate(c), "xp": _xp_for(battle, c),
+			"items_used": c.items_used.duplicate()})
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String
 	for attempt in 5:

@@ -100,8 +100,38 @@ class Repository(PartyMixin, WorldMixin):
 
     def active_character(self, world_id: uuid.UUID, user_id: uuid.UUID) -> dict | None:
         with self.pool.connection() as conn:
-            return _row(conn.execute(
+            c = _row(conn.execute(
                 "select * from characters where world_id=%s and user_id=%s and status='active'", (world_id, user_id)).fetchone())
+            if c is not None:
+                c["items"] = self._loadouts(conn, [c["id"]]).get(c["id"], [])
+        return c
+
+    # ---- items ----
+
+    @staticmethod
+    def _loadouts(conn, character_ids: list) -> dict[str, list[dict]]:
+        """character id -> [{item_id, quantity}], in item id order. The game server decides how many kinds go into a battle."""
+        if not character_ids:
+            return {}
+        rows = conn.execute("select character_id, item_id, quantity from character_items where character_id = any(%s) "
+                            "order by item_id", ([uuid.UUID(str(i)) for i in character_ids],)).fetchall()
+        out: dict[str, list[dict]] = {}
+        for r in rows:
+            out.setdefault(str(r["character_id"]), []).append({"item_id": r["item_id"], "quantity": r["quantity"]})
+        return out
+
+    def grant_items(self, character_id: uuid.UUID, item_id: str, quantity: int, max_stack: int = 99) -> dict:
+        """Adds copies of an item to an active character, never above `max_stack` (the item's own limit, from the game content).
+        No shops, loot or crafting yet: this is the dev/admin way in."""
+        with self.pool.connection() as conn:
+            c = conn.execute("select id from characters where id=%s and status='active'", (character_id,)).fetchone()
+            if c is None:
+                raise NotFound("Character not found")
+            row = conn.execute(
+                "insert into character_items (character_id, item_id, quantity) values (%s,%s,%s) "
+                "on conflict (character_id, item_id) do update set quantity = least(%s, character_items.quantity + excluded.quantity) "
+                "returning quantity", (character_id, item_id, min(quantity, max_stack), max_stack)).fetchone()
+        return {"character_id": str(character_id), "item_id": item_id, "quantity": row["quantity"]}
 
     def retire_character(self, character_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         with self.pool.connection() as conn:
@@ -167,7 +197,8 @@ class Repository(PartyMixin, WorldMixin):
         """Atomically records a finished encounter and applies XP. Idempotent per key: replaying the same
         payload returns the stored result; reusing a key for a different payload is a conflict."""
         canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds,
-                                "p": sorted((str(p["character_id"]), p["outcome"], p["xp"]) for p in participants)})
+                                "p": sorted((str(p["character_id"]), p["outcome"], p["xp"],
+                                             sorted((p.get("items_used") or {}).items())) for p in participants)})
         digest = hashlib.sha256(canonical.encode()).hexdigest()
         ids = [p["character_id"] for p in participants]
         if len(set(ids)) != len(ids):
@@ -189,8 +220,17 @@ class Repository(PartyMixin, WorldMixin):
                     (p["xp"], p["character_id"], world_id)).fetchone()
                 if ok is None:  # rolls the whole transaction back: no partial outcomes
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
-                conn.execute("insert into combat_result_participants (result_id, character_id, outcome, xp_awarded) values (%s,%s,%s,%s)",
-                             (res["id"], p["character_id"], p["outcome"], p["xp"]))
+                used = {k: v for k, v in (p.get("items_used") or {}).items() if v > 0}
+                for item_id, n in used.items():
+                    left = conn.execute(
+                        "update character_items set quantity = quantity - %s where character_id=%s and item_id=%s and quantity >= %s "
+                        "returning quantity", (n, p["character_id"], item_id, n)).fetchone()
+                    if left is None:  # more used than carried: refuse the whole result
+                        raise Invalid("%s used more %s than it carries" % (p["character_id"], item_id))
+                    if left["quantity"] == 0:
+                        conn.execute("delete from character_items where character_id=%s and item_id=%s", (p["character_id"], item_id))
+                conn.execute("insert into combat_result_participants (result_id, character_id, outcome, xp_awarded, items_used) "
+                             "values (%s,%s,%s,%s,%s)", (res["id"], p["character_id"], p["outcome"], p["xp"], Jsonb(used)))
                 if reset_xp:  # testing aid: the award stays in the history, the character starts the next battle at 0
                     conn.execute("update characters set xp = 0 where id=%s", (p["character_id"],))
         return _row(res), False

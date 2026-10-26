@@ -72,6 +72,8 @@ func _step(c: Combatant) -> void:
 				# Usage is consumed when the skill begins executing. Reaction preparation does not consume it.
 				if sk.frequency == Enums.Frequency.ONCE_PER_TURN and sk.kind != Enums.SkillKind.REACTION:
 					c.skills_used[sk.id] = true
+				if a.item_id != "": # an item is used up when it begins, never when it was skipped
+					c.items_used[a.item_id] = int(c.items_used.get(a.item_id, 0)) + 1
 				break
 			b.emit("skip", "{a}'s %s is skipped (%s)." % [sk.display_name, reason], c.id)
 			forfeit(c, a)
@@ -89,7 +91,10 @@ func _stunned(c: Combatant) -> void:
 
 
 func _can_begin(c: Combatant, a: PlannedAction, sk: SkillDef) -> String:
-	if sk == null or not c.skills.has(a.skill_id):
+	if a.item_id != "":
+		if sk == null or c.items.get(a.item_id, 0) - c.items_used.get(a.item_id, 0) <= 0:
+			return "no item left"
+	elif sk == null or not c.skills.has(a.skill_id):
 		return "unknown skill"
 	if sk.frequency == Enums.Frequency.ONCE_PER_TURN and c.skills_used.has(sk.id):
 		return "already used this round"

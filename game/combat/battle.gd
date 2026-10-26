@@ -322,6 +322,7 @@ func snapshot_for(cid: String) -> Dictionary:
 			u["ap_forfeited"] = c.ap_forfeited
 			u["dexterity"] = c.stat("dexterity")
 			u["tiles_per_ap"] = cfg.tiles_per_ap(c.stat("dexterity"))
+			u["items"] = _item_view(c)
 			u["reaction"] = not c.reaction.is_empty()
 			u["escaping"] = c.escape_pending
 		elif me != null and c.team == me.team:  # allies see each other's AP, never each other's plans
@@ -338,6 +339,19 @@ func snapshot_for(cid: String) -> Dictionary:
 		"beats_per_round": beats_per_round, "outcome": outcome, "you": cid, "eliminated": eliminated, "escaped": escaped,
 		"map": {"id": map_id, "w": bf.width, "h": bf.height, "terrain": Array(bf.terrain), "elev": Array(bf.elevation)},
 		"units": units, "plan": plan}
+
+
+## The items you can still use: id, name, hint and copies left (before the ones queued in your plan).
+func _item_view(c: Combatant) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ids: Array = c.items.keys()
+	ids.sort()
+	for id: String in ids:
+		var def := skills.items.get(id) as ItemDef
+		var left: int = c.items[id] - int(c.items_used.get(id, 0))
+		if def != null and left > 0:
+			out.append({"id": id, "name": def.display_name, "hint": def.hint, "count": left})
+	return out
 
 
 ## What a client may know about a unit's statuses (everyone sees them on units they can see).

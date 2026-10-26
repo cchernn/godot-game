@@ -6,7 +6,7 @@ const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
 	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel",
-	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton"]
+	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton", "ItemBox"]
 
 
 func _client() -> Control:
@@ -888,3 +888,39 @@ func test_a_unit_card_lists_statuses_with_turns() -> void:
 	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
 	assert_true(not fx.visible)
 	card.free()
+
+
+func test_the_item_button_lists_your_items_and_queues_them() -> void:
+	var c := _client()
+	var potion := ItemDef.new()
+	potion.id = "potion"
+	potion.display_name = "Potion"
+	potion.hint = "Heals a bit"
+	potion.use = SkillDef.new()
+	potion.use.kind = Enums.SkillKind.SUPPORT
+	potion.use.targeting = Enums.Targeting.SELF
+	var st := SkillStage.new()
+	var heal := HealEffect.new()
+	heal.amount = 5
+	var fx: Array[SkillEffect] = [heal]
+	st.effects = fx
+	var stages: Array[SkillStage] = [st]
+	potion.use.stage_defs = stages
+	c.skills.add_item(potion)
+	var s := _snapshot()
+	for u: Dictionary in s["units"]:
+		if u["id"] == "pc0":
+			u["items"] = [{"id": "potion", "name": "Potion", "hint": "Heals a bit", "count": 2}]
+	c._on_snapshot(s)
+	var item := c.get_node("%ItemButton") as Button
+	assert_true(not item.disabled)
+	item.button_pressed = true
+	var box := c.get_node("%ItemBox") as Control
+	assert_true(box.visible)
+	assert_eq(box.get_child_count(), 1)
+	assert_true("Potion ×2" in (box.get_child(0) as Button).text)
+	(box.get_child(0) as Button).pressed.emit() # self-targeting: queued at once
+	assert_eq(c.plan[0]["item"], "potion")
+	assert_eq(c.plan[0]["skill"], "item:potion")
+	assert_true("Potion ×1" in (box.get_child(0) as Button).text, "one is spoken for")
+	c.free()

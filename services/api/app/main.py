@@ -75,6 +75,13 @@ class ParticipantIn(BaseModel):
     character_id: uuid.UUID
     outcome: Literal["survived", "downed", "eliminated", "escaped"]
     xp: int = Field(ge=0, le=100_000)
+    items_used: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)
+
+
+class GrantItemIn(BaseModel):
+    item_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
+    quantity: int = Field(ge=1, le=99)
+    max_stack: int = Field(default=99, ge=1, le=99)  # the item's own limit, from game/content/items
 
 
 class CombatResultIn(BaseModel):
@@ -247,6 +254,11 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
             body.idempotency_key, body.world_id, body.outcome, body.rounds,
             [p.model_dump() for p in body.participants])
         return {"result": res, "duplicate": dup}
+
+    @app.post("/internal/characters/{character_id}/items", dependencies=[Depends(server_only)])
+    def grant_items(character_id: uuid.UUID, body: GrantItemIn, r: Repository = Depends(repo)) -> dict:
+        """Dev/admin: gives a character copies of an item (see scripts/grant_item.sh). There are no shops or loot yet."""
+        return r.grant_items(character_id, body.item_id, body.quantity, body.max_stack)
 
     # ---- membership ----
 

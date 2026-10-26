@@ -31,6 +31,8 @@ var _selftest: bool = false
 var _selftest_round: int = -1
 var _skill_buttons: Dictionary = {}
 var _skill_ids: Array = []
+var _item_buttons: Dictionary = {}
+var _item_ids: Array = []
 ## Escape asks twice (a second press within this many seconds confirms), so a stray click cannot abandon the fight.
 @export var escape_confirm_seconds: float = 4.0
 var _escape_armed_until_ms: int = 0
@@ -55,6 +57,8 @@ var _preview_sig: int = 0
 @onready var move_btn: Button = %MoveButton
 @onready var attack_btn: Button = %AttackButton
 @onready var defend_btn: Button = %DefendButton
+@onready var item_btn: Button = %ItemButton
+@onready var item_box: VBoxContainer = %ItemBox
 @onready var error_label: Label = %ErrorLabel
 @onready var log_view: RichTextLabel = %LogView
 @onready var board_holder: Control = %BoardHolder
@@ -141,7 +145,14 @@ func _wire_ui() -> void:
 	escape_btn.pressed.connect(_on_escape_pressed)
 	move_btn.pressed.connect(func() -> void: _on_skill_pressed(_slot_skill(Enums.ActionSlot.MOVE)))
 	defend_btn.pressed.connect(func() -> void: _on_skill_pressed(_slot_skill(Enums.ActionSlot.DEFEND)))
-	attack_btn.toggled.connect(func(_on: bool) -> void: _refresh())
+	attack_btn.toggled.connect(func(on: bool) -> void:
+		if on:
+			item_btn.set_pressed_no_signal(false)
+		_refresh())
+	item_btn.toggled.connect(func(on: bool) -> void:
+		if on:
+			attack_btn.set_pressed_no_signal(false)
+		_refresh())
 	%ConnectButton.pressed.connect(_connect)
 	%ContinueButton.pressed.connect(_on_continue_pressed)
 	_set_battle_view(false)
@@ -319,6 +330,10 @@ func _on_continue_pressed() -> void:
 	_skill_ids = []
 	for ch in skill_box.get_children():
 		ch.queue_free()
+	_item_buttons.clear()
+	_item_ids = []
+	for ch in item_box.get_children():
+		ch.queue_free()
 	log_view.clear()
 	_log_round = -1
 	_log_beat = -1
@@ -455,9 +470,9 @@ func _on_cell_clicked(cell: Vector2i, unit_id: String) -> void:
 	elif sk.targeting == Enums.Targeting.CHARACTER:
 		if unit_id == "":
 			return
-		plan.append({"skill": mode, "target": unit_id})
+		plan.append(_new_action(mode, {"target": unit_id}))
 	elif sk.targeting == Enums.Targeting.TILE:
-		plan.append({"skill": mode, "cell": cell})
+		plan.append(_new_action(mode, {"cell": cell}))
 	else:
 		return
 	error_label.text = ""
@@ -482,13 +497,24 @@ func _on_skill_pressed(id: String) -> void:
 		return
 	if sk.kind == Enums.SkillKind.REACTION or sk.targeting == Enums.Targeting.SELF: # nothing to aim: queued at once
 		_prev_plan = plan.duplicate(true)
-		plan.append({"skill": id})
+		plan.append(_new_action(id))
 		_push_plan()
 		return
 	mode = id
-	attack_btn.set_pressed_no_signal(sk.slot() == Enums.ActionSlot.ATTACK)
+	var is_item := id.begins_with("item:")
+	attack_btn.set_pressed_no_signal(not is_item and sk.slot() == Enums.ActionSlot.ATTACK)
+	item_btn.set_pressed_no_signal(is_item)
 	error_label.text = sk.hint
 	_refresh()
+
+
+## A plan entry for a skill, or for an item (its skill is "item:<id>").
+func _new_action(id: String, aim: Dictionary = {}) -> Dictionary:
+	var a := {"skill": id}
+	if id.begins_with("item:"):
+		a["item"] = id.substr(5)
+	a.merge(aim)
+	return a
 
 
 ## The id of the first of your skills in an action-bar slot ("" if you have none).
@@ -591,6 +617,7 @@ func _refresh() -> void:
 				me["ap_spent"], me["ap_reserved"], me["ap_forfeited"], cap]
 			ap_label.modulate = Color.WHITE
 		_rebuild_skill_buttons()
+		_rebuild_item_buttons()
 	queue_list.clear()
 	var beat := 1
 	for a in plan:
@@ -640,6 +667,14 @@ func _refresh() -> void:
 	defend_btn.disabled = not can or defend_id == ""
 	attack_btn.disabled = not can or _skill_buttons.is_empty()
 	skill_box.visible = attack_btn.button_pressed and not attack_btn.disabled
+	for id: String in _item_buttons:
+		var left := _items_left(id)
+		var btn := _item_buttons[id] as Button
+		btn.text = "%s ×%d  (%d AP)" % [(skills.items[id] as ItemDef).display_name, left, skills.get_skill(ItemDef.skill_id_for(id)).total_ap()]
+		btn.disabled = not can or left <= 0
+		btn.set_pressed_no_signal(ItemDef.skill_id_for(id) == mode)
+	item_btn.disabled = not can or _item_buttons.is_empty()
+	item_box.visible = item_btn.button_pressed and not item_btn.disabled
 
 
 ## One card per visible unit, reused between snapshots: allies (you first) in the party row, enemies in sight above it.
@@ -701,6 +736,37 @@ func _rebuild_skill_buttons() -> void:
 	move_btn.tooltip_text = "" if mv == null else mv.hint
 	var df := skills.get_skill(_slot_skill(Enums.ActionSlot.DEFEND))
 	defend_btn.tooltip_text = "" if df == null else df.hint
+
+
+## Copies of an item you can still plan: what you carry minus the ones already in your queue.
+func _items_left(id: String) -> int:
+	var left := 0
+	for it: Dictionary in me.get("items", []):
+		if it["id"] == id:
+			left = int(it["count"])
+	for a in plan:
+		if a.get("item", "") == id:
+			left -= 1
+	return left
+
+
+func _rebuild_item_buttons() -> void:
+	var ids: Array = []
+	for it: Dictionary in me.get("items", []):
+		if skills.items.has(it["id"]):
+			ids.append(it["id"])
+	if ids.hash() == _item_ids.hash():
+		return
+	_item_ids = ids.duplicate()
+	for ch in item_box.get_children():
+		ch.queue_free()
+	_item_buttons.clear()
+	for id: String in ids:
+		var b := skill_button_scene.instantiate() as Button
+		b.tooltip_text = (skills.items[id] as ItemDef).hint
+		b.pressed.connect(_on_skill_pressed.bind(ItemDef.skill_id_for(id)))
+		item_box.add_child(b)
+		_item_buttons[id] = b
 
 
 func _process(_delta: float) -> void:

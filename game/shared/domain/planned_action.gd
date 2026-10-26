@@ -3,6 +3,8 @@ extends RefCounted
 ## One queued action. Parsed defensively: network input is untrusted.
 
 var skill_id: String = ""
+## Set when the action uses an item; skill_id is then the item's skill ("item:<id>").
+var item_id: String = ""
 var path: Array[Vector2i] = []
 var facing: int = -1
 var target_id: String = ""
@@ -27,10 +29,16 @@ static func from_dict(d: Variant) -> PlannedAction:
 	if not d is Dictionary:
 		return null
 	var dict: Dictionary = d
-	if not dict.get("skill") is String:
-		return null
 	var a := PlannedAction.new()
-	a.skill_id = dict["skill"]
+	if dict.has("item"):
+		if not dict["item"] is String or (dict["item"] as String) == "" or (dict["item"] as String).length() > 64:
+			return null
+		a.item_id = dict["item"]
+		a.skill_id = ItemDef.skill_id_for(a.item_id)
+	elif dict.get("skill") is String:
+		a.skill_id = dict["skill"]
+	else:
+		return null
 	if dict.has("path"):
 		if not dict["path"] is Array:
 			return null
@@ -58,6 +66,8 @@ static func from_dict(d: Variant) -> PlannedAction:
 
 func to_dict() -> Dictionary:
 	var d := {"skill": skill_id}
+	if item_id != "":
+		d["item"] = item_id
 	if not path.is_empty():
 		d["path"] = path.duplicate()
 	if facing >= 0:

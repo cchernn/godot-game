@@ -155,6 +155,15 @@ No rule distinguishes friend from foe: any skill can target any visible combatan
 skills follow the target and check range when they land; `TILE` skills hit whoever is on the tile then. `Combatant.shield` soaks damage after armor and before HP and is cleared when a round
 begins; the snapshot carries it. `SkillKind.SUPPORT` and `SkillDef.action_slot` (Attack, Move, Defend) place skills on the client's action bar.
 
+## Items (Phase 4)
+`ItemDef` (id, name, hint, max stack, and an embedded `use: SkillDef`) lives in `game/content/items/item_set.tres`. `SkillDb.load_file()` registers each item's use skill under `item:<id>`
+(frequency forced to unlimited) and keeps the `ItemDef`s in `SkillDb.items`, so planning, validation and the resolver treat an item as a skill. A plan entry is `{"item": id, target/cell}`;
+`PlannedAction` turns it into skill `item:<id>`. The validator counts copies (carried minus used minus already queued); the resolver checks again when the action begins, uses up a copy
+(`Combatant.items_used`) only then, and skips with "no item left" otherwise. Only the owner's snapshot unit carries `items` (id, name, hint, copies left).
+Persistence: table `character_items` (migration `0010`); the API puts `items: [{item_id, quantity}]` on the character in `/internal/auth/session` and on each `get_instance` roster entry; the game
+server takes the first `items.battle_slots` known kinds (`ServerApp._loadout`). Results carry `items_used` per participant and the API subtracts them in the same transaction as the XP
+(more than carried = the whole result is refused, 422; replays do not subtract twice). `POST /internal/characters/{id}/items` (service key) grants items.
+
 ## Areas of effect (Phase 3)
 `AreaShape` (`single | radius | line | cone`, `size`, `requires_los`) hangs off `SkillDef.area`; `AreaShape.cells(bf, caster, centre, facing)` is the one geometry function, used by the
 server (`BeatResolver._area_victims`), the AI (`AiPlanner._area_net_hits`) and the client preview (`TargetingPreview.area_cells`, drawn by `Board3D.area_cells`). The centre is the aimed tile,

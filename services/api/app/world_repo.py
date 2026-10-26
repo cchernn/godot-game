@@ -271,8 +271,10 @@ class WorldMixin:
             roster = conn.execute("select c.id, c.user_id, c.name, c.class from activity_roster r join characters c on c.id=r.character_id "
                                   "where r.instance_id=%s and (%s::uuid is null or r.character_id in (select character_id from party_members where party_id=%s)) "
                                   "order by r.joined_at", (instance_id, inst["party_id"], inst["party_id"])).fetchall()
+            loadouts = self._loadouts(conn, [r["id"] for r in roster])
         act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
-        return {**_row(inst), "roster": [_row(r) for r in roster], "encounter": act["encounter"],
+        roster = [{**_row(r), "items": loadouts.get(str(r["id"]), [])} for r in roster]
+        return {**_row(inst), "roster": roster, "encounter": act["encounter"],
                 "activity_name": act["name"], "max_players": act["max_players"]}
 
     def party_seat(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:

@@ -47,6 +47,9 @@ Unit stats and skills are `.tres` resources under `game/content/` and are all pr
   a stunned unit loses the rest of its queue and cannot react; an Apply Status after a damage effect only lands if the damage connected. No statuses ship yet.
 - **Areas (Phase 3):** a cone is 1, 3, 5... tiles wide per row; a line or cone runs along the dominant axis toward the aim (the user's facing if aimed at their own tile);
   walls stop an area by default (`requires_los`); a radius is checked from its centre, a line or cone from the user. No area skills ship yet.
+- **Items (Phase 4):** `items.battle_slots` = 4 kinds per battle; no cooldown (an item can be used as often as there are copies, AP and beats); a copy is used up when the
+  action begins (not when skipped) and only saved if the battle ends with a result; using more than the character carries refuses the result; enemies carry nothing; the only way to get items
+  is the dev script. No items ship yet.
 - **Party joining:** only a lone character, only at the party's node, only while the party is idle; the leader decides.
 - **Classes** (`services/api/app/rules.py`) and their client mirror are placeholders.
 - **Simultaneous wipe** is a draw.

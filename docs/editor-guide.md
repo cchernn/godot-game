@@ -179,6 +179,17 @@ skill stage and drag the status into its *Status* slot (no list to register it i
 - **Conditions:** *Stunned* (the bearer takes no actions and cannot react; not an interruption) and *Rooted* (cannot move).
 A downed or eliminated unit loses all statuses. A unit card lists its statuses with the turns left; hovering shows the hints.
 
+## Items (Inspector)
+An item is a consumable a character brings into a battle. Each is an `ItemDef` resource in `game/content/items/`, listed in `items/item_set.tres` (right-click > New Resource > ItemDef,
+save as `<id>.tres`, then add it to the set). No items ship yet. Fields: **id** (lower-case, no spaces), **display name**, **hint**, **max stack** (most copies a character can carry),
+and **Use**, which is an embedded skill: targeting, range, area, speed and stages with effects, exactly as in *Skills* above (so an item can heal, shield, damage, hit an area or apply
+a status). You do not set the skill's id or frequency: the game gives it the id `item:<id>` and lets it be used as often as the character has copies and AP.
+In a fight the **Item** button lists what you carry with the copies left (the ones already in your queue are counted as spoken for). A copy is used up when its skill *begins*; if the
+action is skipped (target gone, out of range) nothing is used. What is used is saved with the battle result; a battle that never finishes saves nothing.
+A character brings at most `items.battle_slots` kinds into a battle (`balance.json`, provisional 4). To give a character items for testing:
+`GAME_API_SERVER_KEY=... scripts/grant_item.sh <character_id> <item_id> <quantity> [max_stack]` (needs the API running; there are no shops or loot yet).
+Item changes need `scripts/stack.sh up game web` (and `up api` for a new migration).
+
 ## Things that are still code (for now)
 The global tuning in `config/balance.json` (hit chance, the AP table, rewards) is a JSON file, not an Inspector resource. Game rules,
 networking and the API stay in code. The dropdown choices for class on the character creator mirror the server's rules (`character_creator.gd`).

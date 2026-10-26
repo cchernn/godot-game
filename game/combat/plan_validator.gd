@@ -17,6 +17,7 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 	if actions.size() > MAX_ACTIONS:
 		return _fail("Too many actions")
 	var pos := c.cell
+	var queued := {} # item id -> copies planned so far
 	var total := 0
 	var beats := 0
 	var max_step: int = cfg.get_value("combat", "max_step_height")
@@ -24,7 +25,13 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 	var surcharge: int = cfg.get_value("movement", "difficult_terrain_surcharge")
 	for a in actions:
 		var sk := battle.skills.get_skill(a.skill_id)
-		if sk == null or not c.skills.has(a.skill_id):
+		if a.item_id != "":
+			if sk == null or not battle.skills.items.has(a.item_id):
+				return _fail("Unknown item")
+			queued[a.item_id] = int(queued.get(a.item_id, 0)) + 1
+			if int(queued[a.item_id]) > c.items.get(a.item_id, 0) - c.items_used.get(a.item_id, 0):
+				return _fail("You do not have enough of that item")
+		elif sk == null or not c.skills.has(a.skill_id) or a.skill_id.begins_with("item:"):
 			return _fail("Unknown skill")
 		var cost := 0
 		match sk.kind:
