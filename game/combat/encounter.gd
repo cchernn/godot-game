@@ -54,7 +54,8 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 		if i < builds.size() and builds[i] is Dictionary:
 			var raw: Variant = (builds[i] as Dictionary).get("allocated", {})
 			made = CharacterBuild.compose(tpl, int((builds[i] as Dictionary).get("level", 1)),
-				raw as Dictionary if raw is Dictionary else {}, cfg)
+				raw as Dictionary if raw is Dictionary else {}, cfg, _list((builds[i] as Dictionary).get("learned_skills", [])),
+				_list((builds[i] as Dictionary).get("flags", [])))
 		battle.add_combatant(tpl.make_combatant("pc%d" % i, Enums.Team.PLAYERS, Enums.Facing.EAST,
 			_spawn(map.player_spawns, i, "player seat P%d" % i), cfg, made))
 	for i in def.enemies.size():
@@ -62,6 +63,10 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 			_spawn(map.enemy_spawns, i, "enemy spot E%d" % i), cfg))
 	battle.start()
 	return battle
+
+
+static func _list(v: Variant) -> Array:
+	return v as Array if v is Array else []
 
 
 static func _spawn(spawns: Array[Vector2i], index: int, what: String) -> Vector2i:

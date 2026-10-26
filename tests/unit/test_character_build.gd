@@ -88,3 +88,107 @@ func test_template_problems_for_progression_fields() -> void:
 	t.growth.might = 0
 	t.point_value = null
 	assert_true(str(t.problems(known)).contains("point value"))
+
+
+# ---------- skill unlocks (fixture unlocks only; the shipped classes have none) ----------
+
+func _unlock(skill_id: String, mode: int, conds: Array[UnlockCondition]) -> SkillUnlock:
+	var u := SkillUnlock.new()
+	u.skill = load("res://game/content/skills/%s.tres" % skill_id) as SkillDef
+	u.mode = mode as SkillUnlock.Mode
+	u.conditions = conds
+	return u
+
+
+func _level(n: int) -> LevelCondition:
+	var c := LevelCondition.new()
+	c.min_level = n
+	return c
+
+
+func _attr(name: String, n: int) -> AttributeCondition:
+	var c := AttributeCondition.new()
+	c.attribute = name
+	c.min_value = n
+	return c
+
+
+func _event(flag: String) -> EventCondition:
+	var c := EventCondition.new()
+	c.flag = flag
+	return c
+
+
+## Warrior (starts without bolt): bolt granted at level 3, revive granted by attribute (might 6) and the event, and two picks.
+func _caster() -> UnitTemplate:
+	var t := _tpl()
+	var g: Array[UnlockCondition] = [_level(3)]
+	var a: Array[UnlockCondition] = [_attr("might", 6), _event("met_hermit")]
+	var p1: Array[UnlockCondition] = [_level(2)]
+	var p2: Array[UnlockCondition] = [_level(4)]
+	t.unlocks = [_unlock("bolt", SkillUnlock.Mode.GRANTED, g), _unlock("revive", SkillUnlock.Mode.GRANTED, a),
+		_unlock("disrupt", SkillUnlock.Mode.PICK, p1), _unlock("power_strike", SkillUnlock.Mode.PICK, p2)]
+	t.skills = t.skills.filter(func(s: SkillDef) -> bool: return s.id in ["move", "strike"])
+	t.skill_picks_per_level = 1
+	return t
+
+
+func test_disabled_keeps_the_starting_skills_only() -> void:
+	var b := CharacterBuild.compose(_caster(), 9, {}, _cfg(false), ["disrupt"], ["met_hermit"])
+	assert_eq(b["skills"], ["move", "strike"] as Array[String])
+	assert_eq(b["picks_left"], 0)
+
+
+func test_granted_unlocks_follow_level_attribute_and_event() -> void:
+	var cfg := _cfg(true)
+	assert_eq(CharacterBuild.compose(_caster(), 1, {}, cfg)["skills"], ["move", "strike"] as Array[String])
+	assert_eq(CharacterBuild.compose(_caster(), 3, {}, cfg)["skills"], ["move", "strike", "bolt"] as Array[String])
+	var might_only := CharacterBuild.compose(_caster(), 3, {"might": 4}, cfg)  # might 3 + 4 growth... = 3 + 2 + 4
+	assert_true(not ("revive" in might_only["skills"]), "attribute alone is not enough: needs the event too")
+	var both := CharacterBuild.compose(_caster(), 3, {"might": 1}, cfg, [], ["met_hermit"])
+	assert_true("revive" in both["skills"], "might 3 + 2 growth + 1 point = 6 and the flag")
+	var event_only := CharacterBuild.compose(_caster(), 3, {}, cfg, [], ["met_hermit"])
+	assert_true(not ("revive" in event_only["skills"]), "might 5 is below 6")
+
+
+func test_picks_cost_one_each_and_must_be_available() -> void:
+	var cfg := _cfg(true)
+	var l2 := CharacterBuild.compose(_caster(), 2, {}, cfg)
+	assert_eq(l2["pickable"], ["disrupt"] as Array[String])
+	assert_eq(l2["picks_left"], 1)
+	var taken := CharacterBuild.compose(_caster(), 2, {}, cfg, ["disrupt"])
+	assert_eq(taken["skills"], ["move", "strike", "disrupt"] as Array[String])
+	assert_eq(taken["picks_left"], 0)
+	assert_eq(taken["pickable"], [] as Array[String], "learned skills are no longer on offer")
+	var greedy := CharacterBuild.compose(_caster(), 2, {}, cfg, ["power_strike", "disrupt", "bolt", 7, "disrupt"])
+	assert_eq(greedy["skills"], ["move", "strike", "disrupt"] as Array[String], "not yet available / granted / junk / duplicate: dropped; budget of 1")
+	var l4 := CharacterBuild.compose(_caster(), 4, {}, cfg, ["power_strike", "disrupt"])
+	assert_eq(l4["learned"], ["power_strike", "disrupt"] as Array[String], "3 picks available, both fit")
+
+
+func test_battle_uses_the_composed_skills() -> void:
+	var cfg := _cfg(true)
+	var def := Encounter.definition().duplicate() as EncounterDef
+	var tpls: Array[UnitTemplate] = [_caster()]
+	tpls.append_array(def.classes.slice(1))
+	def.classes = tpls
+	var b := Encounter.build(cfg, SkillDb.load_file(), 2, 1, [], def, [{"level": 3, "learned_skills": ["disrupt"], "flags": []}])
+	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "bolt", "disrupt"] as Array[String])
+	assert_true(b.state.get_c("pc1").skills.size() > 0, "a seat with no build keeps the class's skills")
+
+
+func test_unlock_problems_are_reported() -> void:
+	var known := SkillDb.load_file()
+	var t := _caster()
+	assert_eq(t.problems(known), [] as Array[String])
+	t.unlocks[0].conditions = [] as Array[UnlockCondition]
+	assert_true(str(t.problems(known)).contains("no conditions"))
+	t = _caster()
+	t.unlocks[1].conditions = [_event("Bad Flag")] as Array[UnlockCondition]
+	assert_true(str(t.problems(known)).contains("flag"))
+	t = _caster()
+	t.unlocks.append(_unlock("move", SkillUnlock.Mode.GRANTED, [_level(2)] as Array[UnlockCondition]))
+	assert_true(str(t.problems(known)).contains("twice"))
+	t = _caster()
+	t.unlocks = [t.unlocks[0], t.unlocks[1]]
+	assert_true(str(t.problems(known)).contains("no Pick unlock"))

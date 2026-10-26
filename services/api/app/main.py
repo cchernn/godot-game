@@ -100,6 +100,18 @@ class AllocationIn(BaseModel):
         return {k: n for k, n in v.items() if n > 0}
 
 
+NAME = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
+
+
+class LearnedSkillsIn(BaseModel):
+    learned: list[Annotated[str, NAME]] = Field(max_length=64)
+
+
+class FlagsIn(BaseModel):
+    add: list[Annotated[str, NAME]] = Field(default_factory=list, max_length=64)
+    remove: list[Annotated[str, NAME]] = Field(default_factory=list, max_length=64)
+
+
 class CombatResultIn(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=128)
     world_id: uuid.UUID
@@ -280,6 +292,16 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def set_allocation(character_id: uuid.UUID, body: AllocationIn, r: Repository = Depends(repo)) -> dict:
         """Dev/admin: sets the points a character has put into its attributes. Players cannot allocate yet."""
         return r.set_allocation(character_id, body.allocated)
+
+    @app.put("/internal/characters/{character_id}/learned-skills", dependencies=[Depends(server_only)])
+    def set_learned_skills(character_id: uuid.UUID, body: LearnedSkillsIn, r: Repository = Depends(repo)) -> dict:
+        """Dev/admin: sets the skills a character picked. Players cannot pick yet."""
+        return r.set_learned_skills(character_id, list(dict.fromkeys(body.learned)))
+
+    @app.post("/internal/characters/{character_id}/flags", dependencies=[Depends(server_only)])
+    def change_flags(character_id: uuid.UUID, body: FlagsIn, r: Repository = Depends(repo)) -> dict:
+        """Dev/admin: sets and clears a character's event flags (what unlocks some skills)."""
+        return r.change_flags(character_id, body.add, body.remove)
 
     # ---- membership ----
 

@@ -121,7 +121,7 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 
 ## Stats (Inspector)
 Every class and enemy is a `UnitTemplate` resource. Double-click one in the FileSystem dock (e.g. `stats/classes/warrior.tres`) and edit
-the **Attributes** group: vitality (max HP), might (added to damage and healing), dexterity (AP and accuracy), agility (tiles moved per AP and evasion), the **Progression** group (growth per level, point value, points per level, cap per attribute; all unused while `progression.enabled` is false in `balance.json`) and the **Skills** list. How attributes become battle numbers is `balance.json` "stats". Armor is not a class stat: it will come from gear
+the **Attributes** group: vitality (max HP), might (added to damage and healing), dexterity (AP and accuracy), agility (tiles moved per AP and evasion), the **Progression** group (growth per level, point value, points per level, cap per attribute; all unused while `progression.enabled` is false in `balance.json`) and the **Skills** list (starting skills) with **Unlocks** (a skill, its conditions, and Granted or Pick mode; add LevelCondition, AttributeCondition or EventCondition to the conditions; all conditions must be met) and skill picks per level, also unused while progression is off. How attributes become battle numbers is `balance.json` "stats". Armor is not a class stat: it will come from gear
 (pick skill resources from `game/content/skills`). Each field has a tooltip. All values
 are provisional. Godot only writes non-default values into the file, so a stat at its default (e.g. 0) will not appear in the text, but it is
 there in the Inspector.

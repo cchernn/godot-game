@@ -61,16 +61,26 @@ func show_character(c: Dictionary) -> void:
 	var t := load(path) as UnitTemplate if ResourceLoader.exists(path) else null
 	if t == null:
 		return
-	var build := CharacterBuild.compose(t, int(c.get("level", 1)), (c.get("allocated", {}) if c.get("allocated", {}) is Dictionary else {}) as Dictionary, GameConfig.load_file())
+	var cfg := GameConfig.load_file()
+	var allocated: Variant = c.get("allocated", {})
+	var learned: Variant = c.get("learned_skills", [])
+	var flags: Variant = c.get("flags", [])
+	var build := CharacterBuild.compose(t, int(c.get("level", 1)), allocated as Dictionary if allocated is Dictionary else {}, cfg,
+		learned as Array if learned is Array else [], flags as Array if flags is Array else [])
 	var at: Dictionary = build["attributes"]
 	var st: Dictionary = build["stats"]
 	_stats.text = "Might %d   Dexterity %d   Agility %d   Vitality %d\nHP %d   Damage +%d   Accuracy %d   Evasion %d   AP %d" \
 		% [at["might"], at["dexterity"], at["agility"], at["vitality"], st["max_hp"], st["power"], st["accuracy"], st["evasion"],
-		GameConfig.load_file().ap_capacity(st["dexterity"])]
+		cfg.ap_capacity(st["dexterity"])]
 	if int(build["points_left"]) > 0:
 		_stats.text += "\n%d points to spend" % build["points_left"]
-	for sk in t.skills:
-		_skills.add_item("%s - %s" % [sk.display_name, sk.hint] if sk.hint != "" else sk.display_name)
+	if int(build["picks_left"]) > 0 and not (build["pickable"] as Array).is_empty():
+		_stats.text += "\n%d skill picks to spend" % build["picks_left"]
+	var db := SkillDb.load_file()
+	for sid: String in build["skills"]:
+		var sk := db.get_skill(sid)
+		if sk != null:
+			_skills.add_item("%s - %s" % [sk.display_name, sk.hint] if sk.hint != "" else sk.display_name)
 
 
 ## battles: the API's /characters/me/battles rows, newest first.

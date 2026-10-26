@@ -22,8 +22,12 @@ static func level_for_xp(cfg: GameConfig, xp: int) -> int:
 
 
 ## {attributes: {name: int}, stats: {max_hp, power, accuracy, evasion, dexterity, agility}, points_left: int,
-## allocated: {name: int} (what was accepted)}.
-static func compose(tpl: UnitTemplate, level: int, allocated: Dictionary, cfg: GameConfig) -> Dictionary:
+## allocated: {name: int} (what was accepted), skills: Array[String] (ids, in order: starting, granted, picked),
+## picks_left: int, pickable: Array[String] (Pick unlocks whose conditions are met, not yet learned),
+## learned: Array[String] (the picks that were accepted)}.
+## `learned` = skill ids the character picked, `flags` = event flags it has.
+static func compose(tpl: UnitTemplate, level: int, allocated: Dictionary, cfg: GameConfig,
+		learned: Array = [], flags: Array = []) -> Dictionary:
 	var attrs := tpl.base_attributes().to_dict()
 	var accepted := {}
 	var points_left := 0
@@ -47,7 +51,37 @@ static func compose(tpl: UnitTemplate, level: int, allocated: Dictionary, cfg: G
 				accepted[a] = asked
 				budget -= asked
 		points_left = budget
-	return {"attributes": attrs, "stats": battle_stats(attrs, cfg), "points_left": points_left, "allocated": accepted}
+	var out := {"attributes": attrs, "stats": battle_stats(attrs, cfg), "points_left": points_left, "allocated": accepted}
+	out.merge(_skills(tpl, level, attrs, learned, flags, cfg))
+	return out
+
+
+static func _skills(tpl: UnitTemplate, level: int, attrs: Dictionary, learned: Array, flags: Array, cfg: GameConfig) -> Dictionary:
+	var ids: Array[String] = []
+	for sk in tpl.skills:
+		ids.append(sk.id)
+	var pickable: Array[String] = []
+	var taken: Array[String] = []
+	var picks_left := 0
+	if progression_enabled(cfg):
+		var ctx := {"level": maxi(1, level), "attributes": attrs, "flags": flags.filter(func(f: Variant) -> bool: return f is String)}
+		var by_id := {}
+		for u in tpl.unlocks:
+			if u == null or u.skill == null or u.skill.id in ids or not u.is_met(ctx):
+				continue
+			if u.mode == SkillUnlock.Mode.GRANTED:
+				ids.append(u.skill.id)
+			else:
+				by_id[u.skill.id] = true
+				pickable.append(u.skill.id)
+		picks_left = tpl.skill_picks_per_level * (maxi(1, level) - 1)
+		for want: Variant in learned:
+			if picks_left > 0 and want is String and by_id.has(want) and not want in taken:
+				taken.append(want)
+				picks_left -= 1
+		ids.append_array(taken)
+		pickable = pickable.filter(func(s: String) -> bool: return not s in taken)
+	return {"skills": ids, "picks_left": picks_left, "pickable": pickable, "learned": taken}
 
 
 ## The battle numbers for a set of attributes. Armor is not here: it comes from gear (later).

@@ -33,9 +33,13 @@ extends Resource
 @export_range(0, 99) var max_points_per_stat: int = 0
 
 @export_group("Skills")
-## The skills this unit can use. Pick skill resources from game/content/skills (move, strike, power_strike, bolt,
+## The skills this unit starts with. Pick skill resources from game/content/skills (move, strike, power_strike, bolt,
 ## disrupt, revive, or your own). A skill must also be listed in skills/skill_set.tres.
 @export var skills: Array[SkillDef] = []
+## Skills gained later, and what it takes (level, attribute, event). Only used when config "progression.enabled" is true.
+@export var unlocks: Array[SkillUnlock] = []
+## Skill picks earned at each level above 1 (spent on unlocks whose mode is Pick).
+@export_range(0, 20) var skill_picks_per_level: int = 0
 
 
 ## What is wrong with this template, if anything (empty = fine). `known` is the SkillDb.
@@ -59,6 +63,18 @@ func problems(known: SkillDb) -> Array[String]:
 			out.append("%s: a skill slot is empty" % id)
 		elif known.get_skill(sk.id) == null:
 			out.append("%s: skill '%s' is not in the skill set" % [id, sk.id])
+	var unlocked := {}
+	for u in unlocks:
+		if u == null:
+			out.append("%s: an unlock slot is empty" % id)
+			continue
+		out.append_array(u.problems(known, id))
+		if u.skill != null:
+			if unlocked.has(u.skill.id) or u.skill in skills:
+				out.append("%s: skill '%s' is listed twice (starting skills and unlocks)" % [id, u.skill.id])
+			unlocked[u.skill.id] = true
+	if skill_picks_per_level > 0 and not unlocks.any(func(u: SkillUnlock) -> bool: return u != null and u.mode == SkillUnlock.Mode.PICK):
+		out.append("%s: earns skill picks but has no Pick unlock" % id)
 	return out
 
 
@@ -91,6 +107,9 @@ func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i
 	c.power = st["power"]
 	c.accuracy = st["accuracy"]
 	c.evasion = st["evasion"]
-	for sk in skills:
-		c.skills.append(sk.id)
+	if build.has("skills"):
+		c.skills.assign(build["skills"])
+	else:
+		for sk in skills:
+			c.skills.append(sk.id)
 	return c

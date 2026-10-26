@@ -143,6 +143,27 @@ class Repository(PartyMixin, WorldMixin):
                 raise NotFound("Character not found")
         return {"character_id": str(row["id"]), "allocated": row["allocated"]}
 
+    def set_learned_skills(self, character_id: uuid.UUID, learned: list[str]) -> dict:
+        """Dev/admin: replaces the skills a character picked. Only the shape is checked; the game server keeps the ones the
+        class's unlock rules and skill picks allow."""
+        with self.pool.connection() as conn:
+            row = conn.execute("update characters set learned_skills=%s where id=%s and status='active' returning id, learned_skills",
+                               (Jsonb(learned), character_id)).fetchone()
+            if row is None:
+                raise NotFound("Character not found")
+        return {"character_id": str(row["id"]), "learned_skills": row["learned_skills"]}
+
+    def change_flags(self, character_id: uuid.UUID, add: list[str], remove: list[str]) -> dict:
+        """Dev/admin (later: the game, on story events): sets and clears event flags on a character. Idempotent."""
+        with self.pool.connection() as conn:
+            row = conn.execute("select flags from characters where id=%s and status='active' for update", (character_id,)).fetchone()
+            if row is None:
+                raise NotFound("Character not found")
+            flags = [f for f in row["flags"] if f not in remove]
+            flags += [f for f in dict.fromkeys(add) if f not in flags]
+            conn.execute("update characters set flags=%s where id=%s", (Jsonb(flags), character_id))
+        return {"character_id": str(character_id), "flags": flags}
+
     def retire_character(self, character_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         with self.pool.connection() as conn:
             r = conn.execute("select * from characters where id=%s for update", (character_id,)).fetchone()
