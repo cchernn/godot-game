@@ -42,6 +42,9 @@ Unit stats and skills are `.tres` resources under `game/content/` and are all pr
 - **One login per account:** a login holds the account for 30 seconds after its last API call or heartbeat (`GAME_API_SESSION_SECONDS`); another login is refused (HTTP 423,
   "signed in on another device") until then, or until the holder signs out. Nothing takes a live login over. A closed tab frees the account after the window.
 - **Shield (Phase 1):** lasts until the end of the round, does not stack, armor applies before it; Defend gives a shield of 4 (`game/content/skills/defend.tres`). Heals and shields never miss. Defend is on every class for now.
+- **Statuses (Phase 2):** durations count turns; a status applied mid-turn counts the rest of that turn as its first turn; each-turn effects run at the start of a turn
+  (so a status applied mid-turn first ticks next turn), once per stack; stat changes apply at once, but AP capacity only refreshes at the start of the next round;
+  a stunned unit loses the rest of its queue and cannot react; an Apply Status after a damage effect only lands if the damage connected. No statuses ship yet.
 - **Party joining:** only a lone character, only at the party's node, only while the party is idle; the leader decides.
 - **Classes** (`services/api/app/rules.py`) and their client mirror are placeholders.
 - **Simultaneous wipe** is a draw.

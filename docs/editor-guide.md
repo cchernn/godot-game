@@ -153,12 +153,26 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
   - **Heal:** HP restored, never above the maximum. Does nothing to a downed unit (use a revive skill).
   - **Shield:** points that absorb damage after armor and before HP, until the end of the round. They do not stack: a new shield only replaces a lower one.
   - **Interrupt:** points against the skill the target is in the middle of. Only lands if the damage in the same stage connected.
+  - **Apply Status:** puts a status (a `StatusDef`, see below) on its target. Optional *duration turns* overrides the status's own. After a damage effect it only lands if the damage connected.
+  - **Remove Status:** a cleanse. *Mode*: one named status, all buffs, all debuffs, or everything.
   A skill that does two things (an attack that also shields its user) is just two effects, the second one *On = Caster*.
 - **Reaction:** range, duration and interrupt. Only shown when the kind is *reaction*.
 - **A new skill needs no code:** create a `SkillDef` resource (right-click `skills` > New Resource > SkillDef), save it as `<id>.tres`, set the
   fields, add it to `skill_set.tres`, and add it to a unit's **Skills** list. The skill button, planning and AI pick it up from the data. A new
   *kind* of skill or a new *effect type* is new game logic and is code.
 - Edits need `scripts/stack.sh up game web` to reach the running game (the server resolves skills; the web client lists them).
+
+## Statuses (Inspector)
+A status is a timed condition on a unit: a buff, a debuff, bleeding, a stun. Each is a `StatusDef` resource in `game/content/statuses/` (make the folder when you add the
+first one: right-click > New Resource > StatusDef, save as `<id>.tres`). No statuses ship with the framework yet. To use one, add an **Apply Status** effect to a
+skill stage and drag the status into its *Status* slot (no list to register it in). Fields:
+- **Id**, **display name**, **hint** (shown on hover), **glyph** and **color** (what the unit card shows for now; real icons come later), **kind** (buff, debuff, other: used by cleanses).
+- **Duration turns:** counted in turns (rounds), not beats. A status applied during a turn counts the rest of that turn as its first turn.
+- **Stacking:** *Refresh* restarts the timer; *Stack* adds a stack (up to *max stacks*) and restarts the timer; *Ignore* does nothing if it is already on.
+- **Stat changes (per stack):** armor, power, accuracy, evasion, dexterity. Dexterity also changes AP (from the next turn) and tiles per AP.
+- **Each turn:** a list of Damage, Heal or Shield effects run on the bearer once at the start of every turn, once per stack. Their hit and crit boxes must be off (statuses use no random numbers).
+- **Conditions:** *Stunned* (the bearer takes no actions and cannot react; not an interruption) and *Rooted* (cannot move).
+A downed or eliminated unit loses all statuses. A unit card lists its statuses with the turns left; hovering shows the hints.
 
 ## Things that are still code (for now)
 The global tuning in `config/balance.json` (hit chance, the AP table, rewards) is a JSON file, not an Inspector resource. Game rules,

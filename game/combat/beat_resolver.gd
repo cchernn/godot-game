@@ -15,7 +15,7 @@ func _init(battle: Battle) -> void:
 func run_beat() -> void:
 	var st := b.state
 	for c: Combatant in st.combatants.values():
-		if not c.reaction.is_empty() and b.beat > (c.reaction["expires_beat"] as int):
+		if not c.reaction.is_empty() and (b.beat > (c.reaction["expires_beat"] as int) or c.has_condition("stunned")):
 			c.reaction = {}
 	var ids: Array = st.combatants.keys()
 	ids.sort()
@@ -55,6 +55,9 @@ func _pending_speed(c: Combatant) -> int:
 
 
 func _step(c: Combatant) -> void:
+	if c.has_condition("stunned"):
+		_stunned(c)
+		return
 	if c.current == null:
 		while c.queue_index < c.plan.size():
 			var a := c.plan[c.queue_index]
@@ -77,12 +80,22 @@ func _step(c: Combatant) -> void:
 	_run_stage(c)
 
 
+## A stunned combatant loses its current skill and whatever is left of its queue.
+func _stunned(c: Combatant) -> void:
+	c.reaction = {}
+	if c.current != null or c.queue_index < c.plan.size():
+		b.emit("stunned", "{a} is stunned and cannot act.", c.id)
+		clear_queue(c)
+
+
 func _can_begin(c: Combatant, a: PlannedAction, sk: SkillDef) -> String:
 	if sk == null or not c.skills.has(a.skill_id):
 		return "unknown skill"
 	if sk.frequency == Enums.Frequency.ONCE_PER_TURN and c.skills_used.has(sk.id):
 		return "already used this round"
 	if sk.kind == Enums.SkillKind.MOVE:
+		if c.has_condition("rooted"):
+			return "rooted"
 		if a.path.is_empty() or not b.bf.can_step(c.cell, a.path[0], b.cfg.get_value("combat", "max_step_height")):
 			return "path no longer valid"
 		if b.state.at_cell(a.path[0]) != null:
@@ -158,7 +171,7 @@ func _run_stage(c: Combatant) -> void:
 
 
 func _move_step(c: Combatant, a: PlannedAction) -> void:
-	var tpa := b.cfg.tiles_per_ap(c.dexterity)
+	var tpa := b.cfg.tiles_per_ap(c.stat("dexterity"))
 	var sur: int = b.cfg.get_value("movement", "difficult_terrain_surcharge")
 	var max_step: int = b.cfg.get_value("combat", "max_step_height")
 	var moved := 0
@@ -166,7 +179,9 @@ func _move_step(c: Combatant, a: PlannedAction) -> void:
 		var nxt := a.path[c.move_index]
 		var cost := (1 if moved == 0 else 0) + (sur if b.bf.is_difficult(nxt) else 0)
 		var why := ""
-		if not b.bf.can_step(c.cell, nxt, max_step):
+		if c.has_condition("rooted"):
+			why = "rooted"
+		elif not b.bf.can_step(c.cell, nxt, max_step):
 			why = "terrain"
 		elif b.state.at_cell(nxt) != null:
 			why = "the way is blocked"
@@ -222,32 +237,37 @@ func _run_effects(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionar
 		aimed_at_someone = aimed_at_someone or not on_caster
 		match e["type"] as String:
 			"damage":
-				landed = _damage(c, sk, e, who)
+				landed = _damage(c, sk.display_name, e, who)
 			"heal":
-				_heal(c, sk, e, who)
+				_heal(c, sk.display_name, e, who)
 			"shield":
-				_shield(c, sk, e, who)
+				_shield(c, sk.display_name, e, who)
 			"interrupt":
 				if landed and who.life_state == Enums.LifeState.ALIVE:
 					_add_interrupt(who, e["points"] as int)
+			"apply_status":
+				if (on_caster or landed) and who.life_state == Enums.LifeState.ALIVE:
+					_apply_status(c, e, who)
+			"remove_status":
+				_remove_status(c, e, who)
 	if victim == null and sk.targeting == Enums.Targeting.TILE:
 		var hurts := effects.any(func(e: Dictionary) -> bool: return e["type"] == "damage")
 		b.emit("miss", "{a}'s %s %s." % [sk.display_name, "strikes empty ground" if hurts else "finds no one there"], c.id)
 
 
 ## Returns true when the damage connected (a miss returns false, so a following interrupt effect does not land).
-func _damage(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> bool:
+func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> bool:
 	if victim.life_state == Enums.LifeState.DOWNED:
-		b.emit("hit", "{a}'s %s finishes {t}." % sk.display_name, c.id, victim.id)
+		b.emit("hit", "{a}'s %s finishes {t}." % label, c.id, victim.id)
 		_defeat(victim)
 		return true
 	if not victim.is_present() or victim.life_state != Enums.LifeState.ALIVE:
 		return false
 	if e["can_miss"] as bool:
 		var per: float = b.cfg.get_value("combat", "accuracy_per_point")
-		var chance := clampf((b.cfg.get_value("combat", "base_hit_chance") as float) + (c.accuracy - victim.evasion) * per, 0.05, 1.0)
+		var chance := clampf((b.cfg.get_value("combat", "base_hit_chance") as float) + (c.stat("accuracy") - victim.stat("evasion")) * per, 0.05, 1.0)
 		if b.rng.randf() >= chance:
-			b.emit("miss", "{a}'s %s misses {t}." % sk.display_name, c.id, victim.id)
+			b.emit("miss", "{a}'s %s misses {t}." % label, c.id, victim.id)
 			return false
 	var mult := 1.0
 	var note := ""
@@ -265,35 +285,35 @@ func _damage(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> bo
 			note += " CRITICAL"
 	var raw: int = e["base"] as int
 	if e["uses_power"] as bool:
-		raw += c.power
-	var dmg := maxi(1, roundi(raw * mult) - victim.armor)
+		raw += c.stat("power")
+	var dmg := maxi(1, roundi(raw * mult) - victim.stat("armor"))
 	var absorbed := mini(victim.shield, dmg)
 	victim.shield -= absorbed
 	victim.hp = maxi(0, victim.hp - (dmg - absorbed))
 	if absorbed > 0:
 		note += " (%d absorbed by the shield)" % absorbed
-	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [sk.display_name, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed})
+	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [label, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed})
 	if victim.hp == 0:
 		_defeat(victim)
 		return false # nothing left to interrupt
 	return true
 
 
-func _heal(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> void:
+func _heal(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> void:
 	if victim.life_state != Enums.LifeState.ALIVE:
-		b.emit("no_effect", "{a}'s %s has no effect on {t}." % sk.display_name, c.id, victim.id)
+		b.emit("no_effect", "{a}'s %s has no effect on {t}." % label, c.id, victim.id)
 		return
 	var gained := mini(e["amount"] as int, victim.max_hp - victim.hp)
 	victim.hp += gained
-	b.emit("heal", "{a}'s %s heals {t} for %d." % [sk.display_name, gained], c.id, victim.id, {"amount": gained})
+	b.emit("heal", "{a}'s %s heals {t} for %d." % [label, gained], c.id, victim.id, {"amount": gained})
 
 
-func _shield(c: Combatant, sk: SkillDef, e: Dictionary, victim: Combatant) -> void:
+func _shield(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> void:
 	if victim.life_state != Enums.LifeState.ALIVE:
-		b.emit("no_effect", "{a}'s %s has no effect on {t}." % sk.display_name, c.id, victim.id)
+		b.emit("no_effect", "{a}'s %s has no effect on {t}." % label, c.id, victim.id)
 		return
 	victim.shield = maxi(victim.shield, e["amount"] as int) # does not stack: only a higher shield replaces it
-	b.emit("shield", "{a}'s %s shields {t} (%d)." % [sk.display_name, victim.shield], c.id, victim.id, {"amount": victim.shield})
+	b.emit("shield", "{a}'s %s shields {t} (%d)." % [label, victim.shield], c.id, victim.id, {"amount": victim.shield})
 
 
 ## 0 = front, 1 = side, 2 = rear.
@@ -318,6 +338,7 @@ func _revive(c: Combatant, a: PlannedAction) -> void:
 func _defeat(v: Combatant) -> void:
 	clear_queue(v)
 	v.shield = 0
+	v.statuses.clear()
 	if v.team == Enums.Team.ENEMIES or v.life_state == Enums.LifeState.DOWNED or v.revived_this_encounter:
 		v.life_state = Enums.LifeState.ELIMINATED
 		v.hp = 0
@@ -345,10 +366,93 @@ func _add_interrupt(v: Combatant, pts: int) -> void:
 		v.current = null # completed effects remain; the rest of this skill is cancelled
 
 
+# ---------- Statuses (counted in turns) ----------
+
+## Start of a turn's resolution: each status runs its each-turn effects on its bearer, in a fixed order.
+func run_turn_start() -> void:
+	var ids: Array = b.state.combatants.keys()
+	ids.sort()
+	for id: String in ids:
+		var c := b.state.get_c(id)
+		for s in c.statuses.duplicate():
+			if c.life_state != Enums.LifeState.ALIVE:
+				break
+			var d: Dictionary = s["def"]
+			for tick: Dictionary in d["ticks"]:
+				var times: int = s["stacks"] if tick["type"] != "shield" else 1
+				for i in times:
+					match tick["type"] as String:
+						"damage":
+							_damage(c, d["name"] as String, tick, c)
+						"heal":
+							_heal(c, d["name"] as String, tick, c)
+						"shield":
+							_shield(c, d["name"] as String, tick, c)
+					if c.life_state != Enums.LifeState.ALIVE:
+						break
+
+
+## End of a turn: every status loses a turn and the finished ones fade.
+func run_turn_end() -> void:
+	var ids: Array = b.state.combatants.keys()
+	ids.sort()
+	for id: String in ids:
+		var c := b.state.get_c(id)
+		for s in c.statuses.duplicate():
+			s["turns_left"] = (s["turns_left"] as int) - 1
+			if (s["turns_left"] as int) <= 0:
+				c.statuses.erase(s)
+				if c.is_present():
+					b.emit("status_end", "%s fades from {t}." % s["def"]["name"], "", c.id, {"status": s["id"]})
+
+
+func _apply_status(c: Combatant, e: Dictionary, who: Combatant) -> void:
+	var d: Dictionary = e["status"]
+	if d.is_empty():
+		return
+	var turns: int = e["duration"] if (e["duration"] as int) > 0 else d["duration"]
+	var cur := who.status_of(d["id"])
+	if cur.is_empty():
+		who.statuses.append({"id": d["id"], "def": d, "turns_left": turns, "stacks": 1})
+		b.emit("status_apply", "{t} is afflicted by %s (%d turn%s)." % [d["name"], turns, "" if turns == 1 else "s"],
+			c.id, who.id, {"status": d["id"]})
+		return
+	match d["stacking"] as int:
+		StatusDef.Stacking.IGNORE:
+			b.emit("no_effect", "%s is already on {t}." % d["name"], c.id, who.id)
+		StatusDef.Stacking.REFRESH:
+			cur["turns_left"] = maxi(cur["turns_left"] as int, turns)
+			b.emit("status_apply", "%s on {t} is renewed (%d turns)." % [d["name"], cur["turns_left"]], c.id, who.id, {"status": d["id"]})
+		StatusDef.Stacking.STACK:
+			cur["stacks"] = mini(cur["stacks"] as int + 1, d["max_stacks"] as int)
+			cur["turns_left"] = maxi(cur["turns_left"] as int, turns)
+			b.emit("status_apply", "%s on {t} grows to x%d (%d turns)." % [d["name"], cur["stacks"], cur["turns_left"]],
+				c.id, who.id, {"status": d["id"]})
+
+
+func _remove_status(c: Combatant, e: Dictionary, who: Combatant) -> void:
+	var mode: int = e["mode"]
+	var removed := 0
+	for s in who.statuses.duplicate():
+		var kind: int = s["def"]["kind"]
+		var hit := false
+		match mode:
+			RemoveStatusEffect.Mode.ONE: hit = s["id"] == e["status_id"]
+			RemoveStatusEffect.Mode.BUFFS: hit = kind == StatusDef.Kind.BUFF
+			RemoveStatusEffect.Mode.DEBUFFS: hit = kind == StatusDef.Kind.DEBUFF
+			RemoveStatusEffect.Mode.ALL: hit = true
+		if hit:
+			who.statuses.erase(s)
+			removed += 1
+			b.emit("status_end", "%s is removed from {t}." % s["def"]["name"], c.id, who.id, {"status": s["id"]})
+	if removed == 0:
+		b.emit("no_effect", "Nothing to remove from {t}.", c.id, who.id)
+
+
 func _check_reactions(actor: Combatant) -> void:
 	var reactors: Array[Combatant] = []
 	for r: Combatant in b.state.combatants.values():
-		if r.team != actor.team and r.is_active(b.state.round_number) and not r.reaction.is_empty():
+		if r.team != actor.team and r.is_active(b.state.round_number) and not r.reaction.is_empty() and not r.has_condition("stunned"):
 			reactors.append(r)
 	reactors.sort_custom(func(x: Combatant, y: Combatant) -> bool: return (_rank[x.id] as int) < (_rank[y.id] as int))
 	for r in reactors:

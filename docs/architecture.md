@@ -155,6 +155,13 @@ No rule distinguishes friend from foe: any skill can target any visible combatan
 skills follow the target and check range when they land; `TILE` skills hit whoever is on the tile then. `Combatant.shield` soaks damage after armor and before HP and is cleared when a round
 begins; the snapshot carries it. `SkillKind.SUPPORT` and `SkillDef.action_slot` (Attack, Move, Defend) place skills on the client's action bar.
 
+## Statuses (Phase 2)
+A `StatusDef` resource (stat changes, each-turn effects, `stunned`/`rooted`, duration in turns, stacking) is applied by `ApplyStatusEffect` and removed by `RemoveStatusEffect`.
+A combatant holds `statuses: [{id, def (the StatusDef as a dictionary), turns_left, stacks}]`, so a battle needs no status registry. Rules read armor, power, accuracy, evasion
+and dexterity through `Combatant.stat(name)`. `BeatResolver.run_turn_start()` (called by `Battle.begin_resolution`) runs each-turn effects; `run_turn_end()` (from `_end_round`)
+takes a turn off every status and removes the finished ones. Stun clears the bearer's current skill and queue when its next step comes up; rooted blocks move steps. `_defeat` and
+escape clear statuses. The snapshot carries `statuses` (name, hint, glyph, colour, turns, stacks) and `stunned`/`rooted` for every visible unit. Statuses never touch the battle RNG.
+
 ## Skills as resources
 Each skill is a `SkillDef` resource (`game/content/skills`, with `SkillStage` sub-resources) listed in `skill_set.tres`; units reference the resources directly.
 `SkillDef` still exposes `stages` (array of dictionaries), `reaction` and `total_ap()`, so the battle rules did not change. `SkillDb.load_file()` returns deep copies

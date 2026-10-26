@@ -11,6 +11,7 @@ const DOWN_COLOR := Color(1.0, 0.5, 0.45)
 @onready var _bar: ProgressBar = %HpBar
 @onready var _hp: Label = %HpLabel
 @onready var _status: Label = %StatusLabel
+@onready var _effects: RichTextLabel = %EffectsLabel
 
 
 ## u: a unit from the snapshot. phase: the Enums.RoundPhase. is_you marks the player's own card.
@@ -40,3 +41,17 @@ func show_unit(u: Dictionary, phase: int, is_you: bool) -> void:
 		color = READY_COLOR if u["ready"] else WAITING_COLOR
 	_status.text = " - ".join(parts)
 	_status.modulate = color
+	_show_statuses(u.get("statuses", []))
+
+
+## One coloured glyph and name per status with the turns left; hovering shows what each does.
+func _show_statuses(list: Array) -> void:
+	_effects.visible = not list.is_empty()
+	var text := ""
+	var tips: Array[String] = []
+	for s: Dictionary in list:
+		var stacks := " x%d" % s["stacks"] if int(s["stacks"]) > 1 else ""
+		text += "[color=#%s]%s %s%s %d[/color]  " % [s["color"], s["glyph"], s["name"], stacks, s["turns"]]
+		tips.append("%s (%d turn%s left)%s" % [s["name"], s["turns"], "" if int(s["turns"]) == 1 else "s", ": " + str(s["hint"]) if str(s["hint"]) != "" else ""])
+	_effects.text = text
+	_effects.tooltip_text = "\n".join(tips)

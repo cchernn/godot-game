@@ -19,6 +19,8 @@ var armor: int = 0
 var accuracy: int = 0
 var evasion: int = 0
 var skills: Array[String] = []
+## Active statuses: {id, def (StatusDef.to_dict()), turns_left, stacks}. Counted in turns, cleared when the combatant is defeated.
+var statuses: Array[Dictionary] = []
 
 var life_state: int = Enums.LifeState.ALIVE
 ## Only one revival per encounter.
@@ -55,3 +57,27 @@ func is_active(round_number: int) -> bool:
 
 func is_present() -> bool:
 	return life_state != Enums.LifeState.ELIMINATED and life_state != Enums.LifeState.ESCAPED
+
+
+## Armor, power, accuracy, evasion or dexterity including the changes from statuses (always use this in the rules, not the raw field).
+func stat(stat_name: String) -> int:
+	var v: int = get(stat_name)
+	for s in statuses:
+		v += ((s["def"]["mods"] as Dictionary).get(stat_name, 0) as int) * (s["stacks"] as int)
+	return maxi(1, v) if stat_name == "dexterity" else v
+
+
+## True when any status carries the condition ("stunned" or "rooted").
+func has_condition(condition: String) -> bool:
+	for s in statuses:
+		if s["def"].get(condition, false):
+			return true
+	return false
+
+
+## The active status with this id, or an empty dictionary.
+func status_of(status_id: String) -> Dictionary:
+	for s in statuses:
+		if s["id"] == status_id:
+			return s
+	return {}

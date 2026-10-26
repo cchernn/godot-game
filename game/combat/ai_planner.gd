@@ -10,7 +10,7 @@ func plan_for(battle: Battle, c: Combatant) -> Array[PlannedAction]:
 	var bf := battle.bf
 	var w: Dictionary = cfg.data["ai"]["weights"]
 	var max_step: int = cfg.get_value("combat", "max_step_height")
-	var tpa := cfg.tiles_per_ap(c.dexterity)
+	var tpa := cfg.tiles_per_ap(c.stat("dexterity"))
 	var sur: int = cfg.get_value("movement", "difficult_terrain_surcharge")
 
 	var targets: Array[Combatant] = []
@@ -60,7 +60,7 @@ func plan_for(battle: Battle, c: Combatant) -> Array[PlannedAction]:
 				continue
 			var dmg := 0.0
 			for st in sk.stages:
-				dmg += float((st.get("damage", 0) as int) + c.power)
+				dmg += float((st.get("damage", 0) as int) + c.stat("power"))
 			dmg *= cfg.get_value("combat", "base_hit_chance") as float
 			var score: float = (w["damage"] as float) * dmg
 			if t.life_state == Enums.LifeState.DOWNED or dmg >= t.hp:

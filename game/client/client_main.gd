@@ -239,6 +239,8 @@ func _on_events(list: Array) -> void:
 			"interrupt", "reaction", "reaction_ready": col = "#ffcf5a"
 			"revived", "heal": col = "#7be08a"
 			"shield": col = "#7fd6ff"
+			"status_apply", "stunned": col = "#d9a0ff"
+			"status_end": col = "#9a9a9a"
 			"round_start", "resolution_start": col = "#7fb2ff"
 			"victory": col = "#ffffff"
 		if "unseen" in String(e["text"]):
@@ -249,7 +251,7 @@ func _on_events(list: Array) -> void:
 ## One line summing up the round that just resolved, from the event types seen since the last recap.
 func _append_recap() -> void:
 	var parts: Array[String] = []
-	for t: String in ["hit", "miss", "downed", "eliminated", "revived", "heal", "shield", "interrupt"]:
+	for t: String in ["hit", "miss", "downed", "eliminated", "revived", "heal", "shield", "interrupt", "stunned"]:
 		var n: int = _round_tally.get(t, 0)
 		if n > 0:
 			parts.append("%d %s" % [n, t])

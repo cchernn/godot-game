@@ -48,7 +48,7 @@ func _begin_planning() -> void:
 	state.phase = Enums.RoundPhase.PLANNING
 	beat = 0
 	for c: Combatant in state.combatants.values():
-		c.ap_capacity = cfg.ap_capacity(c.dexterity)
+		c.ap_capacity = cfg.ap_capacity(c.stat("dexterity"))
 		c.ap_reserved = 0
 		c.ap_spent = 0
 		c.ap_forfeited = 0
@@ -156,6 +156,7 @@ func begin_resolution() -> void:
 	state.phase = Enums.RoundPhase.RESOLVING
 	beat = 0
 	emit("resolution_start", "All plans are committed. Resolving.")
+	_resolver.run_turn_start()
 
 
 ## Resolves one beat; moves on to the next planning phase after the last one.
@@ -211,12 +212,14 @@ func _do_escape(c: Combatant) -> void:
 	c.ap_reserved = 0
 	c.current = null
 	c.reaction = {}
+	c.statuses.clear()
 	emit("escape", "{a} escapes!", c.id, "", {}, true)
 
 
 func _end_round() -> void:
 	for c: Combatant in state.combatants.values():
 		_resolver.forfeit_all(c) # unused reservations expire; AP never carries over
+	_resolver.run_turn_end()
 	state.round_number += 1
 	_begin_planning()
 
@@ -309,15 +312,16 @@ func snapshot_for(cid: String) -> Dictionary:
 			continue
 		var u := {"id": c.id, "name": c.display_name, "visual": c.visual, "team": c.team, "cell": c.cell, "facing": c.facing,
 			"hp": c.hp, "max_hp": c.max_hp, "shield": c.shield, "life": c.life_state, "ready": c.ready,
-			"active": c.is_active(state.round_number), "revived": c.revived_this_encounter}
+			"active": c.is_active(state.round_number), "revived": c.revived_this_encounter,
+			"statuses": _status_view(c), "stunned": c.has_condition("stunned"), "rooted": c.has_condition("rooted")}
 		if own:
 			u["skills"] = c.skills
 			u["ap_capacity"] = c.ap_capacity
 			u["ap_reserved"] = c.ap_reserved
 			u["ap_spent"] = c.ap_spent
 			u["ap_forfeited"] = c.ap_forfeited
-			u["dexterity"] = c.dexterity
-			u["tiles_per_ap"] = cfg.tiles_per_ap(c.dexterity)
+			u["dexterity"] = c.stat("dexterity")
+			u["tiles_per_ap"] = cfg.tiles_per_ap(c.stat("dexterity"))
 			u["reaction"] = not c.reaction.is_empty()
 			u["escaping"] = c.escape_pending
 		elif me != null and c.team == me.team:  # allies see each other's AP, never each other's plans
@@ -334,6 +338,16 @@ func snapshot_for(cid: String) -> Dictionary:
 		"beats_per_round": beats_per_round, "outcome": outcome, "you": cid, "eliminated": eliminated, "escaped": escaped,
 		"map": {"id": map_id, "w": bf.width, "h": bf.height, "terrain": Array(bf.terrain), "elev": Array(bf.elevation)},
 		"units": units, "plan": plan}
+
+
+## What a client may know about a unit's statuses (everyone sees them on units they can see).
+func _status_view(c: Combatant) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for s in c.statuses:
+		var d: Dictionary = s["def"]
+		out.append({"id": s["id"], "name": d["name"], "hint": d["hint"], "glyph": d["glyph"], "color": d["color"],
+			"kind": d["kind"], "turns": s["turns_left"], "stacks": s["stacks"]})
+	return out
 
 
 func _err(msg: String) -> Dictionary:

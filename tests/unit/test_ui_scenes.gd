@@ -871,3 +871,20 @@ func test_a_unit_card_shows_its_shield() -> void:
 	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
 	assert_true(not "shield" in (card.get_node("%HpLabel") as Label).text)
 	card.free()
+
+
+func test_a_unit_card_lists_statuses_with_turns() -> void:
+	var card := (load("res://game/content/ui/unit_card.tscn") as PackedScene).instantiate() as UnitCard
+	(Engine.get_main_loop() as SceneTree).root.add_child(card)
+	var u := {"id": "a", "name": "A", "visual": "warrior", "team": Enums.Team.PLAYERS, "hp": 10, "max_hp": 20,
+		"life": Enums.LifeState.ALIVE, "active": true, "ready": false,
+		"statuses": [{"id": "bleed", "name": "Bleed", "hint": "loses HP", "glyph": "B", "color": "ff0000", "kind": 1, "turns": 2, "stacks": 2}]}
+	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
+	var fx := card.get_node("%EffectsLabel") as RichTextLabel
+	assert_true(fx.visible)
+	assert_true("Bleed x2 2" in fx.text)
+	assert_true("loses HP" in fx.tooltip_text)
+	u["statuses"] = []
+	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
+	assert_true(not fx.visible)
+	card.free()
