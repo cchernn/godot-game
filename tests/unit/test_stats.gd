@@ -1,13 +1,14 @@
 extends TestCase
 
 ## The numbers as they were typed into encounter.gd before they became resources.
+## Attributes and the battle numbers they give with the provisional config (armor is gear-only, so always 0).
 const ORIGINAL := {
-	"warrior": {"name": "Warrior", "hp": 40, "dex": 8, "power": 3, "armor": 2, "acc": 0, "eva": 0, "skills": ["move", "strike", "power_strike", "disrupt", "defend"]},
-	"ranger": {"name": "Ranger", "hp": 28, "dex": 12, "power": 1, "armor": 0, "acc": 2, "eva": 1, "skills": ["move", "strike", "bolt", "disrupt", "defend"]},
-	"cleric": {"name": "Cleric", "hp": 30, "dex": 10, "power": 1, "armor": 1, "acc": 0, "eva": 0, "skills": ["move", "strike", "bolt", "revive", "defend"]},
-	"rogue": {"name": "Rogue", "hp": 26, "dex": 16, "power": 2, "armor": 0, "acc": 3, "eva": 3, "skills": ["move", "strike", "bolt", "defend"]},
-	"ghoul": {"name": "Ghoul", "hp": 30, "dex": 8, "power": 2, "armor": 1, "acc": 0, "eva": 0, "skills": ["move", "strike", "power_strike"]},
-	"cultist": {"name": "Cultist", "hp": 20, "dex": 10, "power": 1, "armor": 0, "acc": 1, "eva": 0, "skills": ["move", "bolt", "strike"]},
+	"warrior": {"name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15, "hp": 40, "power": 3, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike", "disrupt", "defend"]},
+	"ranger": {"name": "Ranger", "might": 1, "dex": 12, "agi": 12, "vit": 9, "hp": 28, "power": 1, "acc": 2, "eva": 1, "skills": ["move", "strike", "bolt", "disrupt", "defend"]},
+	"cleric": {"name": "Cleric", "might": 1, "dex": 10, "agi": 10, "vit": 10, "hp": 30, "power": 1, "acc": 1, "eva": 0, "skills": ["move", "strike", "bolt", "revive", "defend"]},
+	"rogue": {"name": "Rogue", "might": 2, "dex": 16, "agi": 16, "vit": 8, "hp": 26, "power": 2, "acc": 4, "eva": 3, "skills": ["move", "strike", "bolt", "defend"]},
+	"ghoul": {"name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10, "hp": 30, "power": 2, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
+	"cultist": {"name": "Cultist", "might": 1, "dex": 10, "agi": 10, "vit": 5, "hp": 20, "power": 1, "acc": 1, "eva": 0, "skills": ["move", "bolt", "strike"]},
 }
 
 
@@ -31,18 +32,20 @@ func _all_templates() -> Array[UnitTemplate]:
 	return out
 
 
-func test_converted_stats_match_the_original_numbers() -> void:
+func test_class_attributes_give_the_expected_battle_numbers() -> void:
 	var seen := {}
 	for t in _all_templates():
 		var want: Dictionary = ORIGINAL[t.id]
 		seen[t.id] = true
 		assert_eq(t.display_name, want["name"], t.id)
-		assert_eq(t.max_hp, want["hp"], "%s hp" % t.id)
-		assert_eq(t.dexterity, want["dex"], "%s dex" % t.id)
-		assert_eq(t.power, want["power"], "%s power" % t.id)
-		assert_eq(t.armor, want["armor"], "%s armor" % t.id)
-		assert_eq(t.accuracy, want["acc"], "%s accuracy" % t.id)
-		assert_eq(t.evasion, want["eva"], "%s evasion" % t.id)
+		assert_eq([t.might, t.dexterity, t.agility, t.vitality], [want["might"], want["dex"], want["agi"], want["vit"]], "%s attributes" % t.id)
+		var c := t.make_combatant("x", Enums.Team.PLAYERS, Enums.Facing.EAST, Vector2i.ZERO, GameConfig.load_file())
+		assert_eq(c.max_hp, want["hp"], "%s hp" % t.id)
+		assert_eq(c.power, want["power"], "%s power" % t.id)
+		assert_eq(c.armor, 0, "%s armor (gear only)" % t.id)
+		assert_eq(c.accuracy, want["acc"], "%s accuracy" % t.id)
+		assert_eq(c.evasion, want["eva"], "%s evasion" % t.id)
+		assert_eq([c.dexterity, c.agility], [want["dex"], want["agi"]], "%s dex/agi" % t.id)
 		assert_eq(_skill_ids(t), want["skills"] as Array[String], "%s skills" % t.id)
 	assert_eq(seen.size(), ORIGINAL.size(), "every original unit has a resource")
 
@@ -101,8 +104,8 @@ func test_class_ids_match_the_account_screen_and_every_unit_has_a_look() -> void
 func test_editing_a_template_changes_the_battle() -> void:
 	var def := Encounter.definition().duplicate() as EncounterDef
 	var tough := def.classes[0].duplicate() as UnitTemplate
-	tough.max_hp = 99
-	tough.power = 7
+	tough.vitality = 45
+	tough.might = 7
 	var few: Array[SkillDef] = [_skill("move"), _skill("strike")]
 	tough.skills = few
 	var swapped: Array[UnitTemplate] = [tough]
@@ -110,8 +113,8 @@ func test_editing_a_template_changes_the_battle() -> void:
 	def.classes = swapped
 	var b := Encounter.build(GameConfig.load_file(), SkillDb.load_file(), 2, 1, [], def)
 	var c := b.state.get_c("pc0")
-	assert_eq(c.max_hp, 99)
-	assert_eq(c.hp, 99)
+	assert_eq(c.max_hp, 100)
+	assert_eq(c.hp, 100)
 	assert_eq(c.power, 7)
 	assert_eq(c.skills, ["move", "strike"] as Array[String])
 	assert_eq(b.state.get_c("pc1").max_hp, 28, "other seats are untouched")

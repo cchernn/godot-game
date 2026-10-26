@@ -6,19 +6,19 @@ extends SceneTree
 
 const ROOT := "res://game/content/"
 const CLASSES := [
-	{"id": "warrior", "name": "Warrior", "hp": 40, "dex": 8, "power": 3, "armor": 2, "acc": 0, "eva": 0,
+	{"id": "warrior", "name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15,
 		"skills": ["move", "strike", "power_strike", "disrupt"]},
-	{"id": "ranger", "name": "Ranger", "hp": 28, "dex": 12, "power": 1, "armor": 0, "acc": 2, "eva": 1,
+	{"id": "ranger", "name": "Ranger", "might": 1, "dex": 12, "agi": 12, "vit": 9,
 		"skills": ["move", "strike", "bolt", "disrupt"]},
-	{"id": "cleric", "name": "Cleric", "hp": 30, "dex": 10, "power": 1, "armor": 1, "acc": 0, "eva": 0,
+	{"id": "cleric", "name": "Cleric", "might": 1, "dex": 10, "agi": 10, "vit": 10,
 		"skills": ["move", "strike", "bolt", "revive"]},
-	{"id": "rogue", "name": "Rogue", "hp": 26, "dex": 16, "power": 2, "armor": 0, "acc": 3, "eva": 3,
+	{"id": "rogue", "name": "Rogue", "might": 2, "dex": 16, "agi": 16, "vit": 8,
 		"skills": ["move", "strike", "bolt"]},
 ]
 const ENEMIES := [
-	{"id": "ghoul", "name": "Ghoul", "hp": 30, "dex": 8, "power": 2, "armor": 1, "acc": 0, "eva": 0,
+	{"id": "ghoul", "name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10,
 		"skills": ["move", "strike", "power_strike"]},
-	{"id": "cultist", "name": "Cultist", "hp": 20, "dex": 10, "power": 1, "armor": 0, "acc": 1, "eva": 0,
+	{"id": "cultist", "name": "Cultist", "might": 1, "dex": 10, "agi": 10, "vit": 5,
 		"skills": ["move", "bolt", "strike"]},
 ]
 ## Who stands on E0, E1, E2 (the same enemy can appear several times).
@@ -57,12 +57,10 @@ func _template(rel: String, d: Dictionary) -> UnitTemplate:
 	var t := UnitTemplate.new()
 	t.id = d["id"]
 	t.display_name = d["name"]
-	t.max_hp = d["hp"]
+	t.might = d["might"]
 	t.dexterity = d["dex"]
-	t.power = d["power"]
-	t.armor = d["armor"]
-	t.accuracy = d["acc"]
-	t.evasion = d["eva"]
+	t.agility = d["agi"]
+	t.vitality = d["vit"]
 	for sid: String in d["skills"]:
 		t.skills.append(load("res://game/content/skills/%s.tres" % sid) as SkillDef)
 	ResourceSaver.save(t, path)

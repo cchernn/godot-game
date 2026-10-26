@@ -12,7 +12,8 @@
 script = ExtResource("1_q6e1f")
 id = "warrior"
 display_name = "Warrior"
-max_hp = 40
-power = 3
-armor = 2
+vitality = 15
+might = 3
+dexterity = 8
+agility = 8
 skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_power_strike"), ExtResource("s_disrupt"), ExtResource("s_defend")])

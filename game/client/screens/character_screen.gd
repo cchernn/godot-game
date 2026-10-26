@@ -61,8 +61,14 @@ func show_character(c: Dictionary) -> void:
 	var t := load(path) as UnitTemplate if ResourceLoader.exists(path) else null
 	if t == null:
 		return
-	_stats.text = "HP %d   Dexterity %d   Power %d   Armor %d   Accuracy %d   Evasion %d" \
-		% [t.max_hp, t.dexterity, t.power, t.armor, t.accuracy, t.evasion]
+	var build := CharacterBuild.compose(t, int(c.get("level", 1)), (c.get("allocated", {}) if c.get("allocated", {}) is Dictionary else {}) as Dictionary, GameConfig.load_file())
+	var at: Dictionary = build["attributes"]
+	var st: Dictionary = build["stats"]
+	_stats.text = "Might %d   Dexterity %d   Agility %d   Vitality %d\nHP %d   Damage +%d   Accuracy %d   Evasion %d   AP %d" \
+		% [at["might"], at["dexterity"], at["agility"], at["vitality"], st["max_hp"], st["power"], st["accuracy"], st["evasion"],
+		GameConfig.load_file().ap_capacity(st["dexterity"])]
+	if int(build["points_left"]) > 0:
+		_stats.text += "\n%d points to spend" % build["points_left"]
 	for sk in t.skills:
 		_skills.add_item("%s - %s" % [sk.display_name, sk.hint] if sk.hint != "" else sk.display_name)
 

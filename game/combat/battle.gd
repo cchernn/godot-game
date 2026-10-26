@@ -321,7 +321,8 @@ func snapshot_for(cid: String) -> Dictionary:
 			u["ap_spent"] = c.ap_spent
 			u["ap_forfeited"] = c.ap_forfeited
 			u["dexterity"] = c.stat("dexterity")
-			u["tiles_per_ap"] = cfg.tiles_per_ap(c.stat("dexterity"))
+			u["agility"] = c.stat("agility")
+			u["tiles_per_ap"] = cfg.tiles_per_ap(c.stat("agility"))
 			u["items"] = _item_view(c)
 			u["reaction"] = not c.reaction.is_empty()
 			u["escaping"] = c.escape_pending

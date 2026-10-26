@@ -6,7 +6,7 @@ const MAX_ACTIONS := 16
 
 
 static func tiles_per_ap(cfg: GameConfig, c: Combatant) -> int:
-	return cfg.tiles_per_ap(c.stat("dexterity"))
+	return cfg.tiles_per_ap(c.stat("agility"))
 
 
 ## Returns {ok, error, costs: Array[int]}. `team_sees` reports whether the cell is visible to the planner's team.

@@ -29,10 +29,11 @@ static func max_players() -> int:
 
 
 ## Player combatants are named "pc0".."pcN" by seat, enemies "e0".. by spot. `classes` (optional, lower-case
-## class ids) picks each seat's template; seats keep their own spawn tile. `def` overrides the default
+## class ids) picks each seat's template; seats keep their own spawn tile. `builds` (optional, one per seat:
+## {level, allocated}) feeds CharacterBuild. `def` overrides the default
 ## encounter (used by tests and the design preview).
 static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int, classes: Array = [],
-		def: EncounterDef = null) -> Battle:
+		def: EncounterDef = null, builds: Array = []) -> Battle:
 	if def == null:
 		def = definition()
 	var problems := def.problems(skills)
@@ -49,11 +50,16 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 			var chosen := def.class_by_id(str(classes[i]))
 			if chosen != null:
 				tpl = chosen
+		var made: Dictionary = {}
+		if i < builds.size() and builds[i] is Dictionary:
+			var raw: Variant = (builds[i] as Dictionary).get("allocated", {})
+			made = CharacterBuild.compose(tpl, int((builds[i] as Dictionary).get("level", 1)),
+				raw as Dictionary if raw is Dictionary else {}, cfg)
 		battle.add_combatant(tpl.make_combatant("pc%d" % i, Enums.Team.PLAYERS, Enums.Facing.EAST,
-			_spawn(map.player_spawns, i, "player seat P%d" % i)))
+			_spawn(map.player_spawns, i, "player seat P%d" % i), cfg, made))
 	for i in def.enemies.size():
 		battle.add_combatant(def.enemies[i].make_combatant("e%d" % i, Enums.Team.ENEMIES, Enums.Facing.WEST,
-			_spawn(map.enemy_spawns, i, "enemy spot E%d" % i)))
+			_spawn(map.enemy_spawns, i, "enemy spot E%d" % i), cfg))
 	battle.start()
 	return battle
 

@@ -84,6 +84,22 @@ class GrantItemIn(BaseModel):
     max_stack: int = Field(default=99, ge=1, le=99)  # the item's own limit, from game/content/items
 
 
+ATTRIBUTES = ("might", "dexterity", "agility", "vitality")
+
+
+class AllocationIn(BaseModel):
+    allocated: dict[str, int]
+
+    @field_validator("allocated")
+    @classmethod
+    def only_attributes(cls, v: dict[str, int]) -> dict[str, int]:
+        if any(k not in ATTRIBUTES for k in v):
+            raise ValueError(f"keys must be among {', '.join(ATTRIBUTES)}")
+        if any(n < 0 or n > 99 for n in v.values()):
+            raise ValueError("points must be between 0 and 99")
+        return {k: n for k, n in v.items() if n > 0}
+
+
 class CombatResultIn(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=128)
     world_id: uuid.UUID
@@ -259,6 +275,11 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def grant_items(character_id: uuid.UUID, body: GrantItemIn, r: Repository = Depends(repo)) -> dict:
         """Dev/admin: gives a character copies of an item (see scripts/grant_item.sh). There are no shops or loot yet."""
         return r.grant_items(character_id, body.item_id, body.quantity, body.max_stack)
+
+    @app.put("/internal/characters/{character_id}/allocation", dependencies=[Depends(server_only)])
+    def set_allocation(character_id: uuid.UUID, body: AllocationIn, r: Repository = Depends(repo)) -> dict:
+        """Dev/admin: sets the points a character has put into its attributes. Players cannot allocate yet."""
+        return r.set_allocation(character_id, body.allocated)
 
     # ---- membership ----
 

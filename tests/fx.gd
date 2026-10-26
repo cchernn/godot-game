@@ -21,6 +21,7 @@ static func battle(rows: Array, units: Array, seed: int = 1) -> Battle:
 		c.max_hp = u.get("hp", 20)
 		c.hp = u.get("cur_hp", c.max_hp)
 		c.dexterity = u.get("dex", 8)
+		c.agility = u.get("agi", 8)
 		c.power = u.get("power", 0)
 		c.armor = u.get("armor", 0)
 		c.skills.assign(u.get("skills", ["move", "strike", "power_strike", "bolt", "disrupt", "revive", "defend"]))

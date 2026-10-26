@@ -12,9 +12,8 @@
 script = ExtResource("1_q7u1k")
 id = "ranger"
 display_name = "Ranger"
-max_hp = 28
+vitality = 9
+might = 1
 dexterity = 12
-power = 1
-accuracy = 2
-evasion = 1
+agility = 12
 skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_bolt"), ExtResource("s_disrupt"), ExtResource("s_defend")])

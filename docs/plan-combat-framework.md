@@ -1,6 +1,6 @@
 # Plan: the combat framework (effects, statuses, areas, items, progression)
 
-Status: **Phases 1, 2 and 3 (committed) and 4 (implemented, not committed yet) are done; the rest is planned.** Work happens one phase at a time; each phase is tested, documented and committed on its own (when the owner says so).
+Status: **Phases 1 to 4 (committed) are done; Phase 5 is in progress (5a, attributes and stats, implemented and not committed yet); the rest is planned.** Work happens one phase at a time; each phase is tested, documented and committed on its own (when the owner says so).
 Scope of this plan is the **framework only** (foundational changes). Specific skills, statuses, class content and items are discussed after all phases; where a phase needs an example it is a
 **test fixture**, not shipped content. The scope is: the data model, the rules, the editor workflow and the UI hooks. Real class and skill design is done afterwards
 in the Godot editor. Every number below is PROVISIONAL, lives in data (`.tres` or `balance.json`) and is listed in `docs/provisional-values.md` when it lands.
@@ -129,7 +129,11 @@ Rules:
 
 Tests: validator limits, consumption on use and not on skip, the combat-result transaction (idempotent replay, over-use refused), loadout limit, effects through items (heal, area bomb), API tests for inventory and the session payload.
 
-## Phase 5: progression foundation (static)
+## Phase 5a: attributes and stats (agreed with the owner)
+
+Four primary attributes replace the six stats: **Might** (damage and healing, physical or magical alike), **Dexterity** (AP and accuracy), **Agility** (tiles moved per AP and evasion), **Vitality** (max HP; later also status potency and resistance, mechanic not designed yet). **Armor** is gear-only (gear comes later) and is not an attribute. `balance.json` "stats" turns attributes into battle numbers; `CharacterBuild.compose(template, level, allocated, cfg)` is the single resolver (server battle build and Character page). Growth per level, point value, points per level and a per-attribute cap are template fields; `progression.enabled` is false, so level and allocated points are ignored for now. API: `characters.allocated` (migration 0011), level and allocation on the session payload and roster, a service-key `PUT /internal/characters/{id}/allocation`. Not done yet: level-ups from XP (`CharacterBuild.level_for_xp` exists, nothing calls it), a player-facing allocation screen, status potency/resistance from Vitality, crit from Dexterity.
+
+## Phase 5b: skill unlocks and picks (static)
 
 **Goal:** the data model and the single resolver for "what stats and skills does this character have", with growth switched off.
 

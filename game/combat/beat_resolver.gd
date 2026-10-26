@@ -176,7 +176,7 @@ func _run_stage(c: Combatant) -> void:
 
 
 func _move_step(c: Combatant, a: PlannedAction) -> void:
-	var tpa := b.cfg.tiles_per_ap(c.stat("dexterity"))
+	var tpa := b.cfg.tiles_per_ap(c.stat("agility"))
 	var sur: int = b.cfg.get_value("movement", "difficult_terrain_surcharge")
 	var max_step: int = b.cfg.get_value("combat", "max_step_height")
 	var moved := 0

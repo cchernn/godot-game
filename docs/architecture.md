@@ -173,7 +173,7 @@ or for character skills the target's tile at execution. Victims are the combatan
 ## Statuses (Phase 2)
 A `StatusDef` resource (stat changes, each-turn effects, `stunned`/`rooted`, duration in turns, stacking) is applied by `ApplyStatusEffect` and removed by `RemoveStatusEffect`.
 A combatant holds `statuses: [{id, def (the StatusDef as a dictionary), turns_left, stacks}]`, so a battle needs no status registry. Rules read armor, power, accuracy, evasion
-and dexterity through `Combatant.stat(name)`. `BeatResolver.run_turn_start()` (called by `Battle.begin_resolution`) runs each-turn effects; `run_turn_end()` (from `_end_round`)
+dexterity and agility through `Combatant.stat(name)`. `BeatResolver.run_turn_start()` (called by `Battle.begin_resolution`) runs each-turn effects; `run_turn_end()` (from `_end_round`)
 takes a turn off every status and removes the finished ones. Stun clears the bearer's current skill and queue when its next step comes up; rooted blocks move steps. `_defeat` and
 escape clear statuses. The snapshot carries `statuses` (name, hint, glyph, colour, turns, stacks) and `stunned`/`rooted` for every visible unit. Statuses never touch the battle RNG.
 

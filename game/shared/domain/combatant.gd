@@ -13,7 +13,10 @@ var max_hp: int = 20
 var hp: int = 20
 ## Soaks damage after armor, before HP; cleared at the end of every round.
 var shield: int = 0
+## Sets action points (see config "ap").
 var dexterity: int = 8
+## Sets tiles moved per AP (see config "movement").
+var agility: int = 8
 var power: int = 0
 var armor: int = 0
 var accuracy: int = 0
@@ -63,12 +66,12 @@ func is_present() -> bool:
 	return life_state != Enums.LifeState.ELIMINATED and life_state != Enums.LifeState.ESCAPED
 
 
-## Armor, power, accuracy, evasion or dexterity including the changes from statuses (always use this in the rules, not the raw field).
+## Armor, power, accuracy, evasion, dexterity or agility including the changes from statuses (always use this in the rules, not the raw field).
 func stat(stat_name: String) -> int:
 	var v: int = get(stat_name)
 	for s in statuses:
 		v += ((s["def"]["mods"] as Dictionary).get(stat_name, 0) as int) * (s["stacks"] as int)
-	return maxi(1, v) if stat_name == "dexterity" else v
+	return maxi(1, v) if stat_name == "dexterity" or stat_name == "agility" else v
 
 
 ## True when any status carries the condition ("stunned" or "rooted").

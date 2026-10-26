@@ -20,7 +20,7 @@ func test_ai_plans_are_deterministic_and_committed_through_the_validator() -> vo
 
 
 func test_ai_attacks_a_reachable_target_using_the_same_rules() -> void:
-	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(3, 1)), Fx.enemy("e", V(6, 1), {"skills": ["move", "strike"], "dex": 12})])
+	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(3, 1)), Fx.enemy("e", V(6, 1), {"skills": ["move", "strike"], "agi": 12})])
 	b.ai_enabled = true
 	b.state.get_c("e").plan = AiPlanner.new().plan_for(b, b.state.get_c("e"))
 	var skills_planned: Array[String] = []

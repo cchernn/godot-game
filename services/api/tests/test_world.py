@@ -353,6 +353,18 @@ def test_the_run_takes_the_roster_and_locks_it(client, pool):
     assert (inst["encounter"], inst["max_players"], inst["activity_name"]) == ("prototype", 4, "Clear the cellar")
 
 
+def test_the_roster_carries_each_characters_level_and_allocated_points(client, pool):
+    w, [t1, t2], _ = party(client, pool)
+    pid = my_party(client, w["id"], t1)["id"]
+    join_party(client, pid, t1, t2)
+    iid = start(client, pid, t1).json()["id"]
+    mine = client.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()
+    assert client.put(f"/internal/characters/{mine['id']}/allocation", json={"allocated": {"might": 2}}, headers=SERVER).status_code == 200
+    roster = client.get(f"/internal/instances/{iid}", headers=SERVER).json()["roster"]
+    assert {r["id"]: (r["level"], r["allocated"]) for r in roster}[mine["id"]] == (1, {"might": 2})
+    assert sorted(str(r["allocated"]) for r in roster) == ["{'might': 2}", "{}"]
+
+
 def test_asks_pending_at_the_start_are_withdrawn(client, pool):
     w, [t1, t2], _ = party(client, pool)
     pid = my_party(client, w["id"], t1)["id"]

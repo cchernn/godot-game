@@ -13,7 +13,7 @@ project from `project.godot`; the first open imports everything.
 | Units (model, labels, animations) | `game/content/units/unit.tscn` and `warrior.tscn`, `ghoul.tscn`... | the 3D editor, AnimationPlayer |
 | Which scene draws which unit | `game/content/units/unit_visuals.tres` | Inspector |
 | What each skill does (damage, AP, range, speed, stages, hint text) | `game/content/skills/*.tres`, listed in `skills/skill_set.tres` | Inspector |
-| Class and enemy stats (HP, dexterity, power, armor, accuracy, evasion, skills) | `game/content/stats/classes/*.tres`, `stats/enemies/*.tres` | Inspector |
+| Class and enemy attributes (might, dexterity, agility, vitality), progression fields and skills | `game/content/stats/classes/*.tres`, `stats/enemies/*.tres` | Inspector |
 | Which classes and enemies a battle uses | `game/content/encounters/prototype.tres` | Inspector |
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
 | Fog / move / target / hover highlights | `game/content/board/materials/*.tres` | Inspector |
@@ -121,7 +121,7 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 
 ## Stats (Inspector)
 Every class and enemy is a `UnitTemplate` resource. Double-click one in the FileSystem dock (e.g. `stats/classes/warrior.tres`) and edit
-the **Stats** group: max HP, dexterity (sets AP and speed), power (added to damage), armor, accuracy, evasion, and the **Skills** list
+the **Attributes** group: vitality (max HP), might (added to damage and healing), dexterity (AP and accuracy), agility (tiles moved per AP and evasion), the **Progression** group (growth per level, point value, points per level, cap per attribute; all unused while `progression.enabled` is false in `balance.json`) and the **Skills** list. How attributes become battle numbers is `balance.json` "stats". Armor is not a class stat: it will come from gear
 (pick skill resources from `game/content/skills`). Each field has a tooltip. All values
 are provisional. Godot only writes non-default values into the file, so a stat at its default (e.g. 0) will not appear in the text, but it is
 there in the Inspector.
@@ -174,7 +174,7 @@ skill stage and drag the status into its *Status* slot (no list to register it i
 - **Id**, **display name**, **hint** (shown on hover), **glyph** and **color** (what the unit card shows for now; real icons come later), **kind** (buff, debuff, other: used by cleanses).
 - **Duration turns:** counted in turns (rounds), not beats. A status applied during a turn counts the rest of that turn as its first turn.
 - **Stacking:** *Refresh* restarts the timer; *Stack* adds a stack (up to *max stacks*) and restarts the timer; *Ignore* does nothing if it is already on.
-- **Stat changes (per stack):** armor, power, accuracy, evasion, dexterity. Dexterity also changes AP (from the next turn) and tiles per AP.
+- **Stat changes (per stack):** armor, power, accuracy, evasion, dexterity, agility. Dexterity also changes AP (from the next turn) and agility changes tiles per AP.
 - **Each turn:** a list of Damage, Heal or Shield effects run on the bearer once at the start of every turn, once per stack. Their hit and crit boxes must be off (statuses use no random numbers).
 - **Conditions:** *Stunned* (the bearer takes no actions and cannot react; not an interruption) and *Rooted* (cannot move).
 A downed or eliminated unit loses all statuses. A unit card lists its statuses with the turns left; hovering shows the hints.

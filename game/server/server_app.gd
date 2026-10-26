@@ -386,9 +386,11 @@ func _start_battle(room: Room) -> void:
 	_seat_the_roster(room)
 	var members := _members(room)
 	var classes: Array = []
+	var builds: Array = []
 	for rec in members:
 		classes.append(rec.character.get("class", ""))
-	room.battle = Encounter.build(cfg, skills, members.size(), seed, classes, room.def)
+		builds.append({"level": int(rec.character.get("level", 1)), "allocated": rec.character.get("allocated", {})})
+	room.battle = Encounter.build(cfg, skills, members.size(), seed, classes, room.def, builds)
 	room.battle_key = "battle-" + Crypto.new().generate_random_bytes(12).hex_encode()
 	var i := 0
 	for rec in members:

@@ -36,11 +36,11 @@ func ap_capacity(dexterity: int) -> int:
 	return mini(cap, get_value("ap", "max_capacity") as int)
 
 
-## Tiles moved per AP: base plus Dexterity bonus, bonus capped. (Provisional formula.)
-func tiles_per_ap(dexterity: int) -> int:
+## Tiles moved per AP: base plus Agility bonus, bonus capped. (Provisional formula.)
+func tiles_per_ap(agility: int) -> int:
 	var bonus := 0
-	for t: int in get_value("movement", "dexterity_bonus_thresholds"):
-		if dexterity >= t:
+	for t: int in get_value("movement", "agility_bonus_thresholds"):
+		if agility >= t:
 			bonus += 1
-	bonus = mini(bonus, get_value("movement", "max_dexterity_bonus") as int)
+	bonus = mini(bonus, get_value("movement", "max_agility_bonus") as int)
 	return (get_value("movement", "tiles_per_ap") as int) + bonus

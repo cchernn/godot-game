@@ -27,7 +27,10 @@ enum Stacking { REFRESH, STACK, IGNORE }
 @export var power: int = 0
 @export var accuracy: int = 0
 @export var evasion: int = 0
+## Also changes AP (from the next turn).
 @export var dexterity: int = 0
+## Also changes tiles moved per AP.
+@export var agility: int = 0
 
 @export_group("Each turn")
 ## Run on the bearer once at the start of every turn it lasts, once per stack (damage, heal or shield effects only; the target is always the bearer).
@@ -49,7 +52,7 @@ func to_dict() -> Dictionary:
 	return {"id": id, "name": display_name if display_name != "" else id, "hint": hint, "glyph": glyph,
 		"color": color.to_html(false), "kind": kind, "duration": duration_turns, "stacking": stacking,
 		"max_stacks": max_stacks,
-		"mods": {"armor": armor, "power": power, "accuracy": accuracy, "evasion": evasion, "dexterity": dexterity},
+		"mods": {"armor": armor, "power": power, "accuracy": accuracy, "evasion": evasion, "dexterity": dexterity, "agility": agility},
 		"ticks": ticks, "stunned": stunned, "rooted": rooted}
 
 

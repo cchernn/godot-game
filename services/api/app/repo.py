@@ -133,6 +133,16 @@ class Repository(PartyMixin, WorldMixin):
                 "returning quantity", (character_id, item_id, min(quantity, max_stack), max_stack)).fetchone()
         return {"character_id": str(character_id), "item_id": item_id, "quantity": row["quantity"]}
 
+    def set_allocation(self, character_id: uuid.UUID, allocated: dict[str, int]) -> dict:
+        """Dev/admin: replaces the points a character has put into its attributes. Only the shape is checked here (the API has
+        no class content); the game server trims it to the class's budget when it builds a battle."""
+        with self.pool.connection() as conn:
+            row = conn.execute("update characters set allocated=%s where id=%s and status='active' returning id, allocated",
+                               (Jsonb(allocated), character_id)).fetchone()
+            if row is None:
+                raise NotFound("Character not found")
+        return {"character_id": str(row["id"]), "allocated": row["allocated"]}
+
     def retire_character(self, character_id: uuid.UUID, user_id: uuid.UUID) -> dict:
         with self.pool.connection() as conn:
             r = conn.execute("select * from characters where id=%s for update", (character_id,)).fetchone()

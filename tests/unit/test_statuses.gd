@@ -149,14 +149,21 @@ func test_stat_changes_reach_damage_and_hit_chance() -> void:
 	assert_eq(c.stat("power"), 2)
 
 
-func test_dexterity_changes_ap_and_movement() -> void:
+func test_dexterity_changes_ap() -> void:
 	var b := _duel()
 	var p := b.state.get_c("p")
 	_give(p, _status("swift", 2, {"dexterity": 4}))
 	assert_eq(p.stat("dexterity"), p.dexterity + 4)
 	Fx.run_round(b)
 	assert_eq(p.ap_capacity, b.cfg.ap_capacity(p.dexterity + 4), "next round's AP follows the changed dexterity")
-	assert_eq(b.snapshot_for("p")["units"][0]["tiles_per_ap"], b.cfg.tiles_per_ap(p.dexterity + 4))
+
+
+func test_agility_changes_tiles_per_ap() -> void:
+	var b := _duel()
+	var p := b.state.get_c("p")
+	_give(p, _status("fleet", 2, {"agility": 4}))
+	assert_eq(p.stat("agility"), p.agility + 4)
+	assert_eq(b.snapshot_for("p")["units"][0]["tiles_per_ap"], b.cfg.tiles_per_ap(p.agility + 4))
 
 
 func test_each_turn_damage_ticks_at_the_start_of_every_turn() -> void:

@@ -38,7 +38,7 @@ func test_hidden_enemies_are_never_in_snapshot_or_public_events() -> void:
 
 
 func test_allies_see_each_others_ap_but_enemies_do_not_get_any() -> void:
-	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1)), Fx.player("b", V(1, 1), {"dex": 12}), Fx.enemy("e", V(4, 1))])
+	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1)), Fx.player("b", V(1, 1), {"agi": 12}), Fx.enemy("e", V(4, 1))])
 	var by_id := {}
 	for u: Dictionary in b.snapshot_for("a")["units"]:
 		by_id[u["id"]] = u

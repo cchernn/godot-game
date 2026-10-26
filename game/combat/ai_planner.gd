@@ -10,7 +10,7 @@ func plan_for(battle: Battle, c: Combatant) -> Array[PlannedAction]:
 	var bf := battle.bf
 	var w: Dictionary = cfg.data["ai"]["weights"]
 	var max_step: int = cfg.get_value("combat", "max_step_height")
-	var tpa := cfg.tiles_per_ap(c.stat("dexterity"))
+	var tpa := cfg.tiles_per_ap(c.stat("agility"))
 	var sur: int = cfg.get_value("movement", "difficult_terrain_surcharge")
 
 	var targets: Array[Combatant] = []
