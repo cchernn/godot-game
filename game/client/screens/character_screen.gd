@@ -79,7 +79,7 @@ func show_character(c: Dictionary) -> void:
 	var db := SkillDb.load_file()
 	for sid: String in build["skills"]:
 		var sk := db.get_skill(sid)
-		if sk != null:
+		if sk != null and sk.slot() == Enums.ActionSlot.SKILL: # Move, Attack and Defend are basic actions, not class skills
 			_skills.add_item("%s - %s" % [sk.display_name, sk.hint] if sk.hint != "" else sk.display_name)
 
 

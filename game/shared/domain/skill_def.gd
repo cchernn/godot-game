@@ -11,7 +11,7 @@ extends Resource
 @export var display_name: String = ""
 ## One line shown as the button tooltip and under the skill list when the skill is picked.
 @export var hint: String = ""
-## Where it sits in the action bar. Moves always sit on Move; most skills are in the Attack list; the default Defend sits on Defend.
+## Where it sits in the action bar. Moves always sit on Move; basic attacks sit in the Attack list; class skills sit in the Skills list; the default Defend sits on Defend.
 @export var action_slot: Enums.ActionSlot = Enums.ActionSlot.ATTACK
 @export var kind: Enums.SkillKind = Enums.SkillKind.ATTACK:
 	set(v):

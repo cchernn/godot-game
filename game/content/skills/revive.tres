@@ -13,6 +13,7 @@ script = ExtResource("1_3a5j8")
 id = "revive"
 display_name = "Revive"
 hint = "Click a downed ally"
+action_slot = 3
 kind = 3
 targeting = 1
 stage_defs = Array[ExtResource("2_ukone")]([SubResource("Resource_vgrvf")])

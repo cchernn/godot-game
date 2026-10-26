@@ -24,6 +24,7 @@ script = ExtResource("1_def")
 id = "bolt"
 display_name = "Bolt"
 hint = "Click a tile (it hits whoever stands there)"
+action_slot = 3
 targeting = 2
 attack_range = 5
 stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_bolt")])

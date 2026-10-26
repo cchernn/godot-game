@@ -54,6 +54,8 @@ var _preview_sig: int = 0
 @onready var status_label: Label = %StatusLabel
 @onready var ap_label: Label = %ApLabel
 @onready var skill_box: VBoxContainer = %SkillBox
+@onready var attack_box: VBoxContainer = %AttackBox
+@onready var skills_btn: Button = %SkillsButton
 @onready var queue_list: ItemList = %QueueList
 @onready var ready_btn: Button = %ReadyButton
 @onready var escape_btn: Button = %RetreatButton
@@ -150,21 +152,13 @@ func _wire_ui() -> void:
 	escape_btn.pressed.connect(_on_escape_pressed)
 	move_btn.pressed.connect(func() -> void: _on_skill_pressed(_slot_skill(Enums.ActionSlot.MOVE)))
 	defend_btn.pressed.connect(func() -> void: _on_skill_pressed(_slot_skill(Enums.ActionSlot.DEFEND)))
-	attack_btn.toggled.connect(func(on: bool) -> void:
-		if on:
-			item_btn.set_pressed_no_signal(false)
-			context_btn.set_pressed_no_signal(false)
-		_refresh())
-	item_btn.toggled.connect(func(on: bool) -> void:
-		if on:
-			attack_btn.set_pressed_no_signal(false)
-			context_btn.set_pressed_no_signal(false)
-		_refresh())
-	context_btn.toggled.connect(func(on: bool) -> void:
-		if on:
-			attack_btn.set_pressed_no_signal(false)
-			item_btn.set_pressed_no_signal(false)
-		_refresh())
+	for pair: Array in [[attack_btn, attack_box], [skills_btn, skill_box], [item_btn, item_box], [context_btn, context_box]]:
+		(pair[0] as Button).toggled.connect(func(on: bool) -> void:
+			if on: # one submenu open at a time
+				for other: Button in [attack_btn, skills_btn, item_btn, context_btn]:
+					if other != pair[0]:
+						other.set_pressed_no_signal(false)
+			_refresh())
 	%ConnectButton.pressed.connect(_connect)
 	%ContinueButton.pressed.connect(_on_continue_pressed)
 	_set_battle_view(false)
@@ -354,6 +348,8 @@ func _on_continue_pressed() -> void:
 	_skill_ids = []
 	for ch in skill_box.get_children():
 		ch.queue_free()
+	for ch in attack_box.get_children():
+		ch.queue_free()
 	_item_buttons.clear()
 	_item_ids = []
 	for ch in item_box.get_children():
@@ -535,6 +531,7 @@ func _on_skill_pressed(id: String) -> void:
 	mode = id
 	var is_item := id.begins_with("item:")
 	attack_btn.set_pressed_no_signal(not is_item and sk.slot() == Enums.ActionSlot.ATTACK)
+	skills_btn.set_pressed_no_signal(not is_item and sk.slot() == Enums.ActionSlot.SKILL)
 	item_btn.set_pressed_no_signal(is_item)
 	error_label.text = sk.hint
 	_refresh()
@@ -700,8 +697,10 @@ func _refresh() -> void:
 	move_btn.disabled = not can or move_id == ""
 	move_btn.set_pressed_no_signal(move_id != "" and mode == move_id)
 	defend_btn.disabled = not can or defend_id == ""
-	attack_btn.disabled = not can or _skill_buttons.is_empty()
-	skill_box.visible = attack_btn.button_pressed and not attack_btn.disabled
+	attack_btn.disabled = not can or attack_box.get_child_count() == 0
+	attack_box.visible = attack_btn.button_pressed and not attack_btn.disabled
+	skills_btn.disabled = not can or skill_box.get_child_count() == 0
+	skill_box.visible = skills_btn.button_pressed and not skills_btn.disabled
 	for id: String in _item_buttons:
 		var left := _items_left(id)
 		var btn := _item_buttons[id] as Button
@@ -757,16 +756,18 @@ func _rebuild_skill_buttons() -> void:
 	_skill_ids = ids.duplicate()
 	for ch in skill_box.get_children():
 		ch.queue_free()
+	for ch in attack_box.get_children():
+		ch.queue_free()
 	_skill_buttons.clear()
 	for id: String in ids:
 		var sk := skills.get_skill(id)
-		if sk.slot() != Enums.ActionSlot.ATTACK:
+		if sk.slot() != Enums.ActionSlot.ATTACK and sk.slot() != Enums.ActionSlot.SKILL:
 			continue # Move and Defend have their own buttons on the action bar
 		var b := skill_button_scene.instantiate() as Button
 		b.text = "%s  (%d AP)" % [sk.display_name, sk.total_ap()]
 		b.tooltip_text = sk.hint
 		b.pressed.connect(_on_skill_pressed.bind(id))
-		skill_box.add_child(b)
+		(attack_box if sk.slot() == Enums.ActionSlot.ATTACK else skill_box).add_child(b)
 		_skill_buttons[id] = b
 	var mv := skills.get_skill(_slot_skill(Enums.ActionSlot.MOVE))
 	move_btn.text = "Move" if mv == null else "Move (1 AP / %d)" % me["tiles_per_ap"]

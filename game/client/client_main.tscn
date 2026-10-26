@@ -119,8 +119,16 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 toggle_mode = true
-tooltip_text = "Pick one of your attacks and skills"
+tooltip_text = "Pick a basic attack"
 text = "Attack"
+
+[node name="SkillsButton" type="Button" parent="SidePanel/Layout/ActionBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+tooltip_text = "Pick one of your class skills"
+text = "Skills"
 
 [node name="DefendButton" type="Button" parent="SidePanel/Layout/ActionBar"]
 unique_name_in_owner = true
@@ -152,6 +160,10 @@ toggle_mode = true
 disabled = true
 tooltip_text = "Actions for what is around you, like opening a chest"
 text = "Context"
+
+[node name="AttackBox" type="VBoxContainer" parent="SidePanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
 
 [node name="SkillBox" type="VBoxContainer" parent="SidePanel/Layout"]
 unique_name_in_owner = true

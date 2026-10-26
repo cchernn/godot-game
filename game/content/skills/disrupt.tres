@@ -12,6 +12,7 @@ script = ExtResource("1_8tp3v")
 id = "disrupt"
 display_name = "Disrupt"
 hint = "Queued immediately: reacts to an enemy starting a multi-stage skill"
+action_slot = 3
 kind = 2
 speed = 7
 stage_defs = Array[ExtResource("2_bv8kt")]([SubResource("Resource_wj4sr")])

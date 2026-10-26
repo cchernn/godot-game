@@ -13,7 +13,8 @@ enum TerrainKind { NORMAL, DIFFICULT, BLOCKED }
 enum SkillKind { MOVE, ATTACK, REACTION, REVIVE, SUPPORT }
 ## SELF: no click, the caster is the target.
 ## Which slot of the action bar a skill sits in: Attack opens a list, Move and Defend are one button each.
-enum ActionSlot { ATTACK, MOVE, DEFEND }
+## Where a skill sits on the action bar: ATTACK = the Attack submenu (basic attacks), MOVE, DEFEND, SKILL = the Skills submenu (class skills).
+enum ActionSlot { ATTACK, MOVE, DEFEND, SKILL }
 enum Targeting { NONE, CHARACTER, TILE, SELF }
 ## ESCAPED: nobody is left standing and at least one character got away.
 enum Outcome { NONE, PLAYERS_WIN, PLAYERS_LOSE, DRAW, ESCAPED }

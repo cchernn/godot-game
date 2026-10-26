@@ -6,7 +6,7 @@ const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
 	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel",
-	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton", "ItemBox", "ContextBox"]
+	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton", "ItemBox", "ContextBox", "AttackBox", "SkillsButton"]
 
 
 func _client() -> Control:
@@ -43,10 +43,13 @@ func test_a_snapshot_fills_the_panel_and_builds_skill_buttons() -> void:
 	assert_true(not (c.get_node("%ConnectPanel") as Control).visible, "connect panel hides on the first snapshot")
 	assert_true((c.get_node("%StatusLabel") as Label).text.begins_with("Round 1"))
 	assert_true((c.get_node("%ApLabel") as Label).text.begins_with("AP: 0 planned"))
+	var attacks := c.get_node("%AttackBox") as VBoxContainer
+	assert_eq(attacks.get_child_count(), 1, "the Attack list: the basic attack (Move and Defend have their own buttons)")
+	var first := attacks.get_child(0) as Button
+	assert_true(first.toggle_mode and first.text.begins_with("Attack"))
 	var box := c.get_node("%SkillBox") as VBoxContainer
-	assert_eq(box.get_child_count(), 3, "the Attack list: strike, power strike, disrupt (Move and Defend have their own buttons)")
-	var first := box.get_child(0) as Button
-	assert_true(first.toggle_mode and first.text.begins_with("Strike"))
+	assert_eq(box.get_child_count(), 2, "the Skills list: power strike, disrupt")
+	assert_true((box.get_child(0) as Button).text.begins_with("Power Strike"))
 	assert_true((c.get_node("%MoveButton") as Button).text.begins_with("Move"))
 	assert_true(not (c.get_node("%ReadyButton") as Button).disabled)
 	c.free()
@@ -374,7 +377,9 @@ func test_character_screen_shows_stats_skills_battles_and_everyones_characters()
 	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nLevel 1 Warrior")
 	assert_eq((s.get_node("%XpLabel") as Label).text, "0 XP")
 	assert_true((s.get_node("%StatsLabel") as Label).text.begins_with("Might "), "stats come from the class resource")
-	assert_true((s.get_node("%SkillsList") as ItemList).item_count >= 2, "and so do the skills")
+	var list := s.get_node("%SkillsList") as ItemList
+	assert_eq(list.item_count, 2, "and so do the skills: only the class skills, not Move, Attack or Defend")
+	assert_true(list.get_item_text(0).begins_with("Power Strike") and list.get_item_text(1).begins_with("Disrupt"))
 	s.show_battles([{"created_at": "2026-10-25T12:00:00+00:00", "result": "players_win", "outcome": "survived", "xp_awarded": 100}])
 	assert_eq((s.get_node("%BattlesList") as ItemList).get_item_text(0), "2026-10-25  Victory - survived, +100 XP")
 	s.show_battles([])
@@ -838,13 +843,18 @@ func test_menu_background_plays_in_the_menus_and_pauses_in_a_battle() -> void:
 	s.free()
 
 
-func test_the_action_bar_has_move_attack_defend_item_retreat_and_context() -> void:
+func test_the_action_bar_has_move_attack_skills_defend_item_retreat_and_context() -> void:
 	var c := _client()
 	c._on_snapshot(_snapshot())
 	var attack := c.get_node("%AttackButton") as Button
-	assert_true(not (c.get_node("%SkillBox") as Control).visible, "the Attack list is closed until you open it")
+	var skills_btn := c.get_node("%SkillsButton") as Button
+	assert_true(not (c.get_node("%AttackBox") as Control).visible and not (c.get_node("%SkillBox") as Control).visible,
+		"the lists are closed until you open one")
 	attack.button_pressed = true
-	assert_true((c.get_node("%SkillBox") as Control).visible)
+	assert_true((c.get_node("%AttackBox") as Control).visible)
+	skills_btn.button_pressed = true
+	assert_true((c.get_node("%SkillBox") as Control).visible and not (c.get_node("%AttackBox") as Control).visible and not attack.button_pressed,
+		"one list at a time")
 	assert_true((c.get_node("%ItemButton") as Button).disabled, "Item waits for its phase")
 	assert_true((c.get_node("%ContextButton") as Button).disabled, "Context waits for its phase")
 	assert_eq((c.get_node("%RetreatButton") as Button).text, "Retreat")

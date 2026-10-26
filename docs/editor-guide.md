@@ -167,6 +167,8 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
   *kind* of skill or a new *effect type* is new game logic and is code.
 - Edits need `scripts/stack.sh up game web` to reach the running game (the server resolves skills; the web client lists them).
 
+**Action bar slots:** a skill's **Action slot** decides where it appears in battle. **Attack** = the Attack submenu (basic attacks; for now only the default Attack, whose id is still `strike`), **Skills** = the Skills submenu and the Character page's skill list (class skills), **Defend** = the Defend button. Moves always sit on Move. Every class lists its basic Move, Attack and Defend like any other skill, but they are not shown as class skills.
+
 ## Statuses (Inspector)
 A status is a timed condition on a unit: a buff, a debuff, bleeding, a stun. Each is a `StatusDef` resource in `game/content/statuses/` (make the folder when you add the
 first one: right-click > New Resource > StatusDef, save as `<id>.tres`). No statuses ship with the framework yet. To use one, add an **Apply Status** effect to a

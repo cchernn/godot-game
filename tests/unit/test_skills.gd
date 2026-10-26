@@ -8,7 +8,7 @@ const FREQ := Enums.Frequency
 const ORIGINAL := {
 	"move": {"name": "Move", "kind": KIND.MOVE, "targeting": TARGET.NONE, "range": 1, "speed": 5, "freq": FREQ.UNLIMITED,
 		"stability": 3, "stages": [["step", 1, 0, 0]], "reaction": {}},
-	"strike": {"name": "Strike", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 6, "freq": FREQ.ONCE_PER_TURN,
+	"strike": {"name": "Attack", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 6, "freq": FREQ.ONCE_PER_TURN,
 		"stability": 1, "stages": [["strike", 1, 6, 1]], "reaction": {}},
 	"power_strike": {"name": "Power Strike", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 4, "freq": FREQ.ONCE_PER_TURN,
 		"stability": 2, "stages": [["wind-up", 1, 0, 0], ["smash", 1, 12, 2]], "reaction": {}},

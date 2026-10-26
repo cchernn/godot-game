@@ -28,6 +28,7 @@ script = ExtResource("1_def")
 id = "power_strike"
 display_name = "Power Strike"
 hint = "Click a character (2 stages)"
+action_slot = 3
 targeting = 1
 speed = 4
 stability = 2
