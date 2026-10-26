@@ -18,7 +18,7 @@ project from `project.godot`; the first open imports everything.
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
 | Fog / move / target / hover highlights | `game/content/board/materials/*.tres` | Inspector |
 | Battle screen: side panel, log, result text, guest connect panel | `game/client/client_main.tscn` | the 2D editor |
-| Each pre-battle screen: sign-in, world picker, join, world hub, character, character creator, overworld, world management, settings, battle-server lobby | `game/client/screens/*.tscn` (one scene each) | the 2D editor |
+| Each pre-battle screen: sign-in, world picker, join, character, character creator, overworld (the game view), world management, settings, battle-server lobby | `game/client/screens/*.tscn` (one scene each) | the 2D editor |
 | How those screens are put together and switched | `game/client/account_flow.tscn` (+ `account_flow.gd`) | the 2D editor |
 | One join request in the host's list | `game/content/ui/join_request_row.tscn` | the 2D editor |
 | Victory / defeat panel | `ResultPanel` in `game/client/client_main.tscn` | the 2D editor |
@@ -75,8 +75,13 @@ If they disagree, the client logs a warning and draws the server's layout, and t
 - Sun, shadows, ambient light and background colour: `Sun` and `WorldEnvironment` in `board_3d.tscn`.
 - The control hint at the top is the `Hud/Hint` label there.
 
-## The overworld map (2D editor)
-`game/client/screens/overworld_screen.tscn` is the map screen. The map itself is the `MapCanvas` node: its Inspector has the colours (route lines, the party's
+## The game view and its windows (2D editor)
+`game/client/screens/overworld_screen.tscn` is the game view: the map fills the screen, the `Dock` along the bottom has a toggle per window, and the `Windows` node holds the
+four windows (`ActivityWindow`, `PartyWindow`, `CharacterWindow`, `MenuWindow`), each an instance of `game/content/ui/floating_window.tscn` with **Editable Children** on.
+Move or resize a window with its anchors and offsets, rename it with its `title`, and give the scrolling area a size with `body_min_size`. Put controls under
+`<window>/Layout/Scroll/Body`; add a window by instancing the scene again, adding a dock button and listing both in the `_toggles` dictionary of `overworld_screen.gd`.
+The panel look is in the `floating_window.tscn` root's Theme Overrides. `Backdrop` is the map's background colour (put a painted map there later).
+The map itself is the `MapCanvas` node. The map itself is the `MapCanvas` node: its Inspector has the colours (route lines, the party's
 place, the picked place), the line width and the margin, and `node_scene` (`game/content/ui/map_node.tscn`, the button used for every place - restyle it there).
 **Where each place sits** is `game/content/overworld/map_layout.tres`: open it, expand `positions` and edit the Vector2 for a node id (x and y are fractions
 of the map area, 0 to 1, top-left is 0,0). A place missing from the list is placed on a ring automatically. Which places and routes exist, and what you can do
@@ -84,8 +89,8 @@ there, comes from the world template (`services/api/templates/*.json`), not from
 
 `client_main.tscn` holds the whole battle screen: `SidePanel` (status, AP, skill list, facing buttons, plan queue, Undo / Clear / Ready,
 error line, combat log), `Banner`, the guest `ConnectPanel`, `ResultPanel`, and the `AccountFlow` coordinator. Every screen before a battle is its own
-scene in `game/client/screens/` (`sign_in_screen`, `world_picker_screen`, `join_screen`, `world_hub_screen`, `character_screen`,
-`character_creator`, `overworld_screen`, `world_management_screen`, `settings_screen`, `lobby_screen`). `account_flow.tscn` just instances them one under another and shows one at a time; open a screen's own
+scene in `game/client/screens/` (`sign_in_screen`, `world_picker_screen`, `join_screen`, `character_screen`,
+`character_creator`, `overworld_screen`, `world_management_screen`, `settings_screen`, `lobby_screen`). `account_flow.tscn` instances the game view full-screen and the other screens in a centred `MenuPanel`, and shows one at a time; open a screen's own
 scene to edit it. The character creator is deliberately a separate scene so it can grow (see docs/guide/01-login-screen.md).
 The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the code when a battle begins; `ResultPanel` appears when it ends.
 - **Move, resize, restyle anything**: containers, margins, fonts, colours, icons, extra decoration labels or images.
@@ -95,6 +100,16 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 - **One look for everything:** `ui/theme.tres` is applied on the root; edit it in the Theme editor (default font size, panel style, button styles).
 - The 3D board area is the `BoardHolder` node; its width is set by `SidePanel`'s left offset (360 px), so resize both together.
 - To preview the screens without a server, press **F6** on `client_main.tscn` (guest connect panel). The battle panel fills in once connected.
+
+## Menu background
+
+`game/content/ui/menu_background.tscn` is the animated backdrop behind sign-in, the world picker and the other menu screens. It is a normal scene, so everything is editable in the editor:
+- **Layers** (back to front): `Sky` (a vertical gradient), `Moon` (a radial gradient), `Hills` (`Far`, `Mid`, `Near`: `Polygon2D` silhouettes you can reshape with the polygon tool), `FogLayer/Fog`. All of this is **placeholder art**:
+  replace any layer with your own `TextureRect` or sprites, or add layers.
+- **Motion:** the `AnimationPlayer` has one looping animation, `drift` (40 s, ping-pong): the hills sway at different speeds (parallax), the fog drifts and the moon breathes. Add tracks for new layers there.
+  Animate a layer's `position` only on nodes that sit at the top-left of their parent (as `FogLayer` does); a `Control` placed with anchors loses its anchored place if its `position` is keyed.
+- Leave `mouse_filter` on *Ignore* for every layer, or the backdrop would swallow clicks meant for the menu.
+- `client_main.tscn` has it as `MenuBackground`. The client shows and plays it in the menus and hides and pauses it during a battle.
 
 ## Escape button and presence timer
 

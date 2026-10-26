@@ -197,11 +197,12 @@ func _flow() -> AccountFlow:
 
 func test_the_coordinator_shows_exactly_one_screen_at_a_time() -> void:
 	var f := _flow()
-	assert_eq(f._screens.size(), 10)
+	assert_eq(f._screens.size(), 8)
 	for pick: Control in f._screens:
 		f._show(pick)
 		for other: Control in f._screens:
 			assert_eq(other.visible, other == pick, "%s while showing %s" % [other.name, pick.name])
+		assert_eq((f.get_node("%MenuPanel") as Control).visible, pick != f.get_node("%OverworldScreen"), "the menu panel is only for the menu screens")
 	f.free()
 
 
@@ -478,38 +479,88 @@ func test_world_management_renames_removes_members_and_guards_delete() -> void:
 	s.free()
 
 
-func test_world_hub_shows_who_you_are_and_announces_each_door() -> void:
-	var s := _screen("res://game/client/screens/world_hub_screen.tscn") as WorldHubScreen
+func test_game_view_opens_windows_from_the_dock_and_the_menu_announces_its_doors() -> void:
+	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
 	var got: Array[String] = []
-	for sig in ["overworld_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
-			"switch_world_pressed"]:
+	for sig in ["settings_pressed", "management_pressed", "switch_world_pressed", "sign_out_pressed", "character_requested"]:
 		s.connect(sig, func() -> void: got.append(sig))
-	s.show_loading("Hollow")
-	assert_eq((s.get_node("%HubWorldLabel") as Label).text, "Hollow")
-	assert_true(not (s.get_node("%ManagementButton") as Control).visible and not (s.get_node("%ResumeButton") as Control).visible)
-	s.show_character({"name": "Aldric", "level": 2, "class": "warrior"})
-	assert_eq((s.get_node("%HubCharacterLabel") as Label).text, "Aldric, level 2 warrior")
-	var party := {"relation": "leader", "leader": {"name": "Aldric"}, "members": [{}, {}], "node_name": "Hollowmere", "instance": null}
-	s.show_party(party)
-	assert_eq((s.get_node("%HubPartyLabel") as Label).text, "Your party: you +1, at Hollowmere")
-	assert_true(not (s.get_node("%ResumeButton") as Control).visible)
-	party["instance"] = {"activity_name": "Training skirmish", "status": "active"}
-	s.show_party(party)
-	assert_eq((s.get_node("%ResumeButton") as Button).text, "Return to battle")
-	assert_true((s.get_node("%ResumeButton") as Control).visible)
+	for key in ["activity", "party", "character", "menu"]:
+		assert_true(not s.is_window_open(key), key + " starts closed")
+	s.set_header("Hollow - Aldric, level 2 warrior")
+	assert_eq((s.get_node("%HudLabel") as Label).text, "Hollow - Aldric, level 2 warrior")
+	(s.get_node("%PartyToggle") as Button).button_pressed = true
+	assert_true(s.is_window_open("party") and not s.is_window_open("activity"), "one window per button")
+	# the window's own X pops its dock button back up
+	((s.get_node("%PartyWindow") as FloatingWindow).get_node("Layout/TitleBar/CloseButton") as Button).pressed.emit()
+	assert_true(not s.is_window_open("party") and not (s.get_node("%PartyToggle") as Button).button_pressed)
+	(s.get_node("%CharacterToggle") as Button).button_pressed = true
+	assert_eq(got, ["character_requested"] as Array[String], "the page is loaded when its window opens")
+	(s.get_node("%CharacterToggle") as Button).button_pressed = false
+	assert_true(not s.is_window_open("character"))
+	# a place picked on the map opens the Activity window
+	s.show_world(_overview(), [_pview("leader", 1)])
+	(s.get_node("%MapCanvas") as MapCanvas).button_for("blackwood").pressed.emit()
+	assert_true(s.is_window_open("activity") and (s.get_node("%ActivityToggle") as Button).button_pressed)
+	# the menu: the host's door is only there for the host, with a count of who is waiting
+	assert_true(not (s.get_node("%ManagementButton") as Control).visible)
 	s.set_host(true)
 	assert_true((s.get_node("%ManagementButton") as Control).visible)
 	s.set_pending_count(3)
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management (3 requests)")
+	assert_eq((s.get_node("%MenuToggle") as Button).text, "Menu (3)")
 	s.set_pending_count(1)
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management (1 request)")
 	s.set_pending_count(0)
 	assert_eq((s.get_node("%ManagementButton") as Button).text, "World management")
-	for b in ["OverworldButton", "CharacterButton", "ManagementButton", "SettingsButton", "ResumeButton", "SwitchWorldButton"]:
+	assert_eq((s.get_node("%MenuToggle") as Button).text, "Menu")
+	for b in ["SettingsButton", "ManagementButton", "SwitchWorldButton", "SignOutButton"]:
 		_press(s, b)
-	assert_eq(got, ["overworld_pressed", "character_pressed", "management_pressed", "settings_pressed", "resume_pressed",
-		"switch_world_pressed"] as Array[String])
+	assert_eq(got, ["character_requested", "settings_pressed", "management_pressed", "switch_world_pressed",
+		"sign_out_pressed"] as Array[String])
 	s.free()
+
+
+func test_party_requests_show_on_the_party_dock_button() -> void:
+	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
+	s.show_world(_overview(), [_pview("leader", 1)])
+	s.show_requests([{"id": "r1", "name": "Tessa", "class": "rogue"}, {"id": "r2", "name": "Bran", "class": "warrior"}])
+	assert_eq((s.get_node("%PartyToggle") as Button).text, "Party (2)")
+	s.show_requests([])
+	assert_eq((s.get_node("%PartyToggle") as Button).text, "Party")
+	s.free()
+
+
+func test_floating_window_opens_and_closes_and_says_so() -> void:
+	var holder := Control.new()
+	var w := (load("res://game/content/ui/floating_window.tscn") as PackedScene).instantiate() as FloatingWindow
+	w.title = "Test"
+	holder.add_child(w)
+	(Engine.get_main_loop() as SceneTree).root.add_child(holder)
+	var closed: Array[bool] = []
+	w.closed.connect(func() -> void: closed.append(true))
+	(w.get_node("Layout/TitleBar/CloseButton") as Button).pressed.emit()
+	assert_true(not w.visible and closed.size() == 1, "the X closes it and reports it")
+	w.open()
+	assert_true(w.visible)
+	assert_eq((w.get_node("Layout/TitleBar/TitleLabel") as Label).text, "Test")
+	w.body_min_size = Vector2(400, 300)
+	assert_eq((w.get_node("Layout/Scroll") as ScrollContainer).custom_minimum_size, Vector2(400, 300))
+	holder.free()
+
+
+func test_status_line_writes_to_the_menu_and_the_game_view() -> void:
+	var l := StatusLine.new()
+	l.menu = Label.new()
+	l.toast_label = Label.new()
+	l.toast_box = Control.new()
+	l.text = "Request sent."
+	assert_eq(l.text, "Request sent.")
+	assert_eq(l.toast_label.text, "Request sent.")
+	assert_true(l.toast_box.visible)
+	l.text = ""
+	assert_true(not l.toast_box.visible, "no empty bar over the map")
+	for n: Node in [l.menu, l.toast_label, l.toast_box]:
+		n.free()
 
 
 func test_join_requests_show_the_chosen_name_with_the_email() -> void:
@@ -764,3 +815,17 @@ func test_fog_tiles_are_called_out_and_unseen_events_are_tinted() -> void:
 	c.call("_on_events", [{"type": "hit", "round": 1, "beat": 1, "text": "Something unseen hits Aldric"}])
 	assert_true("Something unseen" in (c.get_node("%LogView") as RichTextLabel).get_parsed_text())
 	c.free()
+
+
+func test_menu_background_plays_in_the_menus_and_pauses_in_a_battle() -> void:
+	var s := _screen("res://game/content/ui/menu_background.tscn") as MenuBackground
+	var anim := s.get_node("%AnimationPlayer") as AnimationPlayer
+	assert_eq(s.mouse_filter, Control.MOUSE_FILTER_IGNORE, "never swallows a click meant for the menu")
+	assert_true(anim.has_animation("drift") and anim.get_animation("drift").loop_mode != Animation.LOOP_NONE, "a looping animation")
+	s.set_playing(true)
+	assert_true(s.visible and anim.is_playing())
+	s.set_playing(false)
+	assert_true(not s.visible and not anim.is_playing(), "stopped and hidden for the battle")
+	s.set_playing(true)
+	assert_true(s.visible and anim.is_playing())
+	s.free()

@@ -19,6 +19,7 @@ class Identity:
     user_id: uuid.UUID
     is_guest: bool = False
     email: str | None = None  # display label only, never used for authorization
+    session_id: str | None = None  # the Supabase login this token belongs to; absent on guest tokens
 
 
 class TokenVerifier:
@@ -51,7 +52,9 @@ class TokenVerifier:
         if guest and not self.settings.guests_enabled:
             raise AuthError("Guest tokens are not accepted by this server")
         email = claims.get("email")
-        return Identity(user_id=user_id, is_guest=guest, email=email[:120] if isinstance(email, str) else None)
+        sid = claims.get("session_id")
+        return Identity(user_id=user_id, is_guest=guest, email=email[:120] if isinstance(email, str) else None,
+                        session_id=sid[:64] if isinstance(sid, str) and not guest else None)
 
 
 def server_key_ok(settings: Settings, presented: str | None) -> bool:

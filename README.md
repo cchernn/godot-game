@@ -18,7 +18,7 @@ to launch several clients, optionally with args `--url=ws://127.0.0.1:9080 --nam
    (project URL, publishable key).
 2. `scripts/stack.sh init && scripts/stack.sh up` starts the API, battle server and web client in Docker.
 3. Open http://localhost:8080, or open the project in the Godot editor on Windows and press F5. Sign in, pick a world and create a character once,
-   then open **Parties** from the world hub. The client falls back to the guest connect screen if `client_env.json`
+   and you are on the map. The client falls back to the guest connect screen if `client_env.json`
    is absent or `--url=` is passed.
 
 `tests/account_flow_check.gd` is a live check of the sign-in flow (needs `ACCT_EMAIL`/`ACCT_PASSWORD`
@@ -27,12 +27,13 @@ and a running API); it is not part of `scripts/test.sh`.
 ## The player flow
 Open the page -> sign in or create an account (Supabase; new accounts confirm by email) -> **choose a world** from the list (every
 world is listed with your standing in it, even when there is only one) -> if you are not in it yet, **Request to
-join** and wait for the host (the host sees a pending count on **World management** in the hub and approves or rejects) -> create a
-character once -> you land on the **world hub** (Overworld, Character, World management for the host, Settings) -> **Overworld**: the map and your party (every
-character is in one; alone it is a party of one). The party leader travels it along discovered routes and starts activities at the place it stands; players
-standing at the same place can ask a leader to let them in -> the battle server gathers the party -> plan and ready each round -> result screen
-(victory/defeat, XP) -> **Continue** back to the hub. A closed tab can come back to a battle in
-progress from the hub (**Return to battle**). Screens: `docs/editor-guide.md`; a real-browser test of this flow: `tests/browser/README.md`.
+join** and wait for the host (the host sees a pending count on **Menu** and approves or rejects under **World management**) -> create a
+character once -> you are **on the map**, the game view that fills the screen. A dock along the bottom opens windows over it: **Activity** (what can be done at the place
+you picked, Start, Travel), **Party** (your party, join requests, other parties here to ask to join), **Character**, and **Menu** (Settings, World management for the host, choose another world, sign out).
+Everyone arrives as a party of one; the party leader travels it along discovered routes and starts activities at the place it stands; players
+standing at the same place can ask a leader to let them in -> the battle server gathers the party -> plan and ready each round (**Escape** leaves a fight) -> result screen
+(victory/defeat/escaped, XP) -> **Continue** back to the map. A closed tab can come back to a battle in
+progress from the Party window (**Return to battle**). Screens: `docs/editor-guide.md`; a real-browser test of this flow: `tests/browser/README.md`.
 One battle server hosts every party in every world, one room per party.
 
 ## Deployment

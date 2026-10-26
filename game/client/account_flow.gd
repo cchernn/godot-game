@@ -1,5 +1,5 @@
 class_name AccountFlow
-extends PanelContainer
+extends Control
 ## The coordinator for everything before a battle: sign-in, world, joining, the world hub (parties, character,
 ## world management, settings), the party lobby and the wait for the battle server.
 ## Each screen is its own scene (game/client/screens/*.tscn) and only announces events through signals; this
@@ -21,7 +21,9 @@ var env: Dictionary = {}
 var access_token: String = ""
 var user_email: String = ""
 
-@onready var status: Label = %StatusLabel
+## The message line: under the menu screens, or over the map in the game view.
+var status := StatusLine.new()
+@onready var _menu_panel: PanelContainer = %MenuPanel
 @onready var _refresh_timer: Timer = %RefreshTimer
 ## Tells the server this player is still in the world (every few seconds; set in the scene). The server treats a player as
 ## away after about 30 seconds without one.
@@ -29,16 +31,15 @@ var user_email: String = ""
 @onready var _sign_in: SignInScreen = %SignInScreen
 @onready var _worlds_screen: WorldPickerScreen = %WorldPickerScreen
 @onready var _join: JoinScreen = %JoinScreen
-@onready var _hub: WorldHubScreen = %WorldHubScreen
-@onready var _character_screen: CharacterScreen = %CharacterScreen
 @onready var _creator: CharacterCreator = %CharacterCreator
 @onready var _overworld: OverworldScreen = %OverworldScreen
 @onready var _management: WorldManagementScreen = %WorldManagementScreen
 @onready var _settings: SettingsScreen = %SettingsScreen
 @onready var _lobby: LobbyScreen = %LobbyScreen
 ## Every screen; exactly one is visible at a time.
-@onready var _screens: Array[Control] = [_sign_in, _worlds_screen, _join, _hub, _character_screen, _creator,
-	_overworld, _management, _settings, _lobby]
+@onready var _screens: Array[Control] = [_sign_in, _worlds_screen, _join, _creator, _overworld, _management, _settings, _lobby]
+## The character page lives in the game view's Character window.
+@onready var _character_screen: CharacterScreen = _overworld.character_screen
 
 var _refresh_token: String = ""
 var _world: Dictionary = {}
@@ -68,6 +69,9 @@ static func load_env() -> Dictionary:
 
 
 func _ready() -> void:
+	status.menu = %StatusLabel
+	status.toast_box = _overworld.toast_box
+	status.toast_label = _overworld.toast_label
 	_refresh_timer.timeout.connect(_on_refresh_due)
 	_presence_timer.timeout.connect(_send_presence)
 	_sign_in.sign_in_pressed.connect(_on_sign_in_requested.bind(false))
@@ -81,14 +85,12 @@ func _ready() -> void:
 	_join.check_pressed.connect(_check_membership)
 	_join.back_pressed.connect(_step_worlds)
 	_join.sign_out_pressed.connect(sign_out_and_show)
-	_hub.overworld_pressed.connect(_step_overworld)
-	_hub.character_pressed.connect(_step_character_view)
-	_hub.management_pressed.connect(_step_management)
-	_hub.settings_pressed.connect(_step_settings)
-	_hub.resume_pressed.connect(_resume_party)
-	_hub.switch_world_pressed.connect(_step_worlds)
-	_character_screen.back_pressed.connect(_step_hub)
-	_settings.back_pressed.connect(_step_hub)
+	_overworld.character_requested.connect(_step_character_view)
+	_overworld.management_pressed.connect(_step_management)
+	_overworld.settings_pressed.connect(_step_settings)
+	_overworld.switch_world_pressed.connect(_step_worlds)
+	_overworld.sign_out_pressed.connect(sign_out_and_show)
+	_settings.back_pressed.connect(_enter_game)
 	_settings.sign_out_pressed.connect(sign_out_and_show)
 	_settings.change_password_requested.connect(_on_change_password_requested)
 	_settings.display_name_requested.connect(_on_display_name_requested)
@@ -105,12 +107,11 @@ func _ready() -> void:
 	_overworld.decision_made.connect(_decide_party_request)
 	_overworld.resume_pressed.connect(_resume_party)
 	_overworld.refresh_requested.connect(_refresh_overworld)
-	_overworld.back_pressed.connect(_step_hub)
 	_management.decision_made.connect(_decide)
 	_management.rename_requested.connect(_on_rename_requested)
 	_management.remove_member_requested.connect(_on_remove_member_requested)
 	_management.delete_requested.connect(_on_delete_world_requested)
-	_management.back_pressed.connect(_step_hub)
+	_management.back_pressed.connect(_enter_game)
 	_lobby.leave_pressed.connect(_on_leave_pressed)
 	_show(_sign_in)
 
@@ -126,6 +127,7 @@ func setup(p_env: Dictionary) -> void:
 func _show(screen: Control) -> void:
 	for s in _screens:
 		s.visible = s == screen
+	_menu_panel.visible = screen != _overworld # the game view is the whole screen; every other screen is a panel
 
 
 func _say(text: String) -> void:
@@ -189,8 +191,19 @@ func _server_url() -> String:
 
 
 func api(method: int, path: String, body: Variant = null) -> Dictionary:
-	return await _request(method, _api_base() + path,
+	var r := await _request(method, _api_base() + path,
 		["Authorization: Bearer %s" % access_token, "Content-Type: application/json"], body)
+	if r["status"] == 423 and access_token != "": # another login holds this account; this one is dropped, not the holder's
+		_drop_refused_login(r["error"])
+	return r
+
+
+## This login was refused because the account is signed in somewhere else. It forgets its own session without releasing
+## the account (that belongs to the login that holds it) and returns to the sign-in screen with the reason.
+func _drop_refused_login(reason: String) -> void:
+	_forget_session()
+	_step_sign_in()
+	status.text = reason
 
 
 # ---------- Session ----------
@@ -203,7 +216,17 @@ func sign_in(email: String, password: String) -> String:
 	if r["status"] != 200:
 		return r["error"]
 	_adopt_session(r["data"])
-	return ""
+	return await _claim_session()
+
+
+## Claims the account's single login. Returns "" when this login holds it, else the reason it was refused (and forgets the session).
+func _claim_session() -> String:
+	var r := await _request(HTTPClient.METHOD_POST, _api_base() + "/me/session",
+		["Authorization: Bearer %s" % access_token, "Content-Type: application/json"])
+	if r["status"] == 423:
+		_forget_session()
+		return r["error"]
+	return "" # any other failure (API down) is left to the next call to report
 
 
 ## Returns an error message, "" when signed in, or a notice starting with "Check" when the
@@ -222,13 +245,17 @@ func sign_up(email: String, password: String) -> String:
 
 
 func sign_out() -> void:
+	_forget_session()
+	backed_out.emit()
+
+
+func _forget_session() -> void:
 	access_token = ""
 	_refresh_token = ""
 	user_email = ""
 	_refresh_timer.stop()
 	var cf := ConfigFile.new()
 	cf.save(SESSION_PATH)
-	backed_out.emit()
 
 
 func _adopt_session(d: Dictionary) -> void:
@@ -254,10 +281,15 @@ func _restore_session() -> void:
 	_refresh_token = cf.get_value("session", "refresh_token")
 	user_email = cf.get_value("session", "email", "")
 	status.text = "Restoring your session…"
-	if await _refresh():
-		_step_worlds()
-	else:
+	if not await _refresh():
 		_step_sign_in()
+		return
+	var refused := await _claim_session()
+	if refused != "":
+		_step_sign_in()
+		status.text = refused
+		return
+	_step_worlds()
 
 
 func _refresh() -> bool:
@@ -279,6 +311,9 @@ func _on_refresh_due() -> void:
 
 
 func sign_out_and_show() -> void:
+	if access_token != "": # free the account at once for the next login (a closed tab frees it after the grace instead)
+		await _request(HTTPClient.METHOD_POST, _api_base() + "/me/session/release",
+			["Authorization: Bearer %s" % access_token, "Content-Type: application/json"])
 	sign_out()
 	status.text = ""
 	_step_sign_in()
@@ -344,14 +379,18 @@ func _step_world(world: Dictionary) -> void:
 	_world = _membership["world"]
 	if _membership["status"] == "member":
 		await _post_presence() # first, so the server can tell a new session from a reload before the party is read
-		_step_hub()
+		_enter_game()
 	else:
 		_show_join()
 
 
 ## The heartbeat timer: only while the player is inside a world they belong to (the hub, the map and the battle all count).
 func _send_presence() -> void:
-	if _sign_in.visible or _worlds_screen.visible:
+	if access_token == "":
+		return
+	if _sign_in.visible or _worlds_screen.visible or _world.is_empty():
+		await _request(HTTPClient.METHOD_POST, _api_base() + "/me/session", # no world yet: still keeps the login alive
+			["Authorization: Bearer %s" % access_token, "Content-Type: application/json"])
 		return
 	await _post_presence()
 
@@ -362,15 +401,19 @@ func _post_presence() -> void:
 	await api(HTTPClient.METHOD_POST, "/worlds/%s/presence" % _world["id"])
 
 
-# ---------- World hub ----------
+# ---------- Entering the game ----------
 
-## The hub is the world's main menu. It also decides whether the player still needs a character.
-func _step_hub() -> void:
-	_show(_hub)
-	_hub.show_loading(_world["name"])
-	_hub.set_host(_membership.get("is_host", false))
+## Opens the game view of the world (the map, with you in your party). First checks the player has a character; if not, the
+## creator comes first.
+func _enter_game() -> void:
+	status.text = ""
+	_idle_seen = false
+	_shown_requests = []
+	_show(_overworld)
+	_overworld.show_loading()
+	_overworld.set_host(_membership.get("is_host", false))
 	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters/me" % _world["id"])
-	if not _hub.is_visible_in_tree():
+	if not _overworld.is_visible_in_tree():
 		return
 	if r["status"] == 404 or r["status"] == 403:
 		_step_create_character()
@@ -379,18 +422,12 @@ func _step_hub() -> void:
 		status.text = r["error"]
 		return
 	_character = r["data"]
-	_hub.show_character(_character)
-	var p := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties/me" % _world["id"])
-	if _hub.is_visible_in_tree() and p["status"] == 200:
-		_hub.show_party(p["data"])
-	if _membership.get("is_host", false):
-		var pending := await api(HTTPClient.METHOD_GET, "/worlds/%s/requests" % _world["id"])
-		if _hub.is_visible_in_tree() and pending["status"] == 200:
-			_hub.set_pending_count((pending["data"] as Array).size())
+	_overworld.set_header("%s - %s, level %d %s" % [_world["name"], _character["name"], _character["level"], _character["class"]])
+	_refresh_overworld()
 
 
+## Fills the Character window (it asks for this each time it is opened).
 func _step_character_view() -> void:
-	_show(_character_screen)
 	_character_screen.show_checking(_world["name"])
 	_character_screen.show_character(_character)
 	var b := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters/me/battles" % _world["id"])
@@ -407,7 +444,7 @@ func _on_retire_requested() -> void:
 		status.text = r["error"]
 		return
 	_character = {}
-	await _step_hub()  # no active character: the hub sends the player to the creator
+	await _enter_game()  # no active character: the creator comes next
 	status.text = "Character retired. Create a new one."
 
 
@@ -457,7 +494,7 @@ func _on_create_character_requested(character_name: String, class_id: String) ->
 		{"name": character_name, "class": class_id})
 	if c["status"] == 201:
 		status.text = ""
-		_step_hub()
+		_enter_game()
 	else:
 		status.text = c["error"]
 
@@ -487,7 +524,7 @@ func _check_membership() -> void:
 	_membership = m["data"]
 	if _membership["status"] == "member":
 		status.text = ""
-		_step_hub()
+		_enter_game()
 	else:
 		_show_join()
 
@@ -559,15 +596,6 @@ func _decide(request_id: String, approve: bool, row: JoinRequestRow) -> void:
 
 # ---------- Overworld ----------
 
-func _step_overworld() -> void:
-	status.text = ""
-	_idle_seen = false
-	_shown_requests = []
-	_show(_overworld)
-	_overworld.show_loading()
-	_refresh_overworld()
-
-
 ## Re-reads the map and the parties (also asked for by the overworld's timer). When the party's leader starts an
 ## activity, the other members are taken into the battle from here.
 func _refresh_overworld() -> void:
@@ -579,6 +607,10 @@ func _refresh_overworld() -> void:
 		status.text = ov["error"] if ov["status"] != 200 else ps["error"]
 		return
 	_overworld.show_world(ov["data"], ps["data"])
+	if _membership.get("is_host", false):
+		var pending := await api(HTTPClient.METHOD_GET, "/worlds/%s/requests" % _world["id"])
+		if pending["status"] == 200:
+			_overworld.set_pending_count((pending["data"] as Array).size())
 	var mine := _my_party(ps["data"])
 	if mine.is_empty():
 		return
@@ -667,7 +699,7 @@ func _my_party(parties: Array) -> Dictionary:
 	return {}
 
 
-## Back into the battle the party is fighting (from the hub or the overworld).
+## Back into the battle the party is fighting.
 func _resume_party() -> void:
 	var r := await api(HTTPClient.METHOD_GET, "/worlds/%s/parties/me" % _world["id"])
 	if r["status"] != 200:
@@ -677,7 +709,7 @@ func _resume_party() -> void:
 	if run != null and run["status"] == "active":
 		_enter_battle(str(run["id"]))
 	else:
-		_step_hub() # it ended in the meantime
+		_refresh_overworld() # it ended in the meantime
 
 
 # ---------- Battle server ----------
@@ -701,7 +733,7 @@ func _on_leave_pressed() -> void:
 	_back_to_world()
 
 
-## After a battle: back to the hub of the world just played (fresh XP, and the party is gone).
+## After a battle: back to the map of the world just played (fresh XP, and the party is idle again).
 func return_to_menu() -> void:
 	status.text = ""
 	_back_to_world()
@@ -709,6 +741,6 @@ func return_to_menu() -> void:
 
 func _back_to_world() -> void:
 	if _world.has("id"):
-		_step_hub()
+		_enter_game()
 	else:
 		_step_worlds()

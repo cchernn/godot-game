@@ -8,6 +8,9 @@ signal retire_requested
 
 const RESULT_TEXT := {"players_win": "Victory", "players_lose": "Defeat", "draw": "Draw", "escaped": "Escaped"}
 
+## Off when the page lives in a window of its own (the in-game Character window closes with its X).
+@export var show_back_button: bool = true
+
 @onready var _world: Label = %WorldLabel
 @onready var _character: Label = %CharacterLabel
 @onready var _xp: Label = %XpLabel
@@ -24,6 +27,7 @@ var _name := ""
 
 
 func _ready() -> void:
+	%CharacterBackButton.visible = show_back_button
 	%CharacterBackButton.pressed.connect(func() -> void: back_pressed.emit())
 	_confirm.text_changed.connect(func(_t: String) -> void: _sync_retire())
 	_retire.pressed.connect(func() -> void:

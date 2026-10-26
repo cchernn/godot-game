@@ -12,7 +12,7 @@ from . import rules
 from .auth import AuthError, Identity, TokenVerifier, server_key_ok
 from .config import Settings, get_settings
 from .db import make_pool, migrate
-from .repo import Conflict, Forbidden, Invalid, NotFound, Repository, RepoError
+from .repo import Conflict, Forbidden, Invalid, Locked, NotFound, Repository, RepoError
 from .templates import TemplateStore
 
 
@@ -108,7 +108,8 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     if pool is None:
         pool = make_pool(settings.database_url)
         migrate(pool)
-    app.state.repo = Repository(pool, TemplateStore(settings.templates_dir), presence_seconds=settings.presence_seconds)
+    app.state.repo = Repository(pool, TemplateStore(settings.templates_dir), presence_seconds=settings.presence_seconds,
+                               session_seconds=settings.session_seconds)
 
     def repo(request: Request) -> Repository:
         return request.app.state.repo
@@ -117,9 +118,12 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(401, "Missing bearer token")
         try:
-            return request.app.state.verifier.verify(authorization[7:].strip())
+            ident = request.app.state.verifier.verify(authorization[7:].strip())
         except AuthError as e:
             raise HTTPException(401, str(e)) from e
+        if ident.session_id:  # every call keeps the login alive, and a second login is refused (423) while it is
+            request.app.state.repo.claim_session(ident.user_id, ident.session_id)
+        return ident
 
     def server_only(authorization: Annotated[str | None, Header()] = None) -> None:
         presented = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else None
@@ -129,7 +133,7 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     @app.exception_handler(RepoError)
     def repo_error(_: Request, e: RepoError):
         from fastapi.responses import JSONResponse
-        code = {NotFound: 404, Forbidden: 403, Conflict: 409, Invalid: 422}.get(type(e), 400)
+        code = {NotFound: 404, Forbidden: 403, Conflict: 409, Locked: 423, Invalid: 422}.get(type(e), 400)
         return JSONResponse({"detail": str(e)}, status_code=code)
 
     @app.get("/health")
@@ -158,6 +162,22 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     @app.post("/worlds", status_code=201)
     def create_world(body: WorldIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
         return r.create_world(user.user_id, body.name, body.template_id)
+
+    @app.post("/me/session", status_code=204)
+    def claim_session(user: Identity = Depends(current_user)) -> None:
+        """Claims the account's login (current_user already did) and keeps it alive: the client's heartbeat between worlds."""
+
+    @app.post("/me/session/release", status_code=204)
+    def release_session(request: Request, authorization: Annotated[str | None, Header()] = None) -> None:
+        """Sign-out. Verifies the token without claiming, so a refused login cannot release the one that holds the account."""
+        if not authorization or not authorization.lower().startswith("bearer "):
+            raise HTTPException(401, "Missing bearer token")
+        try:
+            ident = request.app.state.verifier.verify(authorization[7:].strip())
+        except AuthError as e:
+            raise HTTPException(401, str(e)) from e
+        if ident.session_id:
+            request.app.state.repo.release_session(ident.user_id, ident.session_id)
 
     @app.get("/me/profile")
     def get_profile(user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
@@ -208,6 +228,8 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
             ident = request.app.state.verifier.verify(body.token)
         except AuthError as e:
             raise HTTPException(401, str(e)) from e
+        if ident.session_id:
+            r.claim_session(ident.user_id, ident.session_id)
         if not r.is_member(body.world_id, ident.user_id):
             raise HTTPException(403, "Not a member of this world")
         out = {"user_id": str(ident.user_id), "guest": ident.is_guest,

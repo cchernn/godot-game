@@ -1,137 +1,322 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://game/client/screens/overworld_screen.gd" id="1"]
 [ext_resource type="PackedScene" path="res://game/content/ui/join_request_row.tscn" id="2"]
 [ext_resource type="Script" path="res://game/client/screens/map_canvas.gd" id="3"]
 [ext_resource type="PackedScene" path="res://game/content/ui/map_node.tscn" id="4"]
 [ext_resource type="Resource" path="res://game/content/overworld/map_layout.tres" id="5"]
+[ext_resource type="PackedScene" path="res://game/content/ui/floating_window.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://game/client/screens/character_screen.tscn" id="7"]
 
-[node name="OverworldScreen" type="HBoxContainer"]
-theme_override_constants/separation = 10
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toast"]
+bg_color = Color(0.08, 0.08, 0.1, 0.88)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 12.0
+content_margin_top = 6.0
+content_margin_right = 12.0
+content_margin_bottom = 6.0
+
+[node name="OverworldScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 script = ExtResource("1")
 row_scene = ExtResource("2")
 
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.11, 0.13, 0.12, 1)
+
 [node name="MapCanvas" type="Control" parent="."]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(560, 520)
-layout_mode = 2
-size_flags_horizontal = 3
 clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 script = ExtResource("3")
 layout = ExtResource("5")
 node_scene = ExtResource("4")
+margin = Vector2(110, 90)
 
-[node name="SideScroll" type="ScrollContainer" parent="."]
-custom_minimum_size = Vector2(330, 520)
-layout_mode = 2
-horizontal_scroll_mode = 0
-
-[node name="Side" type="VBoxContainer" parent="SideScroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 6
-
-[node name="PartyTitleLabel" type="Label" parent="SideScroll/Side"]
+[node name="HudLabel" type="Label" parent="."]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 1
+offset_left = 16.0
+offset_top = 10.0
+offset_right = 420.0
+offset_bottom = 36.0
+mouse_filter = 2
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
 
-[node name="PartyStatusLabel" type="Label" parent="SideScroll/Side"]
+[node name="Windows" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="ActivityWindow" parent="Windows" instance=ExtResource("6")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+offset_left = 24.0
+offset_top = 60.0
+offset_right = 344.0
+offset_bottom = 330.0
+title = "Activity"
+body_min_size = Vector2(320, 220)
+
+[node name="PartyWindow" parent="Windows" instance=ExtResource("6")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -384.0
+offset_top = 60.0
+offset_right = -24.0
+offset_bottom = 480.0
+grow_horizontal = 0
+title = "Party"
+body_min_size = Vector2(340, 380)
+
+[node name="CharacterWindow" parent="Windows" instance=ExtResource("6")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -250.0
+offset_right = 250.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+title = "Character"
+body_min_size = Vector2(480, 440)
+
+[node name="MenuWindow" parent="Windows" instance=ExtResource("6")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 120.0
+offset_top = -250.0
+offset_right = 380.0
+offset_bottom = -62.0
+grow_horizontal = 2
+grow_vertical = 0
+title = "Menu"
+body_min_size = Vector2(240, 150)
+
+[node name="PlaceLabel" type="Label" parent="Windows/ActivityWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="RosterList" type="ItemList" parent="SideScroll/Side"]
+[node name="ActivityList" type="ItemList" parent="Windows/ActivityWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+
+[node name="StartButton" type="Button" parent="Windows/ActivityWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Start the selected activity"
+
+[node name="TravelButton" type="Button" parent="Windows/ActivityWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Travel"
+
+[node name="PlaceHintLabel" type="Label" parent="Windows/ActivityWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="PartyTitleLabel" type="Label" parent="Windows/PartyWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PartyStatusLabel" type="Label" parent="Windows/PartyWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="RosterList" type="ItemList" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 70)
 layout_mode = 2
 
-[node name="MakeLeaderButton" type="Button" parent="SideScroll/Side"]
+[node name="MakeLeaderButton" type="Button" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 disabled = true
 text = "Make selected player the leader"
 
-[node name="PartyLeaveButton" type="Button" parent="SideScroll/Side"]
+[node name="PartyLeaveButton" type="Button" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 text = "Leave party"
 
-[node name="ReturnButton" type="Button" parent="SideScroll/Side"]
+[node name="ReturnButton" type="Button" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 text = "Return to battle"
 
-[node name="RequestsBox" type="VBoxContainer" parent="SideScroll/Side"]
+[node name="RequestsBox" type="VBoxContainer" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="RequestsLabel" type="Label" parent="SideScroll/Side/RequestsBox"]
+[node name="RequestsLabel" type="Label" parent="Windows/PartyWindow/Layout/Scroll/Body/RequestsBox"]
 layout_mode = 2
 text = "Asking to join"
 
-[node name="PartyRequestRows" type="VBoxContainer" parent="SideScroll/Side/RequestsBox"]
+[node name="PartyRequestRows" type="VBoxContainer" parent="Windows/PartyWindow/Layout/Scroll/Body/RequestsBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Separator1" type="HSeparator" parent="SideScroll/Side"]
+[node name="Separator" type="HSeparator" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 layout_mode = 2
 
-[node name="PlaceLabel" type="Label" parent="SideScroll/Side"]
+[node name="OthersLabel" type="Label" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-autowrap_mode = 3
 
-[node name="ActivityList" type="ItemList" parent="SideScroll/Side"]
+[node name="OthersList" type="ItemList" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 70)
 layout_mode = 2
 
-[node name="StartButton" type="Button" parent="SideScroll/Side"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-text = "Start the selected activity"
-
-[node name="TravelButton" type="Button" parent="SideScroll/Side"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-text = "Travel"
-
-[node name="PlaceHintLabel" type="Label" parent="SideScroll/Side"]
-unique_name_in_owner = true
-layout_mode = 2
-autowrap_mode = 3
-
-[node name="Separator2" type="HSeparator" parent="SideScroll/Side"]
-layout_mode = 2
-
-[node name="OthersLabel" type="Label" parent="SideScroll/Side"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="OthersList" type="ItemList" parent="SideScroll/Side"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 60)
-layout_mode = 2
-
-[node name="AskButton" type="Button" parent="SideScroll/Side"]
+[node name="AskButton" type="Button" parent="Windows/PartyWindow/Layout/Scroll/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 text = "Ask to join"
 
-[node name="OverworldBackButton" type="Button" parent="SideScroll/Side"]
+[node name="CharacterScreen" parent="Windows/CharacterWindow/Layout/Scroll/Body" instance=ExtResource("7")]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Back to hub"
+size_flags_horizontal = 3
+show_back_button = false
+
+[node name="SettingsButton" type="Button" parent="Windows/MenuWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Settings"
+
+[node name="ManagementButton" type="Button" parent="Windows/MenuWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "World management"
+
+[node name="SwitchWorldButton" type="Button" parent="Windows/MenuWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Choose another world"
+
+[node name="SignOutButton" type="Button" parent="Windows/MenuWindow/Layout/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Sign out"
+
+[node name="Dock" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -52.0
+offset_right = 200.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 8
+
+[node name="ActivityToggle" type="Button" parent="Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Activity"
+
+[node name="PartyToggle" type="Button" parent="Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Party"
+
+[node name="CharacterToggle" type="Button" parent="Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Character"
+
+[node name="MenuToggle" type="Button" parent="Dock"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+toggle_mode = true
+text = "Menu"
+
+[node name="ToastBox" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -260.0
+offset_top = 12.0
+offset_right = 260.0
+offset_bottom = 48.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_toast")
+
+[node name="ToastLabel" type="Label" parent="ToastBox"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="OverworldTimer" type="Timer" parent="."]
 unique_name_in_owner = true
 wait_time = 3.0
+
+[editable path="Windows/ActivityWindow"]
+[editable path="Windows/PartyWindow"]
+[editable path="Windows/CharacterWindow"]
+[editable path="Windows/MenuWindow"]

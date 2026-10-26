@@ -6,7 +6,7 @@ import psycopg.errors
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from .errors import Conflict, Forbidden, Invalid, NotFound, RepoError  # noqa: F401
+from .errors import Conflict, Forbidden, Invalid, Locked, NotFound, RepoError  # noqa: F401
 from .templates import TemplateError, TemplateStore
 from .party_repo import PartyMixin
 from .world_repo import WorldMixin
@@ -21,10 +21,32 @@ def _row(r: dict | None) -> dict | None:
 class Repository(PartyMixin, WorldMixin):
     """All durable reads/writes. Gameplay rules never live here."""
 
-    def __init__(self, pool: ConnectionPool, templates: TemplateStore | None = None, presence_seconds: int = 30):
+    def __init__(self, pool: ConnectionPool, templates: TemplateStore | None = None, presence_seconds: int = 30,
+                 session_seconds: int = 30):
         self.pool = pool
+        self.session_seconds = session_seconds
         self.presence_seconds = presence_seconds
         self.templates = templates or TemplateStore()
+
+    # ---- login session ----
+
+    def claim_session(self, user_id: uuid.UUID, session_id: str) -> None:
+        """Takes (or refreshes) the account's single login. A different login holds it while it was heard from within
+        `session_seconds`; then this raises Locked and nothing changes, so credentials alone never take a live login over."""
+        with self.pool.connection() as conn:
+            row = conn.execute(
+                "insert into player_sessions (user_id, session_id) values (%s, %s) "
+                "on conflict (user_id) do update set session_id = excluded.session_id, last_seen_at = now() "
+                "where player_sessions.session_id = excluded.session_id "
+                "or player_sessions.last_seen_at < now() - make_interval(secs => %s) returning user_id",
+                (user_id, session_id, self.session_seconds)).fetchone()
+        if row is None:
+            raise Locked("This account is signed in on another device")
+
+    def release_session(self, user_id: uuid.UUID, session_id: str) -> None:
+        """Sign-out: frees the account at once, but only for the login that holds it."""
+        with self.pool.connection() as conn:
+            conn.execute("delete from player_sessions where user_id = %s and session_id = %s", (user_id, session_id))
 
     # ---- worlds ----
 

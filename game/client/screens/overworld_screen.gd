@@ -1,9 +1,12 @@
 class_name OverworldScreen
-extends HBoxContainer
-## The world map and your party. The map shows the places you know and where your party stands; the side
-## panel is your party (roster, leader tools, join requests), the place you picked (its activities, Travel) and
-## the other parties standing here. The party leader travels and starts activities; everyone else watches.
-## It only reports what the player asked for; the coordinator calls the API and feeds the answers back.
+extends Control
+## The game view of a world: the map fills the screen and windows float over it, opened from the dock at the bottom.
+##   Activity  - the place you picked on the map: what can be done there, Start and Travel.
+##   Party     - your party (roster, leader tools, join requests) and the other parties standing here to ask to join.
+##   Character - your character page.
+##   Menu      - Settings, World management (host), Choose another world, Sign out.
+## The party leader travels and starts activities; everyone else watches. It only reports what the player asked for;
+## the coordinator calls the API and feeds the answers back.
 
 signal travel_requested(node_id: String)
 signal start_requested(activity_id: String)
@@ -16,7 +19,12 @@ signal decision_made(request_id: String, approve: bool, row: JoinRequestRow)
 signal resume_pressed
 ## Asked on a timer while the screen is visible, so the map and parties stay current.
 signal refresh_requested
-signal back_pressed
+## The Character window was opened (the coordinator loads the page).
+signal character_requested
+signal settings_pressed
+signal management_pressed
+signal switch_world_pressed
+signal sign_out_pressed
 
 ## One of these per player asking to join.
 @export var row_scene: PackedScene
@@ -45,12 +53,41 @@ var _place_activities: Array = []
 @onready var _others_list: ItemList = %OthersList
 @onready var _ask: Button = %AskButton
 @onready var _timer: Timer = %OverworldTimer
+@onready var _hud: Label = %HudLabel
+@onready var _manage: Button = %ManagementButton
+@onready var _party_toggle: Button = %PartyToggle
+@onready var _toggles: Dictionary = {
+	"activity": [%ActivityToggle, %ActivityWindow], "party": [%PartyToggle, %PartyWindow],
+	"character": [%CharacterToggle, %CharacterWindow], "menu": [%MenuToggle, %MenuWindow]}
+## The character page inside the Character window.
+@onready var character_screen: CharacterScreen = %CharacterScreen
+## The message line over the map (errors and notices). The coordinator writes it through its StatusLine.
+@onready var toast_box: Control = %ToastBox
+@onready var toast_label: Label = %ToastLabel
+
+var _pending_requests: int = 0
 
 
 func _ready() -> void:
+	for key: String in _toggles:
+		var toggle: Button = _toggles[key][0]
+		var window: FloatingWindow = _toggles[key][1]
+		toggle.toggled.connect(func(on: bool) -> void:
+			if on:
+				window.open()
+				if key == "character":
+					character_requested.emit()
+			else:
+				window.hide())
+		window.closed.connect(func() -> void: toggle.set_pressed_no_signal(false))
 	_map.node_pressed.connect(func(id: String) -> void:
 		_selected_node = id
-		_refresh_view())
+		_refresh_view()
+		open_window("activity"))
+	%SettingsButton.pressed.connect(func() -> void: settings_pressed.emit())
+	_manage.pressed.connect(func() -> void: management_pressed.emit())
+	%SwitchWorldButton.pressed.connect(func() -> void: switch_world_pressed.emit())
+	%SignOutButton.pressed.connect(func() -> void: sign_out_pressed.emit())
 	_roster.item_selected.connect(func(_i: int) -> void: _refresh_party_buttons())
 	_activity_list.item_selected.connect(func(_i: int) -> void: _refresh_place_buttons())
 	_others_list.item_selected.connect(func(_i: int) -> void: _refresh_others_buttons())
@@ -66,11 +103,39 @@ func _ready() -> void:
 		if id != "":
 			start_requested.emit(id))
 	_ask.pressed.connect(_on_ask_pressed)
-	%OverworldBackButton.pressed.connect(func() -> void: back_pressed.emit())
 	_timer.timeout.connect(func() -> void: refresh_requested.emit())
 	visibility_changed.connect(func() -> void:
 		if not is_visible_in_tree():
 			_timer.stop()) # never keep refreshing a screen nobody sees
+
+
+## Opens one of the windows ("activity", "party", "character" or "menu") as if its dock button was pressed.
+func open_window(key: String) -> void:
+	var toggle: Button = _toggles[key][0]
+	if not toggle.button_pressed:
+		toggle.button_pressed = true # its toggled handler opens the window
+	else:
+		(_toggles[key][1] as FloatingWindow).move_to_front()
+
+
+func is_window_open(key: String) -> bool:
+	return (_toggles[key][1] as Control).visible
+
+
+## "World - Character, level N class" in the corner.
+func set_header(text: String) -> void:
+	_hud.text = text
+
+
+## Only the host sees World management.
+func set_host(is_host: bool) -> void:
+	_manage.visible = is_host
+	_manage.text = "World management"
+
+
+func set_pending_count(count: int) -> void:
+	_manage.text = "World management (%d request%s)" % [count, "" if count == 1 else "s"] if count > 0 else "World management"
+	%MenuToggle.text = "Menu (%d)" % count if count > 0 else "Menu"
 
 
 func show_loading() -> void:
@@ -86,6 +151,8 @@ func show_loading() -> void:
 		b.hide()
 	_requests_box.hide()
 	clear_requests()
+	_pending_requests = 0
+	_party_toggle.text = "Party"
 	_timer.start()
 
 
@@ -116,6 +183,8 @@ func my_party() -> Dictionary:
 func show_requests(requests: Array) -> void:
 	clear_requests()
 	_requests_box.visible = not requests.is_empty()
+	_pending_requests = requests.size()
+	_party_toggle.text = "Party (%d)" % _pending_requests if _pending_requests > 0 else "Party"
 	for req: Dictionary in requests:
 		var row := row_scene.instantiate() as JoinRequestRow
 		_request_rows.add_child(row)
@@ -202,6 +271,8 @@ func _show_party() -> void:
 	if _mine["relation"] != "leader" or run != null:
 		_requests_box.hide()
 		clear_requests()
+		_pending_requests = 0
+		_party_toggle.text = "Party"
 	_refresh_party_buttons()
 
 

@@ -1,0 +1,187 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://game/client/menu_background.gd" id="1"]
+
+[sub_resource type="Gradient" id="Gradient_sky"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.03, 0.03, 0.07, 1, 0.1, 0.09, 0.17, 1, 0.2, 0.14, 0.2, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_sky"]
+gradient = SubResource("Gradient_sky")
+width = 4
+height = 256
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
+
+[sub_resource type="Gradient" id="Gradient_moon"]
+offsets = PackedFloat32Array(0, 0.35, 0.36, 1)
+colors = PackedColorArray(0.95, 0.93, 0.85, 1, 0.9, 0.88, 0.8, 1, 0.9, 0.88, 0.8, 0.18, 0.9, 0.88, 0.8, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_moon"]
+gradient = SubResource("Gradient_moon")
+width = 256
+height = 256
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="Gradient_fog"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.7, 0.72, 0.8, 0, 0.7, 0.72, 0.8, 0.16, 0.7, 0.72, 0.8, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_fog"]
+gradient = SubResource("Gradient_fog")
+width = 4
+height = 128
+fill_from = Vector2(0, 0)
+fill_to = Vector2(0, 1)
+
+[sub_resource type="Animation" id="Animation_drift"]
+resource_name = "drift"
+length = 40.0
+loop_mode = 2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Hills/Far:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 40),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(-20, 0), Vector2(20, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Hills/Mid:position")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 40),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(-45, 0), Vector2(45, 0)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Hills/Near:position")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 40),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(-80, 0), Vector2(80, 0)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("FogLayer:position")
+tracks/3/interp = 2
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 40),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(-140, 0), Vector2(140, 0)]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("Moon:modulate")
+tracks/4/interp = 2
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 20, 40),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 0.85), Color(1, 1, 1, 1), Color(1, 1, 1, 0.85)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_menu"]
+_data = {
+&"drift": SubResource("Animation_drift")
+}
+
+[node name="MenuBackground" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Sky" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_sky")
+expand_mode = 1
+
+[node name="Moon" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.74
+anchor_top = 0.17
+anchor_right = 0.74
+anchor_bottom = 0.17
+offset_left = -110.0
+offset_top = -110.0
+offset_right = 110.0
+offset_bottom = 110.0
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_moon")
+expand_mode = 1
+
+[node name="Hills" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -360.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="Far" type="Polygon2D" parent="Hills"]
+color = Color(0.13, 0.12, 0.2, 1)
+polygon = PackedVector2Array(-300, 140, -150, 90, 0, 120, 160, 60, 330, 110, 520, 40, 700, 105, 900, 70, 1100, 120, 1300, 60, 1500, 100, 1700, 55, 1900, 110, 2200, 80, 2200, 700, -300, 700)
+
+[node name="Mid" type="Polygon2D" parent="Hills"]
+color = Color(0.08, 0.08, 0.14, 1)
+polygon = PackedVector2Array(-300, 230, -100, 180, 120, 215, 330, 150, 560, 210, 780, 160, 1000, 225, 1230, 170, 1450, 215, 1700, 165, 1950, 220, 2200, 190, 2200, 700, -300, 700)
+
+[node name="Near" type="Polygon2D" parent="Hills"]
+color = Color(0.04, 0.04, 0.08, 1)
+polygon = PackedVector2Array(-300, 310, -60, 270, 180, 300, 420, 255, 650, 305, 900, 265, 1150, 310, 1400, 270, 1650, 305, 1900, 265, 2200, 300, 2200, 700, -300, 700)
+
+[node name="FogLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Fog" type="TextureRect" parent="FogLayer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = -0.2
+anchor_top = 0.62
+anchor_right = 1.2
+anchor_bottom = 0.92
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_fog")
+expand_mode = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+unique_name_in_owner = true
+libraries = {
+&"": SubResource("AnimationLibrary_menu")
+}
+autoplay = "drift"

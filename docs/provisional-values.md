@@ -39,6 +39,8 @@ Unit stats and skills are `.tres` resources under `game/content/` and are all pr
 - **Presence window:** 30 seconds (`GAME_API_PRESENCE_SECONDS`); the client sends a heartbeat every 10 seconds (`PresenceTimer` in `account_flow.tscn`).
   A player returning after the window leaves an idle party whose other members are offline; idle parties whose members are all offline are disbanded when
   the world's parties are listed. A character with no heartbeat on record counts as online.
+- **One login per account:** a login holds the account for 30 seconds after its last API call or heartbeat (`GAME_API_SESSION_SECONDS`); another login is refused (HTTP 423,
+  "signed in on another device") until then, or until the holder signs out. Nothing takes a live login over. A closed tab frees the account after the window.
 - **Party joining:** only a lone character, only at the party's node, only while the party is idle; the leader decides.
 - **Classes** (`services/api/app/rules.py`) and their client mirror are placeholders.
 - **Simultaneous wipe** is a draw.

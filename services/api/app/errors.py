@@ -16,3 +16,7 @@ class Conflict(RepoError):
 
 class Invalid(RepoError):
     pass
+
+
+class Locked(RepoError):
+    """The account is held by another live login."""

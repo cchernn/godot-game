@@ -11,19 +11,19 @@ snippet below is from this repo. The exercises were run for real before they wer
 ```
 ClientMain  (client_main.tscn)         owns the battle UI and the connection to the battle server
 └─ AccountFlow  (account_flow.tscn)    the COORDINATOR: session, API calls, which screen is showing
-   └─ Layout (VBoxContainer)
-      ├─ TitleLabel
-      ├─ SignInScreen        sign_in_screen.tscn        ← the login
-      ├─ WorldPickerScreen   world_picker_screen.tscn
-      ├─ JoinScreen          join_screen.tscn
-      ├─ WorldHubScreen      world_hub_screen.tscn      the main menu of a world
-      ├─ CharacterScreen     character_screen.tscn
-      ├─ CharacterCreator    character_creator.tscn
-      ├─ OverworldScreen     overworld_screen.tscn      (map + party; rows: ui/join_request_row.tscn)
-      ├─ WorldManagementScreen  world_management_screen.tscn  (rows: ui/join_request_row.tscn)
-      ├─ SettingsScreen      settings_screen.tscn
-      ├─ LobbyScreen         lobby_screen.tscn          waiting on the battle server
-      └─ StatusLabel         one shared message line
+   ├─ OverworldScreen        overworld_screen.tscn      the game view, full screen: the map, a dock and windows
+   │                         (its Character window holds character_screen.tscn; rows: ui/join_request_row.tscn)
+   └─ MenuPanel              the centred panel for everything outside the game view
+      └─ Layout (VBoxContainer)
+         ├─ TitleLabel
+         ├─ SignInScreen        sign_in_screen.tscn        ← the login
+         ├─ WorldPickerScreen   world_picker_screen.tscn
+         ├─ JoinScreen          join_screen.tscn
+         ├─ CharacterCreator    character_creator.tscn
+         ├─ WorldManagementScreen  world_management_screen.tscn  (rows: ui/join_request_row.tscn)
+         ├─ SettingsScreen      settings_screen.tscn
+         ├─ LobbyScreen         lobby_screen.tscn          waiting on the battle server
+         └─ StatusLabel         the message line (over the map, it is shown as a bar instead)
 ```
 
 Each screen is its own scene and script in `game/client/screens/`. `account_flow.tscn` only *instances* them and shows exactly one at a time.
@@ -86,7 +86,7 @@ form and reporting input, it belongs in the screen.*
 | Show exactly one screen | `_show(screen)` and the `_screens` array | Loops the array and sets `visible`. Adding a screen means adding it to `_screens`. |
 | Talk to the API / Supabase | `_request()`, `api()`, `_auth_call()` | One `HTTPRequest` per call, `await`ed. Returns `{status, data, error}` so callers never touch raw responses. |
 | Keep the session | `sign_in()`, `_adopt_session()`, `_refresh()` | Details below. |
-| Decide where to go next | `_step_worlds()`, `_step_world()`, `_step_hub()`, `_step_overworld()`, ... | The routing. Reads like a story: sign in → picker → membership check → hub (or the join screen) → overworld → battle. |
+| Decide where to go next | `_step_worlds()`, `_step_world()`, `_enter_game()`, ... | The routing. Reads like a story: sign in → picker → membership check → the map (or the join screen) → battle. |
 
 It exposes only a small surface to `ClientMain`: the signals `entered(server, token, name, world, party)`, `backed_out`, `token_refreshed`, and the methods `show_lobby()` and
 `return_to_menu()`. Everything else is internal.
@@ -191,8 +191,8 @@ A "tip" screen shown once after sign-in and before the world picker. This is the
 
 ### Exercise C: read before you change
 Open `character_creator.gd` and `account_flow.gd` side by side. Trace what happens from the moment you press **Create** in the creator to
-the moment the new character appears on the world hub. You should cross: the signal `create_requested` → `_on_create_character_requested`
-→ `api(POST /characters)` → `_step_hub()` → `WorldHubScreen.show_character()`. That is the whole pattern in one path.
+the moment the map opens with the new character in its corner. You should cross: the signal `create_requested` → `_on_create_character_requested`
+→ `api(POST /characters)` → `_enter_game()` → `OverworldScreen.set_header()`. That is the whole pattern in one path.
 
 ## 7. Where an elaborate character creator would go
 

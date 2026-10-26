@@ -43,6 +43,7 @@ var _preview_sig: int = 0
 @onready var account: AccountFlow = %AccountFlow
 @onready var url_edit: LineEdit = %UrlEdit
 @onready var name_edit: LineEdit = %NameEdit
+@onready var menu_background: MenuBackground = %MenuBackground
 @onready var banner: Label = %Banner
 @onready var status_label: Label = %StatusLabel
 @onready var ap_label: Label = %ApLabel
@@ -151,7 +152,7 @@ func _enter_account_mode(env: Dictionary) -> void:
 	account.show()
 	account.setup(env)
 	connect_panel = account
-	connect_status = account.status
+	connect_status = account.status.menu
 	account.entered.connect(func(server_url: String, token: String, display_name: String, world_id: String, instance_id: String) -> void:
 		net.access_token = token
 		net.world_id = world_id
@@ -251,6 +252,7 @@ func _append_recap() -> void:
 
 ## The board and side panel only exist while a battle is on; before and after, the screen is the menu.
 func _set_battle_view(on: bool) -> void:
+	menu_background.set_playing(not on)
 	board_holder.visible = on
 	side_panel.visible = on
 	unit_strip.visible = on

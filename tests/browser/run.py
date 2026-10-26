@@ -1,19 +1,21 @@
 """Drives the deployed web client in headless Chromium (one browser per player) and saves screenshots to /out.
 The UI is drawn on a canvas, so interaction is by coordinates; screenshots show each screen.
 Env: HOST_EMAIL/HOST_PASSWORD (existing host account), TESTER_EMAIL/TESTER_PASSWORD (signs up in the page),
-STAGE (party | pending | reset | tour), URL, CLICKS (tour: "x,y,label;x,y,label"),
-ESCAPE_XY (party: "x,y;x,y" where the Escape button can be (planning, resolving); the tester presses it twice mid-battle), PROBE=1 (party: stop at the battle screen)."""
+STAGE (party | pending | reset | session | tour), URL, CLICKS (tour: "x,y,label;x,y,label"),
+ESCAPE_XY (party: "x,y;x,y" where the Escape button can be (planning, resolving); the tester presses it twice mid-battle), PROBE=request|return|1 (party: stop after the request arrives / the Party window after a reload / at the battle screen)."""
 import os, time
 from playwright.sync_api import sync_playwright
 
 OUT = "/out"
 W, H = 1280, 720
-# Overworld side panel, with a party of one at Hollowmere (set from the screenshots in tests/browser/README.md)
-OTHERS = (950, 513)    # first row of "Other parties here"
-ASK = (950, 585)       # Ask to join
-APPROVE = (1020, 299)  # Approve on the first join request
-ACTIVITY = (950, 394)  # first activity at the party's place
-START = (950, 477)     # Start the selected activity
+# The game view (1280x720): the dock along the bottom opens windows over the map
+DOCK_ACTIVITY, DOCK_PARTY, DOCK_CHARACTER, DOCK_MENU = (485, 688), (585, 688), (685, 688), (785, 688)
+OTHERS = (950, 360)    # first row of "Other parties here" in the Party window
+ASK = (1050, 442)      # Ask to join
+APPROVE = (1130, 347)  # Approve on the first join request (Party window)
+RETURN = (1050, 286)   # Return to battle in the Party window
+ACTIVITY = (200, 171)  # first activity in the Activity window
+START = (218, 275)     # Start the selected activity
 URL = os.environ.get("URL", "http://localhost:8080")
 STAGE = os.environ.get("STAGE", "party")
 LOGS = []
@@ -68,10 +70,12 @@ def main() -> None:
                 pending_flow(b)
             elif STAGE == "reset":
                 reset_flow(b)
+            elif STAGE == "session":
+                session_flow(b)
             elif STAGE == "tour":
                 tour(b)
             else:
-                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | reset | tour)")
+                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | reset | session | tour)")
         finally:
             with open(f"{OUT}/console.log", "w") as f:
                 f.write("\n".join(LOGS))
@@ -91,45 +95,56 @@ def tour(b):
         host.shot(f"{i:02d}_{label}")
 
 
+def open_world(player, wait=6):
+    """From the world picker to the game view (the map), where the party lives."""
+    player.click(640, 238, wait=1)            # "Test World"
+    player.click(640, 353, wait=wait)         # Open selected world
+
+
 def party_flow(b):
-    """The host (a party of one at Hollowmere) and the tester meet on the overworld: the tester asks the host's party to
-    let them in, the host approves and starts an activity, the tester is taken into the battle by itself, drops out and
-    comes back, and both play to the result and return to the hub. Needs both accounts to be members of the world with
-    a character each, both parties idle at the same place (tests/browser/parties.py lists them)."""
+    """The host (a party of one at Hollowmere) and the tester meet on the map: the tester asks the host's party to let
+    them in (Party window), the host approves and starts an activity (Activity window), the tester is taken into the
+    battle by itself, drops out and comes back (Party window > Return to battle), and both play to the result and return
+    to the map. Needs both accounts to be members of the world with a character each, both parties idle at the same place
+    (tests/browser/parties.py lists them)."""
     host = Player(b, "host")
     tester = Player(b, "tester")
     host.sign_in(os.environ["HOST_EMAIL"], os.environ["HOST_PASSWORD"])
-    host.click(640, 238, wait=1)              # "Test World" (the host's only world)
-    host.click(640, 353, wait=4)              # Open selected world
-    host.shot("01_hub")
-    host.click(640, 327, wait=3)              # Overworld
-    host.shot("02_overworld_alone")
+    open_world(host)
+    host.click(*DOCK_PARTY, wait=2)
+    host.shot("01_game_alone")
     tester.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
-    tester.click(640, 238, wait=1)            # "Test World"
-    tester.click(640, 353, wait=4)            # Open selected world
-    tester.click(640, 348, wait=3)            # Overworld (no World management button for a member, so a row lower)
-    tester.shot("01_overworld")
-    tester.click(OTHERS[0], OTHERS[1], wait=1)    # the host's party in "Other parties here"
-    tester.click(ASK[0], ASK[1], wait=3)          # Ask to join
+    open_world(tester)
+    tester.click(*DOCK_PARTY, wait=2)
+    tester.shot("01_game")
+    tester.click(*OTHERS, wait=1)             # the host's party in "Other parties here"
+    tester.click(*ASK, wait=3)                # Ask to join
     tester.shot("02_requested")
     time.sleep(5)
     host.shot("03_request_arrived")
-    host.click(APPROVE[0], APPROVE[1], wait=3)    # Approve
+    if os.environ.get("PROBE") == "request":
+        return
+    host.click(*APPROVE, wait=3)              # Approve
     host.shot("04_party_of_two")
-    time.sleep(6)                             # the tester's overworld notices on its own
+    time.sleep(6)                             # the tester's map notices on its own
     tester.shot("03_in_the_party")
-    host.click(ACTIVITY[0], ACTIVITY[1], wait=1)  # Training skirmish
-    host.click(START[0], START[1], wait=2)        # Start
+    host.click(*DOCK_PARTY, wait=1)           # close the Party window, open Activity
+    host.click(*DOCK_ACTIVITY, wait=1)
+    host.click(*ACTIVITY, wait=1)             # Training skirmish
+    host.shot("04b_activity_picked")
+    host.click(*START, wait=2)                # Start
     state(host, "battle", 90)                 # (the gather lobby can be over before a screen can see it)
     state(tester, "battle", 90)
     host.shot("05_battle")
     tester.page.reload()                      # the tester's tab dies mid-battle...
     time.sleep(float(os.environ.get("WAIT", "18")))
     tester.shot("04_after_reload")
-    tester.click(640, 238, wait=1)            # ...they sign back in (the session is restored) and pick the world
-    tester.click(640, 353, wait=9)            # (the hub fills in the party line a moment after it opens)
-    tester.shot("05_hub_with_battle")
-    tester.click(640, 327, wait=1)            # Return to battle
+    open_world(tester, wait=6)                # ...they sign back in (the session is restored) and pick the world
+    tester.click(*DOCK_PARTY, wait=3)
+    tester.shot("05_party_with_battle")
+    if os.environ.get("PROBE") == "return":
+        return
+    tester.click(*RETURN, wait=1)             # Return to battle
     state(tester, "battle", 60)
     tester.shot("06_back_in_battle")
     if os.environ.get("PROBE"):                # only look at the battle screen, to find click positions
@@ -158,8 +173,8 @@ def party_flow(b):
     host.shot("08_result")
     host.click(440, 445, wait=4)              # Continue
     tester.click(440, 445, wait=4)
-    host.shot("09_hub_after")
-    tester.shot("07_hub_after")
+    host.shot("09_game_after")
+    tester.shot("07_game_after")
     state(host, "menu", 10)
 
 
@@ -169,9 +184,22 @@ def reset_flow(b):
     Needs the tester to be a member of the host's party and both to have been offline for a minute (tests/browser/parties.py)."""
     tester = Player(b, "tester")
     tester.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
-    tester.click(640, 238, wait=1)            # "Test World"
-    tester.click(640, 353, wait=9)            # Open selected world (the hub fills in the party line a moment later)
-    tester.shot("01_hub_after_the_gap")
+    open_world(tester, wait=6)
+    tester.click(*DOCK_PARTY, wait=3)
+    tester.shot("01_party_after_the_gap")
+
+
+def session_flow(b):
+    """One login per account: a second browser signing in with the same credentials is refused and the first carries on."""
+    first = Player(b, "first")
+    first.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
+    time.sleep(2)
+    first.shot("01_signed_in")
+    second = Player(b, "second")
+    second.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
+    second.shot("02_second_refused")
+    time.sleep(12)                            # past a heartbeat of the first: it must still be signed in
+    first.shot("03_first_still_in")
 
 
 def pending_flow(b):

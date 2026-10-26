@@ -72,6 +72,10 @@ party playing one activity; the battle server runs it, and when it ends the part
   and under `max_party_size`. Approval moves the character out of their party of one and withdraws their other pending asks. There is no direct join.
 - **Display name:** `GET/PUT /me/profile` (`profiles`, 1 to 24 printable characters, set on the Settings screen). Other players see it instead of the email prefix: the owner column of
   the character list and the members list. The host's join-request list shows "Name (email)", so the host still knows who is asking.
+- **One login per account:** the Supabase access token carries a `session_id` (one per sign-in; a reload that restores the saved session keeps it). `player_sessions` records
+  the holder and when it was last heard from. Every API call (`current_user`) and the battle server's auth check claim it; a different `session_id` is refused with 423 while
+  the holder was heard from within `session_seconds` (30, PROVISIONAL, `GAME_API_SESSION_SECONDS`), so credentials alone never take over a live login. Sign-out releases it
+  (`POST /me/session/release`, only by the holder); the client heartbeat also runs between worlds (`POST /me/session`). Guest tokens have no `session_id` and are not tracked.
 - **Presence:** the client sends `POST /worlds/{id}/presence` every 10 s while it is inside a world (hub, map and battle alike; the `PresenceTimer` in
   `account_flow.tscn`). A player counts as online for `presence_seconds` (30, PROVISIONAL, `GAME_API_PRESENCE_SECONDS`) after the last one. A player who comes back after
   a longer gap is on a new session: if nobody else in their idle party is online, they leave it and are alone, at the same node. Listing the world's parties disbands
@@ -92,7 +96,7 @@ party playing one activity; the battle server runs it, and when it ends the part
   whole roster in roster order, and starts when everyone has arrived or after `lobby.gather_seconds` (a late or absent member keeps their seat and can still
   join in, like a dropped player). Rooms are keyed by party; two parties never see each other. Guest play (local development) is one anonymous room that
   starts at `lobby.players_required`.
-- **Reconnecting:** a party's seat belongs to the character, so a closed tab can return from the hub (**Return to battle**) while the party is active. If the
+- **Reconnecting:** a party's seat belongs to the character, so a closed tab can return from the Party window (**Return to battle**) while the party is active. If the
   server restarted and lost the room, the next arrival builds a fresh room and battle for the same roster. If nobody comes back within the grace period the
   server cancels the party.
 - **The end:** the server sends `s_result` ({outcome, rounds, xp, you, saved}) at once (saved=false) and again after the API stored the result (saved=true), and
@@ -133,8 +137,8 @@ hovering one says so, and events about an unseen enemy are tinted purple in the 
 
 ## Worlds and rooms
 - After sign-in the client always shows a world picker (`GET /worlds/available`: every world, its player count and the caller's standing; no member identities).
-  Opening a world runs the membership flow (member -> the world hub, otherwise request to join). The hub (parties, character, world management for the host,
-  settings) is the main menu; a player without a character is sent to the character creator from there.
+  Opening a world runs the membership flow (member -> straight onto the map, otherwise request to join). There is no hub: the map is the game, and the character page, the party,
+  the activities and a Menu (settings, world management for the host, switching world, signing out) are windows over it. A player without a character is sent to the character creator first.
 - `scripts/e2e_edge.py` checks three awkward situations end to end: a party member who never connects (their seat is played by timeouts and they are stored), the battle server restarting mid-battle (the players reconnect and the party's battle ends once; the new room replays the battle from the start), and a player escaping in round 1 (stored as `escaped` with participation XP).
 - The battle server is not bound to a world. `--world-id` optionally restricts a server to one world. `scripts/e2e_worlds.py` runs two parties in two worlds at
   once on one server.
@@ -159,12 +163,14 @@ screens' signals, and calls methods on the screens to tell them what to show. `C
 and talks to `AccountFlow` through its signals (`entered(server, token, name, world, party)`, `backed_out`, `token_refreshed`) and `show_lobby` / `return_to_menu`. Adding a screen means a new
 scene + script, one instance in `account_flow.tscn`, one entry in `_screens`, and the signal connections (worked example in docs/guide/01-login-screen.md).
 
-The screens: `sign_in`, `world_picker`, `join` (ask to join a world), `world_hub` (the main menu), `character` (view), `character_creator`, `overworld`
-(the map and your party), `world_management` (the host's join requests), `settings` and `lobby` (waiting on the battle server for the party to arrive).
+The screens: `sign_in`, `world_picker`, `join` (ask to join a world), `character_creator`, `overworld`
+(the game view: the map with the Activity, Party, Character and Menu windows; the character page is the `character` screen inside its window), `world_management` (the host's join requests), `settings` and `lobby` (waiting on the battle server for the party to arrive).
 `overworld` and `join` refresh themselves on a `Timer` while visible.
 
-The **overworld** (`overworld_screen.tscn`) has the map on the left (`MapCanvas`: a button per discovered node, a line per discovered route) and a side panel:
-your party (roster, leader tools, join requests, Leave), the place you picked (its activities, Start, Travel) and the other parties standing at your node (Ask
-to join). The leader travels the party and starts activities; the rest watch, and are taken into the battle when it starts. Node positions are not in the
+The **overworld** (`overworld_screen.tscn`) is the game view. The map (`MapCanvas`: a button per discovered node, a line per discovered route) fills the whole screen,
+the dock along the bottom opens four windows (`FloatingWindow`, `game/content/ui/floating_window.tscn`, each closed with its X): **Activity** (the place you picked: its
+activities, Start, Travel), **Party** (your party: roster, leader tools, join requests, Leave, Return to battle; and the other parties standing at your node, to Ask to join),
+**Character** and **Menu**. `AccountFlow` is a full-screen control holding the game view and, centred over it, the `MenuPanel` with the other screens (sign-in, worlds, join,
+creator, world management, settings, lobby). Messages (`StatusLine`) show under the menu screens, or as a bar over the map. The leader travels the party and starts activities; the rest watch, and are taken into the battle when it starts. Node positions are not in the
 world template (that is game data); they live in `game/content/overworld/map_layout.tres` (a `MapLayout`, fractions of the map area). Nodes missing from it are
 spread around a ring, so a new template node always shows up. Why a button is disabled is written under it (`OverworldScreen.travel_problem` / `start_problem`).
