@@ -1,7 +1,8 @@
 """Drives the deployed web client in headless Chromium (one browser per player) and saves screenshots to /out.
 The UI is drawn on a canvas, so interaction is by coordinates; screenshots show each screen.
 Env: HOST_EMAIL/HOST_PASSWORD (existing host account), TESTER_EMAIL/TESTER_PASSWORD (signs up in the page),
-STAGE (party | pending | tour), URL, CLICKS (tour: "x,y,label;x,y,label")."""
+STAGE (party | pending | reset | tour), URL, CLICKS (tour: "x,y,label;x,y,label"),
+ESCAPE_XY (party: "x,y;x,y" where the Escape button can be (planning, resolving); the tester presses it twice mid-battle), PROBE=1 (party: stop at the battle screen)."""
 import os, time
 from playwright.sync_api import sync_playwright
 
@@ -65,10 +66,12 @@ def main() -> None:
                 party_flow(b)
             elif STAGE == "pending":
                 pending_flow(b)
+            elif STAGE == "reset":
+                reset_flow(b)
             elif STAGE == "tour":
                 tour(b)
             else:
-                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | tour)")
+                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | reset | tour)")
         finally:
             with open(f"{OUT}/console.log", "w") as f:
                 f.write("\n".join(LOGS))
@@ -129,6 +132,18 @@ def party_flow(b):
     tester.click(640, 327, wait=1)            # Return to battle
     state(tester, "battle", 60)
     tester.shot("06_back_in_battle")
+    if os.environ.get("PROBE"):                # only look at the battle screen, to find click positions
+        host.shot("06_probe")
+        return
+    if os.environ.get("ESCAPE_XY"):           # the tester leaves the fight (two presses) and watches
+        spots = [tuple(map(int, xy.split(","))) for xy in os.environ["ESCAPE_XY"].split(";")]
+        for press in (1, 2):                  # the button sits further right while resolving, so every press tries each spot
+            for x, y in spots:
+                tester.click(x, y, wait=0.5)
+            tester.shot(f"06{'bc'[press - 1]}_escape_press_{press}")
+        time.sleep(4)
+        tester.shot("06d_escaped_spectating")
+        host.shot("06e_host_sees_escape")
     deadline = time.time() + 720
     while time.time() < deadline:
         if host.page.evaluate("window.unnamedState") == "result" and tester.page.evaluate("window.unnamedState") == "result":
@@ -146,6 +161,17 @@ def party_flow(b):
     host.shot("09_hub_after")
     tester.shot("07_hub_after")
     state(host, "menu", 10)
+
+
+def reset_flow(b):
+    """The tester opens the world after being away longer than the presence window while in the host's party: the hub
+    should show a party of one (the party was reset), and the host's party should be without them.
+    Needs the tester to be a member of the host's party and both to have been offline for a minute (tests/browser/parties.py)."""
+    tester = Player(b, "tester")
+    tester.sign_in(os.environ["TESTER_EMAIL"], os.environ["TESTER_PASSWORD"])
+    tester.click(640, 238, wait=1)            # "Test World"
+    tester.click(640, 353, wait=9)            # Open selected world (the hub fills in the party line a moment later)
+    tester.shot("01_hub_after_the_gap")
 
 
 def pending_flow(b):

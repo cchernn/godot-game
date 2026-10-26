@@ -343,16 +343,21 @@ func _step_world(world: Dictionary) -> void:
 	_membership = m["data"]
 	_world = _membership["world"]
 	if _membership["status"] == "member":
-		await _send_presence() # first, so the server can tell a new session from a reload before the party is read
+		await _post_presence() # first, so the server can tell a new session from a reload before the party is read
 		_step_hub()
 	else:
 		_show_join()
 
 
-## The heartbeat: only while the player is inside a world they belong to (the hub, the map and the battle all count).
+## The heartbeat timer: only while the player is inside a world they belong to (the hub, the map and the battle all count).
 func _send_presence() -> void:
-	if access_token == "" or _world.is_empty() or _membership.get("status", "") != "member" \
-			or _sign_in.visible or _worlds_screen.visible:
+	if _sign_in.visible or _worlds_screen.visible:
+		return
+	await _post_presence()
+
+
+func _post_presence() -> void:
+	if access_token == "" or _world.is_empty() or _membership.get("status", "") != "member":
 		return
 	await api(HTTPClient.METHOD_POST, "/worlds/%s/presence" % _world["id"])
 
