@@ -74,6 +74,7 @@ func _ready() -> void:
 		var window: FloatingWindow = _toggles[key][1]
 		toggle.toggled.connect(func(on: bool) -> void:
 			if on:
+				_close_others(key) # the windows share one spot, so only one category is open at a time
 				window.open()
 				if key == "character":
 					character_requested.emit()
@@ -107,6 +108,13 @@ func _ready() -> void:
 	visibility_changed.connect(func() -> void:
 		if not is_visible_in_tree():
 			_timer.stop()) # never keep refreshing a screen nobody sees
+
+
+func _close_others(keep: String) -> void:
+	for key: String in _toggles:
+		if key != keep:
+			(_toggles[key][0] as Button).set_pressed_no_signal(false)
+			(_toggles[key][1] as Control).hide()
 
 
 ## Opens one of the windows ("activity", "party", "character" or "menu") as if its dock button was pressed.

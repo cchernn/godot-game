@@ -78,7 +78,7 @@ If they disagree, the client logs a warning and draws the server's layout, and t
 ## The game view and its windows (2D editor)
 `game/client/screens/overworld_screen.tscn` is the game view: the map fills the screen, the `Dock` along the bottom has a toggle per window, and the `Windows` node holds the
 four windows (`ActivityWindow`, `PartyWindow`, `CharacterWindow`, `MenuWindow`), each an instance of `game/content/ui/floating_window.tscn` with **Editable Children** on.
-Move or resize a window with its anchors and offsets, rename it with its `title`, and give the scrolling area a size with `body_min_size`. Put controls under
+The four windows share one spot (the right side) and only one is open at a time: opening one closes the other (`_close_others` in `overworld_screen.gd`). To move them, change the anchors and offsets of each (keep them the same). Rename a window with its `title`, and give the scrolling area a size with `body_min_size`. Put controls under
 `<window>/Layout/Scroll/Body`; add a window by instancing the scene again, adding a dock button and listing both in the `_toggles` dictionary of `overworld_screen.gd`.
 The panel look is in the `floating_window.tscn` root's Theme Overrides. `Backdrop` is the map's background colour (put a painted map there later).
 The map itself is the `MapCanvas` node. The map itself is the `MapCanvas` node: its Inspector has the colours (route lines, the party's

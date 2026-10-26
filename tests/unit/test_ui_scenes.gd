@@ -490,6 +490,11 @@ func test_game_view_opens_windows_from_the_dock_and_the_menu_announces_its_doors
 	assert_eq((s.get_node("%HudLabel") as Label).text, "Hollow - Aldric, level 2 warrior")
 	(s.get_node("%PartyToggle") as Button).button_pressed = true
 	assert_true(s.is_window_open("party") and not s.is_window_open("activity"), "one window per button")
+	# the windows share one spot: opening another closes the open one and pops its dock button up
+	(s.get_node("%ActivityToggle") as Button).button_pressed = true
+	assert_true(s.is_window_open("activity") and not s.is_window_open("party") and not (s.get_node("%PartyToggle") as Button).button_pressed, "one category at a time")
+	(s.get_node("%PartyToggle") as Button).button_pressed = true
+	assert_true(s.is_window_open("party") and not s.is_window_open("activity") and not (s.get_node("%ActivityToggle") as Button).button_pressed)
 	# the window's own X pops its dock button back up
 	((s.get_node("%PartyWindow") as FloatingWindow).get_node("Layout/TitleBar/CloseButton") as Button).pressed.emit()
 	assert_true(not s.is_window_open("party") and not (s.get_node("%PartyToggle") as Button).button_pressed)
