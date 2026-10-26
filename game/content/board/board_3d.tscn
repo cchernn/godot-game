@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://game/client/board/camera_rig.gd" id="8_ctt67"]
 [ext_resource type="Material" path="res://game/content/board/materials/range.tres" id="9_range"]
 [ext_resource type="Material" path="res://game/content/board/materials/valid.tres" id="10_valid"]
+[ext_resource type="Material" path="res://game/content/board/materials/area.tres" id="11_area"]
 
 [sub_resource type="Environment" id="Environment_2kpgk"]
 background_mode = 1
@@ -28,6 +29,7 @@ target_material = ExtResource("6_ab661")
 hover_material = ExtResource("7_2scl0")
 range_material = ExtResource("9_range")
 valid_material = ExtResource("10_valid")
+area_material = ExtResource("11_area")
 camera_rig = NodePath("CameraRig")
 map_root = NodePath("Map")
 units_root = NodePath("Units")

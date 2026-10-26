@@ -146,6 +146,11 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
 - **Targeting:** what the player clicks (a character, a tile, yourself, or nothing) and the reach in tiles. Hidden for moves and reactions. **Anyone can be aimed at**,
   friend or foe, and you too: a heal on an enemy heals it, a strike on an ally hurts it. *Character* skills follow the target and are checked when they land (still in range = hit);
   *tile* skills hit whoever stands on the tile when they land (so they are usually given more damage).
+- **Area:** leave empty for one target, or pick an *AreaShape* resource: *Radius* (every tile within *size* steps of the centre), *Line* (*size* tiles straight from the user
+  toward the aimed tile) or *Cone* (*size* rows in front of the user, 1, 3, 5... tiles wide). *Requires LOS* lets walls (and higher ground) stop it: a radius is checked from its
+  centre, a line or cone from the user. Everyone on a covered tile is hit: friend, foe and the user too. A *tile* skill's area is shown on the board while the player picks; a *character*
+  skill's area is centred on the target when it lands, so it follows a target that moved, and only the single target is visible while planning. Each victim gets its own hit and crit
+  roll (in id order); effects aimed at the target apply to every victim, effects *On = Caster* apply once. Area skills hitting the caster's own tile (Targeting = self) make a nova.
 - **Timing:** speed (higher resolves first in a beat), frequency (once per turn or unlimited) and stability (interruption points that cancel it).
 - **Stages:** the steps of the skill, each with its own **AP** and a list of **effects** (below). Power Strike has two stages: a wind-up (no effects) and a smash (damage and an interrupt).
 - **Effects** (`SkillStage > Effects`, pick the type, then fill it in; every effect has *On*: the skill's target, or the caster):

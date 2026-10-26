@@ -82,3 +82,21 @@ func test_a_queue_item_takes_one_beat_per_step() -> void:
 	assert_eq(TargetingPreview.action_beats(_skill("move"), 2, 1), 2)
 	assert_eq(TargetingPreview.action_beats(_skill("strike"), 0, 1), 1)
 	assert_eq(TargetingPreview.action_beats(_skill("power_strike"), 0, 1), 2, "a two-stage skill takes two beats")
+
+
+func test_a_tile_area_shows_its_tiles_while_planning_but_a_character_area_does_not() -> void:
+	var bf := Battlefield.from_rows(ROWS)
+	var sk := SkillDef.new()
+	sk.kind = Enums.SkillKind.ATTACK
+	sk.targeting = Enums.Targeting.TILE
+	sk.attack_range = 7
+	var a := AreaShape.new()
+	a.shape = AreaShape.Shape.RADIUS
+	a.size = 1
+	sk.area = a
+	assert_eq(TargetingPreview.area_cells(bf, sk, Vector2i(0, 3), Vector2i(4, 2), Enums.Facing.EAST).size(), 5)
+	assert_eq(TargetingPreview.area_cells(bf, sk, Vector2i(0, 3), Vector2i(7, 0), Enums.Facing.EAST).size(), 0, "out of reach")
+	var text := TargetingPreview.hover_text(sk, [_foe("g", Vector2i(4, 2))], _me(), bf, Vector2i(0, 3), Vector2i(4, 2), 0, -1, 3)
+	assert_true("covers 5 tile" in text and "1 unit" in text, text)
+	sk.targeting = Enums.Targeting.CHARACTER
+	assert_eq(TargetingPreview.area_cells(bf, sk, Vector2i(0, 3), Vector2i(4, 2), Enums.Facing.EAST).size(), 0)

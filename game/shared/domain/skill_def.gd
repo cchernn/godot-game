@@ -25,6 +25,11 @@ extends Resource
 ## Reach in tiles (Manhattan distance) for attacks and revives.
 @export_range(0, 20) var attack_range: int = 1
 
+@export_group("Area")
+## Empty (or Single) = hits one target. Otherwise everyone on the covered tiles is hit, friend or foe. A character-targeted skill
+## covers its area around the target's tile when it lands; a tile-targeted skill around the aimed tile, which the player sees while planning.
+@export var area: AreaShape
+
 @export_group("Timing")
 ## Higher resolves first within a beat.
 @export_range(0, 20) var speed: int = 5
@@ -57,9 +62,16 @@ func _validate_property(property: Dictionary) -> void:
 		property["usage"] = PROPERTY_USAGE_NO_EDITOR
 	elif str(property["name"]) in ["targeting", "attack_range"] and kind in [Enums.SkillKind.MOVE, Enums.SkillKind.REACTION]:
 		property["usage"] = PROPERTY_USAGE_NO_EDITOR
+	elif str(property["name"]) == "area" and kind not in [Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT]:
+		property["usage"] = PROPERTY_USAGE_NO_EDITOR
 
 
 # ---- views the battle rules read ----
+
+## True when the skill covers more than one tile.
+func is_area() -> bool:
+	return area != null and not area.is_single()
+
 
 func slot() -> Enums.ActionSlot:
 	return Enums.ActionSlot.MOVE if kind == Enums.SkillKind.MOVE else action_slot
@@ -113,6 +125,10 @@ func problems() -> Array[String]:
 				out.append("%s: %s" % [id, p])
 	if kind in [Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT] and targeting == Enums.Targeting.NONE:
 		out.append("%s: needs a target type (character, tile or self)" % id)
+	if area != null:
+		out.append_array(area.problems())
+		if not area.is_single() and kind not in [Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT]:
+			out.append("%s: only attack and support skills can have an area" % id)
 	if kind == Enums.SkillKind.REVIVE and targeting != Enums.Targeting.CHARACTER:
 		out.append("%s: a revive targets a character" % id)
 	if kind == Enums.SkillKind.REACTION and (reaction_duration_beats < 1 or reaction_range < 1):

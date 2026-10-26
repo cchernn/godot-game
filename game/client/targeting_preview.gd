@@ -57,6 +57,16 @@ static func valid_targets(bf: Battlefield, units: Array, me: Dictionary, sk: Ski
 	return out
 
 
+## The tiles a tile-targeted area skill would cover if aimed at `aim` from `from` (empty when it is not an area skill, or `aim` is not
+## a legal target). Target-based skills show no area while planning: it is only known when they land.
+static func area_cells(bf: Battlefield, sk: SkillDef, from: Vector2i, aim: Vector2i, facing: int) -> Array[Vector2i]:
+	if sk == null or not sk.is_area() or sk.targeting != Enums.Targeting.TILE or not bf.in_bounds(aim):
+		return []
+	if Enums.manhattan(from, aim) > sk.attack_range or not bf.has_los(from, aim):
+		return []
+	return sk.area.cells(bf, from, aim, facing)
+
+
 ## One line about the hovered tile for the skill being planned ("" when there is nothing to say).
 ## `reach` is the result of `reachable`, `path_cost` the AP of the walk to the tile (-1 if there is no path).
 static func hover_text(sk: SkillDef, units: Array, me: Dictionary, bf: Battlefield, from: Vector2i, hover: Vector2i,
@@ -84,6 +94,13 @@ static func hover_text(sk: SkillDef, units: Array, me: Dictionary, bf: Battlefie
 			return "Out of range (%d tiles, reach %d)" % [d, sk.attack_range]
 		if not bf.has_los(from, hover):
 			return "No line of sight"
+		if sk.is_area():
+			var covered := area_cells(bf, sk, from, hover, int(me.get("facing", Enums.Facing.SOUTH)))
+			var hit := 0
+			for u: Dictionary in units:
+				if u["cell"] in covered:
+					hit += 1
+			return "In range: covers %d tile(s), %d unit(s) in sight" % [covered.size(), hit]
 		return "In range"
 	return ""
 

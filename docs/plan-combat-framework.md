@@ -1,6 +1,6 @@
 # Plan: the combat framework (effects, statuses, areas, items, progression)
 
-Status: **Phases 1 (committed) and 2 (implemented, not committed yet) are done; the rest is planned.** Work happens one phase at a time; each phase is tested, documented and committed on its own (when the owner says so).
+Status: **Phases 1 and 2 (committed) and 3 (implemented, not committed yet) are done; the rest is planned.** Work happens one phase at a time; each phase is tested, documented and committed on its own (when the owner says so).
 Scope of this plan is the **framework only** (foundational changes). Specific skills, statuses, class content and items are discussed after all phases; where a phase needs an example it is a
 **test fixture**, not shipped content. The scope is: the data model, the rules, the editor workflow and the UI hooks. Real class and skill design is done afterwards
 in the Godot editor. Every number below is PROVISIONAL, lives in data (`.tres` or `balance.json`) and is listed in `docs/provisional-values.md` when it lands.

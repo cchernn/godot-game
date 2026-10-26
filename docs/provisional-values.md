@@ -45,6 +45,8 @@ Unit stats and skills are `.tres` resources under `game/content/` and are all pr
 - **Statuses (Phase 2):** durations count turns; a status applied mid-turn counts the rest of that turn as its first turn; each-turn effects run at the start of a turn
   (so a status applied mid-turn first ticks next turn), once per stack; stat changes apply at once, but AP capacity only refreshes at the start of the next round;
   a stunned unit loses the rest of its queue and cannot react; an Apply Status after a damage effect only lands if the damage connected. No statuses ship yet.
+- **Areas (Phase 3):** a cone is 1, 3, 5... tiles wide per row; a line or cone runs along the dominant axis toward the aim (the user's facing if aimed at their own tile);
+  walls stop an area by default (`requires_los`); a radius is checked from its centre, a line or cone from the user. No area skills ship yet.
 - **Party joining:** only a lone character, only at the party's node, only while the party is idle; the leader decides.
 - **Classes** (`services/api/app/rules.py`) and their client mirror are placeholders.
 - **Simultaneous wipe** is a draw.

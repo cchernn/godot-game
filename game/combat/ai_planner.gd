@@ -62,6 +62,11 @@ func plan_for(battle: Battle, c: Combatant) -> Array[PlannedAction]:
 			for st in sk.stages:
 				dmg += float((st.get("damage", 0) as int) + c.stat("power"))
 			dmg *= cfg.get_value("combat", "base_hit_chance") as float
+			if sk.is_area():
+				var net := _area_net_hits(battle, c, sk, stand, t.cell)
+				if net <= 0:
+					continue # it would hurt its own side as much as the players
+				dmg *= float(net)
 			var score: float = (w["damage"] as float) * dmg
 			if t.life_state == Enums.LifeState.DOWNED or dmg >= t.hp:
 				score += (w["objective"] as float) * 8.0
@@ -78,6 +83,20 @@ func plan_for(battle: Battle, c: Combatant) -> Array[PlannedAction]:
 	if not best.is_empty():
 		return best
 	return _approach(battle, c, targets, search, cells, tpa, sur)
+
+
+## Players an area skill would catch minus the AI's own side it would catch, aimed at `aim` from `stand`. (The rules treat everyone
+## alike; the AI knows who is who.)
+func _area_net_hits(battle: Battle, c: Combatant, sk: SkillDef, stand: Vector2i, aim: Vector2i) -> int:
+	var net := 0
+	for cell in sk.area.cells(battle.bf, stand, aim, c.facing):
+		if cell == stand:
+			net -= 1
+			continue
+		var who := battle.state.at_cell(cell)
+		if who != null:
+			net += 1 if who.team == Enums.Team.PLAYERS else -1
+	return net
 
 
 func _build(c: Combatant, sk: SkillDef, t: Combatant, path: Array[Vector2i]) -> Array[PlannedAction]:

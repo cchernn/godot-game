@@ -401,6 +401,7 @@ func _update_preview() -> void:
 ## One line about the tile under the mouse: what a walk there costs, or whether the target is in reach.
 func _update_hover_text() -> void:
 	hover_label.text = ""
+	board.area_cells.clear()
 	if not snap.is_empty() and board.bf != null and board.bf.in_bounds(board.hover) and not board.is_seen(board.hover):
 		hover_label.text = "Fog: not visible to your team"
 	var sk: SkillDef = skills.get_skill(mode) if mode != "" else null
@@ -414,6 +415,7 @@ func _update_hover_text() -> void:
 		path_len = path.size()
 		if path_len > 0:
 			cost = Pathfinder.ap_cost(board.bf, path, me["tiles_per_ap"], 1)
+	board.area_cells.assign(TargetingPreview.area_cells(board.bf, sk, from, board.hover, int(me.get("facing", Enums.Facing.SOUTH))))
 	hover_label.text = TargetingPreview.hover_text(sk, snap["units"], me, board.bf, from, board.hover, path_len, cost,
 		me["ap_capacity"] - _plan_cost())
 	if not board.is_seen(board.hover):

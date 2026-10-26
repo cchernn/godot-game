@@ -227,32 +227,63 @@ func _run_effects(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionar
 		b.emit("windup", "{a} begins %s%s." % [sk.display_name, " on {t}" if victim else ""],
 			c.id, victim.id if victim else "")
 		return
-	var landed := true
-	var aimed_at_someone := false
+	# Who is hit: the one target, or everyone on the covered tiles (found now, so it follows a target that moved).
+	var victims: Array[Combatant] = []
+	if sk.is_area():
+		victims = _area_victims(c, sk, aim)
+		if not victims.is_empty():
+			b.emit("area", "{a}'s %s covers %d target%s." % [sk.display_name, victims.size(), "" if victims.size() == 1 else "s"], c.id)
+	elif victim != null:
+		victims.append(victim)
+	var landed := {} # victim id -> whether the damage before the current effect connected (default yes)
+	var any_landed := true
 	for e: Dictionary in effects:
-		var on_caster := (e["on"] as int) == SkillEffect.On.CASTER
-		var who: Combatant = c if on_caster else victim
-		if who == null:
+		if (e["on"] as int) == SkillEffect.On.CASTER:
+			_apply_effect(c, sk, e, c, any_landed or e["type"] != "interrupt")
 			continue
-		aimed_at_someone = aimed_at_someone or not on_caster
-		match e["type"] as String:
-			"damage":
-				landed = _damage(c, sk.display_name, e, who)
-			"heal":
-				_heal(c, sk.display_name, e, who)
-			"shield":
-				_shield(c, sk.display_name, e, who)
-			"interrupt":
-				if landed and who.life_state == Enums.LifeState.ALIVE:
-					_add_interrupt(who, e["points"] as int)
-			"apply_status":
-				if (on_caster or landed) and who.life_state == Enums.LifeState.ALIVE:
-					_apply_status(c, e, who)
-			"remove_status":
-				_remove_status(c, e, who)
-	if victim == null and sk.targeting == Enums.Targeting.TILE:
+		var any := false
+		for v in victims:
+			var ok := _apply_effect(c, sk, e, v, landed.get(v.id, true))
+			if e["type"] == "damage":
+				landed[v.id] = ok
+				any = any or ok
+		if e["type"] == "damage" and not victims.is_empty():
+			any_landed = any
+	if victims.is_empty() and sk.targeting == Enums.Targeting.TILE:
 		var hurts := effects.any(func(e: Dictionary) -> bool: return e["type"] == "damage")
 		b.emit("miss", "{a}'s %s %s." % [sk.display_name, "strikes empty ground" if hurts else "finds no one there"], c.id)
+
+
+## Everyone standing on the skill's covered tiles, caster included, in id order so that rolls come out the same every time.
+func _area_victims(c: Combatant, sk: SkillDef, aim: Vector2i) -> Array[Combatant]:
+	var out: Array[Combatant] = []
+	for cell in sk.area.cells(b.bf, c.cell, aim, c.facing):
+		var who := b.state.at_cell(cell)
+		if who != null and not out.has(who):
+			out.append(who)
+	out.sort_custom(func(x: Combatant, y: Combatant) -> bool: return x.id < y.id)
+	return out
+
+
+## Runs one effect on one receiver. `connected` = whether the damage before it landed on this receiver (interrupts and statuses
+## need it). Returns whether a damage effect connected (true for every other kind).
+func _apply_effect(c: Combatant, sk: SkillDef, e: Dictionary, who: Combatant, connected: bool) -> bool:
+	match e["type"] as String:
+		"damage":
+			return _damage(c, sk.display_name, e, who)
+		"heal":
+			_heal(c, sk.display_name, e, who)
+		"shield":
+			_shield(c, sk.display_name, e, who)
+		"interrupt":
+			if connected and who.life_state == Enums.LifeState.ALIVE:
+				_add_interrupt(who, e["points"] as int)
+		"apply_status":
+			if connected and who.life_state == Enums.LifeState.ALIVE:
+				_apply_status(c, e, who)
+		"remove_status":
+			_remove_status(c, e, who)
+	return true
 
 
 ## Returns true when the damage connected (a miss returns false, so a following interrupt effect does not land).

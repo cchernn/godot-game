@@ -22,6 +22,8 @@ const MOVE_SPEED := 6.0   ## tiles per second for smoothed unit movement
 ## Tiles a picked move or skill can reach, and the units it can target.
 @export var range_material: Material
 @export var valid_material: Material
+## Tiles an area skill would cover where the mouse is.
+@export var area_material: Material
 @export var overlay_lift: float = 0.02
 
 @export_group("Nodes")
@@ -37,6 +39,7 @@ var plan_cells: Array[Vector2i] = []   # planned movement tiles
 var plan_marks: Array[Vector2i] = []   # planned attack targets
 var range_cells: Array[Vector2i] = []  # tiles the picked skill can reach
 var valid_cells: Array[Vector2i] = []  # tiles of units it can target
+var area_cells: Array[Vector2i] = []  # tiles an area skill covers if aimed at the hovered tile
 var hover: Vector2i = Vector2i(-1, -1)
 
 var _map_id: String = "<unset>"
@@ -239,7 +242,7 @@ func _process(delta: float) -> void:
 		var p: Vector2 = _disp[id]
 		node.set_world_position(_unit_position(p, node.position.y, delta), delta)
 		node.visible = _seen.has(Vector2i(p.round())) or u["team"] == Enums.Team.PLAYERS
-	var sig := hash([plan_cells, plan_marks, range_cells, valid_cells, hover, _serial])
+	var sig := hash([plan_cells, plan_marks, range_cells, valid_cells, area_cells, hover, _serial])
 	if sig != _overlay_sig:
 		_overlay_sig = sig
 		_refresh_overlays()
@@ -256,6 +259,7 @@ func _refresh_overlays() -> void:
 	_show("range", range_cells, range_material, 0.005)
 	_show("move", plan_cells, move_material, 0.01)
 	_show("valid", valid_cells, valid_material, 0.015)
+	_show("area", area_cells, area_material, 0.017)
 	_show("target", plan_marks, target_material, 0.02)
 	var hovered: Array[Vector2i] = []
 	if bf != null and bf.in_bounds(hover):

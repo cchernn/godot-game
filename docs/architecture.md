@@ -155,6 +155,12 @@ No rule distinguishes friend from foe: any skill can target any visible combatan
 skills follow the target and check range when they land; `TILE` skills hit whoever is on the tile then. `Combatant.shield` soaks damage after armor and before HP and is cleared when a round
 begins; the snapshot carries it. `SkillKind.SUPPORT` and `SkillDef.action_slot` (Attack, Move, Defend) place skills on the client's action bar.
 
+## Areas of effect (Phase 3)
+`AreaShape` (`single | radius | line | cone`, `size`, `requires_los`) hangs off `SkillDef.area`; `AreaShape.cells(bf, caster, centre, facing)` is the one geometry function, used by the
+server (`BeatResolver._area_victims`), the AI (`AiPlanner._area_net_hits`) and the client preview (`TargetingPreview.area_cells`, drawn by `Board3D.area_cells`). The centre is the aimed tile,
+or for character skills the target's tile at execution. Victims are the combatants on covered tiles, rolled in id order. `_run_effects` runs each effect over all victims
+(caster-side effects once); an interrupt or status after a damage effect needs that damage to have connected on that victim. Walls are never covered.
+
 ## Statuses (Phase 2)
 A `StatusDef` resource (stat changes, each-turn effects, `stunned`/`rooted`, duration in turns, stacking) is applied by `ApplyStatusEffect` and removed by `RemoveStatusEffect`.
 A combatant holds `statuses: [{id, def (the StatusDef as a dictionary), turns_left, stacks}]`, so a battle needs no status registry. Rules read armor, power, accuracy, evasion
