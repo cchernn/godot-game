@@ -14,10 +14,13 @@ extends RefCounted
 
 const TERRAIN_NODE := "Terrain"
 const SPAWNS_NODE := "Spawns"
+const OBJECTS_NODE := "Objects"
 
 var battlefield: Battlefield
 var player_spawns: Array[Vector2i] = []
 var enemy_spawns: Array[Vector2i] = []
+## The map objects: {id, def, cell}, in node order.
+var objects: Array[Dictionary] = []
 ## Height index of the highest block per column (for rendering and picking).
 var column_top: Dictionary = {}
 var error: String = ""
@@ -88,6 +91,24 @@ static func from_node(root: Node) -> MapDef:
 				def.player_spawns.append(cell)
 			elif String(m.name).begins_with("E"):
 				def.enemy_spawns.append(cell)
+	var objs := root.get_node_or_null(OBJECTS_NODE)
+	if objs != null:
+		for m in objs.get_children():
+			if not m is MapObject:
+				continue
+			var o := m as MapObject
+			var oid := String(o.name)
+			var cell := _marker_cell(root, gm, o)
+			if not PlannedAction._is_name(oid) or oid != oid.to_lower():
+				def.error = "Map object '%s': the name must be lower-case letters, digits and underscores" % oid
+			elif o.def == null:
+				def.error = "Map object '%s' has no definition" % oid
+			elif def.objects.any(func(x: Dictionary) -> bool: return x["id"] == oid):
+				def.error = "Two map objects are named '%s'" % oid
+			elif not def.battlefield.in_bounds(cell) or def.battlefield.is_blocked(cell):
+				def.error = "Map object '%s' is not on a walkable tile" % oid
+			else:
+				def.objects.append({"id": oid, "def": o.def, "cell": cell})
 	return def
 
 

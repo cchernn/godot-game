@@ -32,5 +32,14 @@ func add_item(item: ItemDef) -> void:
 	skills[sk.id] = sk
 
 
+## Registers the skills of a map object's actions ("ctx:<object id>:<action id>"). The battle and the client both do this for the
+## objects on the map, so plans and the rules treat context actions like any skill.
+func add_context(object_id: String, def: ContextObjectDef) -> void:
+	for a in def.actions:
+		if a != null and a.use != null:
+			var sk := a.make_skill(object_id)
+			skills[sk.id] = sk
+
+
 func get_skill(id: String) -> SkillDef:
 	return skills.get(id) as SkillDef

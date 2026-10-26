@@ -6,7 +6,7 @@ const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
 	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel",
-	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton", "ItemBox"]
+	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton", "ItemBox", "ContextBox"]
 
 
 func _client() -> Control:
@@ -923,4 +923,44 @@ func test_the_item_button_lists_your_items_and_queues_them() -> void:
 	assert_eq(c.plan[0]["item"], "potion")
 	assert_eq(c.plan[0]["skill"], "item:potion")
 	assert_true("Potion ×1" in (box.get_child(0) as Button).text, "one is spoken for")
+	c.free()
+
+
+func test_context_button_lists_the_actions_of_objects_in_reach() -> void:
+	var c := _client()
+	var chest := ContextObjectDef.new()
+	chest.id = "chest"
+	chest.display_name = "Chest"
+	var act := ContextAction.new()
+	act.id = "open"
+	act.display_name = "Open"
+	act.requires_state = "closed"
+	act.sets_state = "open"
+	act.use = SkillDef.new()
+	var st := SkillStage.new()
+	st.ap = 2
+	var stages: Array[SkillStage] = [st]
+	act.use.stage_defs = stages
+	chest.actions = [act] as Array[ContextAction]
+	c.skills.add_context("chest", chest)
+	var s := _snapshot()
+	var me_cell := Vector2i(0, 2)
+	for u: Dictionary in s["units"]:
+		if u["id"] == "pc0":
+			me_cell = u["cell"]
+	s["objects"] = [{"id": "chest", "name": "Chest", "cell": me_cell + Vector2i(1, 0), "state": "closed", "blocks": true, "reach": 1,
+		"actions": [{"id": "open", "name": "Open", "hint": "Opens it"}]},
+		{"id": "far", "name": "Far", "cell": me_cell + Vector2i(5, 0), "state": "closed", "blocks": false, "reach": 1,
+		"actions": [{"id": "open", "name": "Open", "hint": ""}]}]
+	c._on_snapshot(s)
+	var btn := c.get_node("%ContextButton") as Button
+	assert_true(not btn.disabled)
+	btn.button_pressed = true
+	var box := c.get_node("%ContextBox") as Control
+	assert_true(box.visible)
+	assert_eq(box.get_child_count(), 1, "only the chest in reach")
+	assert_true("Chest: Open" in (box.get_child(0) as Button).text and "2 AP" in (box.get_child(0) as Button).text)
+	(box.get_child(0) as Button).pressed.emit()
+	assert_eq([c.plan[0]["object"], c.plan[0]["action"], c.plan[0]["skill"]], ["chest", "open", "ctx:chest:open"])
+	assert_true(c.board.bf.object_blocks.has(me_cell + Vector2i(1, 0)), "a blocking object closes its tile on the board")
 	c.free()

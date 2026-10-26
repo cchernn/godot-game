@@ -190,6 +190,16 @@ A character brings at most `items.battle_slots` kinds into a battle (`balance.js
 `GAME_API_SERVER_KEY=... scripts/grant_item.sh <character_id> <item_id> <quantity> [max_stack]` (needs the API running; there are no shops or loot yet).
 Item changes need `scripts/stack.sh up game web` (and `up api` for a new migration).
 
+## Map objects and context actions (Inspector)
+
+Chests, levers, doors and traps are **map objects**. Their state lasts for one battle only.
+
+1. **Define the object** as a `ContextObjectDef` resource in `game/content/objects/` (new Resource, pick `ContextObjectDef`): id, name, **initial state** (any name you choose, e.g. `closed`), **reach** (1 = next to it), **blocking states** (while the object is in one of these, nobody can walk onto its tile, e.g. `closed` for a door), and its **actions**.
+2. **Each action** is a `ContextAction`: id, name, hint, **requires state** (empty = any), **sets state** (empty = unchanged) and **use**, a skill-like resource: pick its speed and add **stages**. Each stage has its own AP cost and a list of **effects** that land on the unit that acts: Grant Item, Set Flag, Damage, Heal, Shield, Apply Status... A stage with no effects is fine (a lever only changes state). Its kind and targeting are set by the game.
+3. **Place it on a map:** open the map scene, add a Node3D called `Objects` (once), and under it instance `game/content/objects/map_object.tscn`. **Rename the instance**: its name is its id (lower-case letters, digits and underscores, unique on the map). Move it onto a tile and assign the definition in the Inspector. The placeholder box and its state label are in the scene; swap the mesh or the whole scene as you like (keep the `MapObject` script on the root).
+
+In battle, the **Context** button lists the actions of objects within reach of where the unit will stand, in the state they are in now. Context actions cost AP and resolve in the beat order like skills; if two units go for the same object, the one who acts first changes its state and the other action is skipped. Items and flags earned from objects are saved with the battle result. Players only for now; enemies do not use objects yet.
+
 ## Things that are still code (for now)
 The global tuning in `config/balance.json` (hit chance, the AP table, rewards) is a JSON file, not an Inspector resource. Game rules,
 networking and the API stay in code. The dropdown choices for class on the character creator mirror the server's rules (`character_creator.gd`).

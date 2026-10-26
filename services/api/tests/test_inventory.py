@@ -132,3 +132,30 @@ def test_learned_skills_and_flags_are_checked(client):
         assert client.put(f"{base}/learned-skills", json=bad, headers=SERVER).status_code == 422, bad
     for bad in ({"add": ["Has Space"]}, {"remove": [3]}):
         assert client.post(f"{base}/flags", json=bad, headers=SERVER).status_code == 422, bad
+
+
+def test_a_result_adds_picked_up_items_and_earned_flags(client):
+    w, tok, char = one_character(client)
+    me = lambda: client.get(f"/worlds/{w['id']}/characters/me", headers=auth(tok)).json()
+    grant(client, char["id"], "potion", 1)
+    body = result_body(w["id"], [char["id"]], key="battle-gain-1")
+    body["participants"][0].update({"items_gained": {"potion": 2, "key": 1}, "items_used": {"potion": 3},
+                                    "flags_set": ["opened_vault", "opened_vault"]})
+    assert client.post("/internal/combat-results", json=body, headers=SERVER).status_code == 200
+    assert carried(client, w["id"], tok) == {"key": 1}, "1 carried + 2 picked up - 3 used"
+    assert me()["flags"] == ["opened_vault"]
+    replay = client.post("/internal/combat-results", json=body, headers=SERVER)
+    assert replay.status_code == 200 and replay.json()["duplicate"]
+    assert me()["flags"] == ["opened_vault"] and carried(client, w["id"], tok) == {"key": 1}
+    again = result_body(w["id"], [char["id"]], key="battle-gain-2")
+    again["participants"][0]["flags_set"] = ["second", "opened_vault"]
+    assert client.post("/internal/combat-results", json=again, headers=SERVER).status_code == 200
+    assert me()["flags"] == ["opened_vault", "second"], "flags merge without duplicates"
+
+
+def test_picked_up_item_and_flag_shapes_are_checked(client):
+    w, tok, char = one_character(client)
+    for bad in ({"items_gained": {"potion": -1}}, {"flags_set": ["Bad Flag"]}, {"items_gained": {"potion": 100}}):
+        body = result_body(w["id"], [char["id"]])
+        body["participants"][0].update(bad)
+        assert client.post("/internal/combat-results", json=body, headers=SERVER).status_code == 422, bad

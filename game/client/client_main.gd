@@ -33,6 +33,9 @@ var _skill_buttons: Dictionary = {}
 var _skill_ids: Array = []
 var _item_buttons: Dictionary = {}
 var _item_ids: Array = []
+var _context_buttons: Dictionary = {}
+var _context_sig: Array = []
+var _objects_map: String = "<unset>"
 ## Escape asks twice (a second press within this many seconds confirms), so a stray click cannot abandon the fight.
 @export var escape_confirm_seconds: float = 4.0
 var _escape_armed_until_ms: int = 0
@@ -59,6 +62,8 @@ var _preview_sig: int = 0
 @onready var defend_btn: Button = %DefendButton
 @onready var item_btn: Button = %ItemButton
 @onready var item_box: VBoxContainer = %ItemBox
+@onready var context_btn: Button = %ContextButton
+@onready var context_box: VBoxContainer = %ContextBox
 @onready var error_label: Label = %ErrorLabel
 @onready var log_view: RichTextLabel = %LogView
 @onready var board_holder: Control = %BoardHolder
@@ -148,10 +153,17 @@ func _wire_ui() -> void:
 	attack_btn.toggled.connect(func(on: bool) -> void:
 		if on:
 			item_btn.set_pressed_no_signal(false)
+			context_btn.set_pressed_no_signal(false)
 		_refresh())
 	item_btn.toggled.connect(func(on: bool) -> void:
 		if on:
 			attack_btn.set_pressed_no_signal(false)
+			context_btn.set_pressed_no_signal(false)
+		_refresh())
+	context_btn.toggled.connect(func(on: bool) -> void:
+		if on:
+			attack_btn.set_pressed_no_signal(false)
+			item_btn.set_pressed_no_signal(false)
 		_refresh())
 	%ConnectButton.pressed.connect(_connect)
 	%ContinueButton.pressed.connect(_on_continue_pressed)
@@ -226,10 +238,22 @@ func _on_snapshot(s: Dictionary) -> void:
 			plan.append(copy)
 		_prev_plan = plan.duplicate(true)
 		mode = ""
+	_register_map_objects(str(s["map"].get("id", "")))
 	board.set_snapshot(s)
 	_refresh()
 	if _selftest:
 		_run_selftest()
+
+
+## The map objects' actions are skills too ("ctx:<object>:<action>"); the client reads the same map scene as the server to know them.
+func _register_map_objects(map_id: String) -> void:
+	if map_id == _objects_map:
+		return
+	_objects_map = map_id
+	if map_id == "" or map_id.length() > 40 or not ResourceLoader.exists(Board3D.MAP_DIR + map_id + ".tscn"):
+		return
+	for o: Dictionary in MapDef.load_scene(Board3D.MAP_DIR + map_id + ".tscn").objects:
+		skills.add_context(o["id"], o["def"])
 
 
 func _on_events(list: Array) -> void:
@@ -334,6 +358,11 @@ func _on_continue_pressed() -> void:
 	_item_ids = []
 	for ch in item_box.get_children():
 		ch.queue_free()
+	_context_buttons.clear()
+	_context_sig = []
+	for ch in context_box.get_children():
+		ch.queue_free()
+	_objects_map = "<unset>"
 	log_view.clear()
 	_log_round = -1
 	_log_beat = -1
@@ -375,6 +404,8 @@ func _predicted_cell() -> Vector2i:
 
 func _action_cost(a: Dictionary) -> int:
 	var sk := skills.get_skill(a["skill"])
+	if sk == null: # a map object this client could not read
+		return 0
 	if sk.kind == Enums.SkillKind.MOVE:
 		var path: Array[Vector2i] = []
 		path.assign(a["path"])
@@ -385,7 +416,8 @@ func _action_cost(a: Dictionary) -> int:
 ## Beats an action takes in the queue (see TargetingPreview.action_beats).
 func _action_beats(a: Dictionary) -> int:
 	var path_len := (a["path"] as Array).size() if a["skill"] == "move" else 0
-	return TargetingPreview.action_beats(skills.get_skill(a["skill"]), path_len, me.get("tiles_per_ap", 1))
+	var sk := skills.get_skill(a["skill"])
+	return TargetingPreview.action_beats(sk, path_len, me.get("tiles_per_ap", 1)) if sk != null else 1
 
 
 ## Shades what the picked skill can reach (blue) and the units it can hit (green) on the board.
@@ -618,12 +650,15 @@ func _refresh() -> void:
 			ap_label.modulate = Color.WHITE
 		_rebuild_skill_buttons()
 		_rebuild_item_buttons()
+		_rebuild_context_buttons()
 	queue_list.clear()
 	var beat := 1
 	for a in plan:
 		var sk := skills.get_skill(a["skill"])
-		var txt := sk.display_name
-		if a["skill"] == "move":
+		var txt := sk.display_name if sk != null else str(a.get("action", a["skill"]))
+		if a.has("object"):
+			txt += " (%s)" % _object_name(a["object"])
+		elif a["skill"] == "move":
 			txt += " %d tile(s)" % (a["path"] as Array).size()
 		elif a.has("target"):
 			txt += " → " + _unit_name(a["target"])
@@ -675,6 +710,8 @@ func _refresh() -> void:
 		btn.set_pressed_no_signal(ItemDef.skill_id_for(id) == mode)
 	item_btn.disabled = not can or _item_buttons.is_empty()
 	item_box.visible = item_btn.button_pressed and not item_btn.disabled
+	context_btn.disabled = not can or _context_buttons.is_empty()
+	context_box.visible = context_btn.button_pressed and not context_btn.disabled
 
 
 ## One card per visible unit, reused between snapshots: allies (you first) in the party row, enemies in sight above it.
@@ -767,6 +804,48 @@ func _rebuild_item_buttons() -> void:
 		b.pressed.connect(_on_skill_pressed.bind(ItemDef.skill_id_for(id)))
 		item_box.add_child(b)
 		_item_buttons[id] = b
+
+
+func _object_name(object_id: String) -> String:
+	for o: Dictionary in snap.get("objects", []):
+		if o["id"] == object_id:
+			return str(o["name"])
+	return object_id
+
+
+## Map objects within reach of where you will stand, and what each offers in its current state.
+func _rebuild_context_buttons() -> void:
+	var here := _predicted_cell()
+	var wanted: Array = []
+	for o: Dictionary in snap.get("objects", []):
+		if Enums.manhattan(here, o["cell"]) > int(o["reach"]):
+			continue
+		for a: Dictionary in o["actions"]:
+			var sk := skills.get_skill(ContextAction.skill_id_for(o["id"], a["id"]))
+			if sk != null:
+				wanted.append([o["id"], a["id"], "%s: %s  (%d AP)" % [o["name"], a["name"], sk.total_ap()], a["hint"]])
+	if wanted.hash() == _context_sig.hash():
+		return
+	_context_sig = wanted
+	for ch in context_box.get_children():
+		ch.queue_free()
+	_context_buttons.clear()
+	for w: Array in wanted:
+		var b := skill_button_scene.instantiate() as Button
+		b.text = w[2]
+		b.tooltip_text = w[3]
+		b.pressed.connect(_on_context_pressed.bind(w[0], w[1]))
+		context_box.add_child(b)
+		_context_buttons["%s:%s" % [w[0], w[1]]] = b
+
+
+func _on_context_pressed(object_id: String, action_id: String) -> void:
+	if not _can_edit():
+		return
+	_prev_plan = plan.duplicate(true)
+	plan.append({"skill": ContextAction.skill_id_for(object_id, action_id), "object": object_id, "action": action_id})
+	error_label.text = ""
+	_push_plan()
 
 
 func _process(_delta: float) -> void:

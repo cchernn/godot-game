@@ -9,6 +9,7 @@ if you add a placeholder anywhere, add it here.
 |---|---|---|
 | `ap.base_capacity`, `max_capacity`, `dexterity_thresholds` | 3, 5, [10, 16] | Action points per round |
 | `stats.*` (`hp_base` 10, `hp_per_vitality` 2, `power_per_might` 1, `accuracy_baseline` 8 / `_per_dexterity` 0.5, `evasion_baseline` 10 / `_per_agility` 0.5) | see file | How the four attributes become HP, damage, accuracy and evasion |
+| Context actions | cost AP like skills; reach 1 (Manhattan); state per battle only; blocking objects block walking but not sight; picked-up items capped by the item's `max_stack` in battle and 99 when saved | Map objects (Phase 6) |
 | `progression.enabled`, `xp_to_level` | false, [100, 250, 450, 700, 1000] | Levels are off; the XP table is a placeholder |
 | Class attributes and the absence of armor | see class `.tres` | Armor is gear-only (gear comes later); warrior and ghoul now have -1 evasion |
 | `movement.*` | 1 tile per AP, bonus at Dexterity 12 / 18, difficult terrain +1 | How far an AP moves a character |

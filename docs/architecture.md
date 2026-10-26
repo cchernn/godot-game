@@ -177,6 +177,10 @@ dexterity and agility through `Combatant.stat(name)`. `BeatResolver.run_turn_sta
 takes a turn off every status and removes the finished ones. Stun clears the bearer's current skill and queue when its next step comes up; rooted blocks move steps. `_defeat` and
 escape clear statuses. The snapshot carries `statuses` (name, hint, glyph, colour, turns, stacks) and `stunned`/`rooted` for every visible unit. Statuses never touch the battle RNG.
 
+## Map objects and context actions (Phase 6)
+
+A map scene may have an `Objects` node of `MapObject` markers (`game/content/objects/map_object.tscn`, each with a `ContextObjectDef`); `MapDef` reads them like spawns, so server and client agree. `Battle.add_object` creates a `ContextObject` (id, def, cell, state) and registers each `ContextAction` as the skill `ctx:<object id>:<action id>` through `SkillDb.add_context` (the client does the same from the map scene), so validation, AP, beat order, interrupts and effects are the existing ones. A `PlannedAction` with `object`/`action` is checked for reach and state at plan time (`PlanValidator`, simulating the state changes queued earlier in the same plan) and again when it begins (`BeatResolver._context_problem`); the state changes when the action begins. A state in the def's `blocking_states` sets `Battlefield.object_blocks` for the tile (blocks walking, not sight). New effects `GrantItemEffect` and `SetFlagEffect` fill `Combatant.items_gained`/`flags_gained`; the result's participants carry `items_gained` and `flags_set`, and the API adds them (items capped at 99, added before used copies are taken off; flags merged). The snapshot has an `objects` list (state, blocks, reach, the actions on offer).
+
 ## Skills as resources
 Each skill is a `SkillDef` resource (`game/content/skills`, with `SkillStage` sub-resources) listed in `skill_set.tres`; units reference the resources directly.
 `SkillDef` still exposes `stages` (array of dictionaries), `reaction` and `total_ap()`, so the battle rules did not change. `SkillDb.load_file()` returns deep copies

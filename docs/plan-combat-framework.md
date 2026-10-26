@@ -1,6 +1,6 @@
 # Plan: the combat framework (effects, statuses, areas, items, progression)
 
-Status: **Phases 1 to 4 and 5a (committed) are done; 5b (skill unlock mechanism) is implemented and not committed yet; the rest is planned.** Work happens one phase at a time; each phase is tested, documented and committed on its own (when the owner says so).
+Status: **Phases 1 to 5 (committed) are done; Phase 6 (context actions) is implemented and not committed yet.** Work happens one phase at a time; each phase is tested, documented and committed on its own (when the owner says so).
 Scope of this plan is the **framework only** (foundational changes). Specific skills, statuses, class content and items are discussed after all phases; where a phase needs an example it is a
 **test fixture**, not shipped content. The scope is: the data model, the rules, the editor workflow and the UI hooks. Real class and skill design is done afterwards
 in the Godot editor. Every number below is PROVISIONAL, lives in data (`.tres` or `balance.json`) and is listed in `docs/provisional-values.md` when it lands.
@@ -155,11 +155,9 @@ Rules:
 
 Tests: `compose` with synthetic states (growth, thresholds, events, picks), unknown skill ids rejected by `problems()`, the disabled path equals today, API payload and flag endpoint.
 
-## Phase 6: context actions (outline only; needs a design pass first)
+## Phase 6: context actions (implemented, mechanism only)
 
-Situation/tile actions: map objects (a chest, a lever) list actions with conditions (adjacent to the unit, state of the object); when a unit stands next to one, the Context slot shows it (e.g. "Open"). Resolved in the beat order
-like a skill, with results that use the existing systems (grant an item, set an event flag, apply an effect). Needs from the owner: example objects, where they are authored (map editor), whether state is per battle or persistent.
-Not part of the phases above; the Context slot stays disabled until then.
+Agreed with the owner: chest, door and trap are the example kinds (test fixtures only; none ship); object state lasts for one battle; objects are placed on the map scene (`Objects` node, `MapObject` markers with a `ContextObjectDef`); players only for now, enemies and the AI later; every action costs AP. A `ContextObjectDef` has an initial state, a reach, blocking states and `ContextAction`s (requires state, sets state, a skill-like `use` with stages and effects). New effects: Grant Item and Set Flag. Actions are registered as skills `ctx:<object>:<action>`, so planning, AP, beat order and effects reuse the existing rules; state is re-checked when the action begins, so a second unit racing for the same object is skipped. Granted items and flags are saved with the battle result (API: `items_gained`, `flags_set` on participants). Client: the Context button lists actions of objects in reach. Not done: enemy/AI use, triggering traps by walking onto them, persistent object state, sight-blocking doors, a shipped example.
 
 ---
 

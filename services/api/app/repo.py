@@ -229,7 +229,9 @@ class Repository(PartyMixin, WorldMixin):
         payload returns the stored result; reusing a key for a different payload is a conflict."""
         canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds,
                                 "p": sorted((str(p["character_id"]), p["outcome"], p["xp"],
-                                             sorted((p.get("items_used") or {}).items())) for p in participants)})
+                                             sorted((p.get("items_used") or {}).items()),
+                                             sorted((p.get("items_gained") or {}).items()), sorted(set(p.get("flags_set") or [])))
+                                            for p in participants)})
         digest = hashlib.sha256(canonical.encode()).hexdigest()
         ids = [p["character_id"] for p in participants]
         if len(set(ids)) != len(ids):
@@ -247,10 +249,18 @@ class Repository(PartyMixin, WorldMixin):
                 return _row(existing), True
             for p in participants:
                 ok = conn.execute(
-                    "update characters set xp = xp + %s where id=%s and world_id=%s and status='active' returning id",
+                    "update characters set xp = xp + %s where id=%s and world_id=%s and status='active' returning id, flags",
                     (p["xp"], p["character_id"], world_id)).fetchone()
                 if ok is None:  # rolls the whole transaction back: no partial outcomes
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
+                gained = {k: v for k, v in (p.get("items_gained") or {}).items() if v > 0}
+                for item_id, n in gained.items():  # picked up in the battle: added before the used ones are taken off
+                    conn.execute("insert into character_items (character_id, item_id, quantity) values (%s,%s,%s) "
+                                 "on conflict (character_id, item_id) do update set quantity = least(99, character_items.quantity + excluded.quantity)",
+                                 (p["character_id"], item_id, n))
+                new_flags = [f for f in dict.fromkeys(p.get("flags_set") or []) if f not in ok["flags"]]
+                if new_flags:
+                    conn.execute("update characters set flags=%s where id=%s", (Jsonb(list(ok["flags"]) + new_flags), p["character_id"]))
                 used = {k: v for k, v in (p.get("items_used") or {}).items() if v > 0}
                 for item_id, n in used.items():
                     left = conn.execute(

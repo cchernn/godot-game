@@ -11,7 +11,7 @@ func verify_session(_token: String, _world_id: String, _instance_id: String = ""
 	return {"ok": false, "error": "Persistence is not configured"}
 
 
-## participants: [{character_id, outcome, xp, items_used: {item id: copies}}]. Idempotent per key. Returns {ok, duplicate, error}.
+## participants: [{character_id, outcome, xp, items_used: {item id: copies}, items_gained: {item id: copies}, flags_set: [flag]}]. Idempotent per key. Returns {ok, duplicate, error}.
 func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: int, _participants: Array) -> Dictionary:
 	return {"ok": true, "duplicate": false}
 

@@ -633,7 +633,7 @@ func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	for rec in _members(room):
 		var c := battle.state.get_c(rec.combatant_id)
 		participants.append({"character_id": rec.character["id"], "outcome": _fate(c), "xp": _xp_for(battle, c),
-			"items_used": c.items_used.duplicate()})
+			"items_used": c.items_used.duplicate(), "items_gained": c.items_gained.duplicate(), "flags_set": c.flags_gained.duplicate()})
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String
 	for attempt in 5:

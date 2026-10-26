@@ -26,6 +26,9 @@ var skills: Array[String] = []
 var items: Dictionary = {}
 ## Copies used up so far (an item is used up when its skill begins), reported with the result.
 var items_used: Dictionary = {}
+## Copies picked up during the battle (from map objects), and event flags earned. Reported with the result.
+var items_gained: Dictionary = {}
+var flags_gained: Array[String] = []
 ## Active statuses: {id, def (StatusDef.to_dict()), turns_left, stacks}. Counted in turns, cleared when the combatant is defeated.
 var statuses: Array[Dictionary] = []
 

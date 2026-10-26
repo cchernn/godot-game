@@ -18,6 +18,8 @@ var outcome: int = Enums.Outcome.NONE
 var ai_enabled: bool = true
 ## Full internal log (never sent as-is to clients).
 var events: Array[Dictionary] = []
+## The map objects by id (chests, levers, doors...), see ContextObject.
+var objects: Dictionary = {}
 
 var _resolver: BeatResolver
 var _ai: AiPlanner = AiPlanner.new()
@@ -36,6 +38,27 @@ func _init(p_cfg: GameConfig, p_skills: SkillDb, p_bf: Battlefield, p_seed: int 
 
 func add_combatant(c: Combatant) -> void:
 	state.add(c)
+
+
+## Puts a map object on the field and registers its actions as skills. A blocking state closes its tile to walking.
+func add_object(def: ContextObjectDef, object_id: String, cell: Vector2i) -> ContextObject:
+	var o := ContextObject.new(object_id, def, cell)
+	objects[object_id] = o
+	skills.add_context(object_id, def)
+	_sync_block(o)
+	return o
+
+
+func set_object_state(o: ContextObject, new_state: String) -> void:
+	o.state = new_state
+	_sync_block(o)
+
+
+func _sync_block(o: ContextObject) -> void:
+	if o.blocks():
+		bf.object_blocks[o.cell] = true
+	else:
+		bf.object_blocks.erase(o.cell)
 
 
 func start() -> void:
@@ -339,7 +362,23 @@ func snapshot_for(cid: String) -> Dictionary:
 	return {"round": state.round_number, "phase": state.phase, "beat": beat,
 		"beats_per_round": beats_per_round, "outcome": outcome, "you": cid, "eliminated": eliminated, "escaped": escaped,
 		"map": {"id": map_id, "w": bf.width, "h": bf.height, "terrain": Array(bf.terrain), "elev": Array(bf.elevation)},
-		"units": units, "plan": plan}
+		"units": units, "plan": plan, "objects": _object_view()}
+
+
+## Every map object with its state and the actions it offers right now (everyone sees objects; they are part of the map).
+func _object_view() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ids: Array = objects.keys()
+	ids.sort()
+	for id: String in ids:
+		var o := objects[id] as ContextObject
+		var offered: Array[Dictionary] = []
+		for a in o.def.actions:
+			if a != null and a.use != null and o.offers(a):
+				offered.append({"id": a.id, "name": a.display_name, "hint": a.hint})
+		out.append({"id": id, "name": o.def.display_name, "cell": o.cell, "state": o.state, "blocks": o.blocks(),
+			"reach": o.def.reach, "actions": offered})
+	return out
 
 
 ## The items you can still use: id, name, hint and copies left (before the ones queued in your plan).

@@ -8,6 +8,8 @@ var width: int = 0
 var height: int = 0
 var terrain: PackedInt32Array = PackedInt32Array()
 var elevation: PackedInt32Array = PackedInt32Array()
+## Tiles a map object currently blocks (cell -> true): walkable terrain nobody can enter, but sight passes over it.
+var object_blocks: Dictionary = {}
 
 
 ## Legend: '.' flat, '1'..'9' elevation, '~' difficult terrain, '#' blocked (wall/obstacle).
@@ -55,7 +57,7 @@ func elevation_at(c: Vector2i) -> int:
 
 
 func is_blocked(c: Vector2i) -> bool:
-	return not in_bounds(c) or terrain_at(c) == Enums.TerrainKind.BLOCKED
+	return not in_bounds(c) or terrain_at(c) == Enums.TerrainKind.BLOCKED or object_blocks.has(c)
 
 
 func is_difficult(c: Vector2i) -> bool:

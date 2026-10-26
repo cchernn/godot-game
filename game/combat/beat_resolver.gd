@@ -91,7 +91,11 @@ func _stunned(c: Combatant) -> void:
 
 
 func _can_begin(c: Combatant, a: PlannedAction, sk: SkillDef) -> String:
-	if a.item_id != "":
+	if a.object_id != "":
+		var why := _context_problem(c, a, true)
+		if why != "":
+			return why
+	elif a.item_id != "":
 		if sk == null or c.items.get(a.item_id, 0) - c.items_used.get(a.item_id, 0) <= 0:
 			return "no item left"
 	elif sk == null or not c.skills.has(a.skill_id):
@@ -112,10 +116,26 @@ func _can_begin(c: Combatant, a: PlannedAction, sk: SkillDef) -> String:
 	return _stage_problem(c, a, sk, 0)
 
 
+## Why a map object's action cannot happen right now, or "". The state is only required when it begins (a later stage
+## carries on after the action's own state change).
+func _context_problem(c: Combatant, a: PlannedAction, beginning: bool) -> String:
+	var o := b.objects.get(a.object_id) as ContextObject
+	var act: ContextAction = o.def.action(a.action_id) if o != null else null
+	if o == null or act == null:
+		return "object gone"
+	if not o.in_reach(c.cell):
+		return "out of reach"
+	if beginning and not o.offers(act):
+		return "not possible now"
+	return ""
+
+
 ## "" if the stage can execute right now.
 func _stage_problem(c: Combatant, a: PlannedAction, sk: SkillDef, stage_index: int) -> String:
 	if a.reserved_left < (sk.stages[stage_index]["ap"] as int):
 		return "not enough AP"
+	if a.object_id != "" and stage_index > 0:
+		return _context_problem(c, a, false)
 	match sk.kind:
 		Enums.SkillKind.ATTACK, Enums.SkillKind.REVIVE, Enums.SkillKind.SUPPORT:
 			if sk.targeting == Enums.Targeting.SELF:
@@ -158,7 +178,10 @@ func _run_stage(c: Combatant) -> void:
 	_spend(c, a, stage["ap"] as int)
 	match sk.kind:
 		Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT:
-			_run_effects(c, a, sk, stage)
+			if a.object_id != "":
+				_run_context(c, a, sk, stage)
+			else:
+				_run_effects(c, a, sk, stage)
 		Enums.SkillKind.REVIVE:
 			_revive(c, a)
 		Enums.SkillKind.REACTION:
@@ -209,6 +232,21 @@ func _move_step(c: Combatant, a: PlannedAction) -> void:
 			c.facing = a.facing
 		forfeit(c, a)
 		c.current = null
+
+
+## One stage of a map object's action: the effects land on the actor, and the object changes state when the action begins.
+func _run_context(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionary) -> void:
+	var o := b.objects[a.object_id] as ContextObject
+	var act := o.def.action(a.action_id)
+	if o.cell != c.cell:
+		c.facing = Enums.facing_from_delta(o.cell - c.cell)
+	if c.current_stage == 0:
+		b.emit("context", "{a} uses %s on the %s." % [act.display_name, o.def.display_name], c.id)
+	if not (stage.get("effects", []) as Array).is_empty():
+		_run_effects(c, a, sk, stage)
+	if c.current_stage == 0 and act.sets_state != "" and c.current != null:
+		b.set_object_state(o, act.sets_state)
+		b.emit("object_state", "The %s is now %s." % [o.def.display_name, act.sets_state], c.id)
 
 
 ## Runs a stage's effects, in order, on whoever it is aimed at (and `on = CASTER` effects on the caster). Anyone can be the
@@ -288,7 +326,35 @@ func _apply_effect(c: Combatant, sk: SkillDef, e: Dictionary, who: Combatant, co
 				_apply_status(c, e, who)
 		"remove_status":
 			_remove_status(c, e, who)
+		"grant_item":
+			_grant_item(c, e, who)
+		"set_flag":
+			_set_flag(c, e, who)
 	return true
+
+
+## Copies go to the receiver, never above the item's own limit; reported with the result so they are saved.
+func _grant_item(c: Combatant, e: Dictionary, who: Combatant) -> void:
+	var id: String = e["item"]
+	var def := b.skills.items.get(id) as ItemDef
+	if def == null:
+		b.emit("no_effect", "{a} finds nothing usable.", c.id, who.id)
+		return
+	var carried: int = int(who.items.get(id, 0)) - int(who.items_used.get(id, 0))
+	var n := mini(e["count"] as int, def.max_stack - carried)
+	if n <= 0:
+		b.emit("no_effect", "{t} cannot carry any more %s." % def.display_name, c.id, who.id)
+		return
+	who.items[id] = int(who.items.get(id, 0)) + n
+	who.items_gained[id] = int(who.items_gained.get(id, 0)) + n
+	b.emit("grant_item", "{t} gets %d %s." % [n, def.display_name], c.id, who.id)
+
+
+func _set_flag(c: Combatant, e: Dictionary, who: Combatant) -> void:
+	var flag: String = e["flag"]
+	if not who.flags_gained.has(flag):
+		who.flags_gained.append(flag)
+	b.emit("set_flag", "{t} has earned something (%s)." % flag, c.id, who.id)
 
 
 ## Returns true when the damage connected (a miss returns false, so a following interrupt effect does not land).

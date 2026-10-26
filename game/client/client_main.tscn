@@ -148,8 +148,9 @@ text = "Retreat"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+toggle_mode = true
 disabled = true
-tooltip_text = "Actions for what is around you, like opening a chest. Not in the game yet."
+tooltip_text = "Actions for what is around you, like opening a chest"
 text = "Context"
 
 [node name="SkillBox" type="VBoxContainer" parent="SidePanel/Layout"]
@@ -157,6 +158,10 @@ unique_name_in_owner = true
 layout_mode = 2
 
 [node name="ItemBox" type="VBoxContainer" parent="SidePanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ContextBox" type="VBoxContainer" parent="SidePanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 

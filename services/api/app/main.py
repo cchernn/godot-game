@@ -76,6 +76,8 @@ class ParticipantIn(BaseModel):
     outcome: Literal["survived", "downed", "eliminated", "escaped"]
     xp: int = Field(ge=0, le=100_000)
     items_used: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)
+    items_gained: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)  # from map objects
+    flags_set: list[Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]] = Field(default_factory=list, max_length=32)
 
 
 class GrantItemIn(BaseModel):

@@ -69,7 +69,11 @@ func _ready() -> void:
 func set_snapshot(snap: Dictionary) -> void:
 	var m: Dictionary = snap["map"]
 	bf = Battlefield.from_arrays(m["w"], m["h"], m["terrain"], m["elev"])
+	for o: Dictionary in snap.get("objects", []):
+		if o["blocks"]:
+			bf.object_blocks[o["cell"]] = true
 	_ensure_map(str(m.get("id", "")))
+	_show_object_states(snap.get("objects", []))
 	units.assign(snap["units"])
 	me_id = snap["you"]
 	_seen.clear()
@@ -82,6 +86,19 @@ func set_snapshot(snap: Dictionary) -> void:
 						_seen[c] = true
 	_sync_units()
 	_serial += 1
+
+
+## Shows each object's state on its map node (the Label3D in map_object.tscn).
+func _show_object_states(list: Array) -> void:
+	if _gm == null or not is_instance_valid(_gm):
+		return
+	var holder := _gm.get_parent().get_node_or_null(MapDef.OBJECTS_NODE)
+	if holder == null:
+		return
+	for o: Dictionary in list:
+		var node := holder.get_node_or_null(str(o["id"])) as MapObject
+		if node != null:
+			node.show_state(str(o["state"]))
 
 
 func _sync_units() -> void:

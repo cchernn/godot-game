@@ -44,6 +44,12 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 	assert(map.error == "", map.error)
 	var battle := Battle.new(cfg, skills, map.battlefield, seed)
 	battle.map_id = def.map_id()
+	for o: Dictionary in map.objects:
+		var issues := (o["def"] as ContextObjectDef).problems()
+		for p in issues:
+			push_error("Map object %s: %s" % [o["id"], p])
+		assert(issues.is_empty(), "; ".join(issues))
+		battle.add_object(o["def"], o["id"], o["cell"])
 	for i in mini(player_count, def.max_players()):
 		var tpl: UnitTemplate = def.classes[i]
 		if i < classes.size():

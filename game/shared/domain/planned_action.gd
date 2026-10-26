@@ -5,6 +5,9 @@ extends RefCounted
 var skill_id: String = ""
 ## Set when the action uses an item; skill_id is then the item's skill ("item:<id>").
 var item_id: String = ""
+## Set when the action is a map object's action; skill_id is then "ctx:<object>:<action>".
+var object_id: String = ""
+var action_id: String = ""
 var path: Array[Vector2i] = []
 var facing: int = -1
 var target_id: String = ""
@@ -24,6 +27,15 @@ static func _to_cell(v: Variant) -> Variant:
 	return null
 
 
+static func _is_name(v: Variant) -> bool:
+	if not v is String or (v as String) == "" or (v as String).length() > 40:
+		return false
+	for ch in (v as String):
+		if not (ch in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"):
+			return false
+	return true
+
+
 ## Returns null if malformed.
 static func from_dict(d: Variant) -> PlannedAction:
 	if not d is Dictionary:
@@ -35,6 +47,12 @@ static func from_dict(d: Variant) -> PlannedAction:
 			return null
 		a.item_id = dict["item"]
 		a.skill_id = ItemDef.skill_id_for(a.item_id)
+	elif dict.has("object"):
+		if not _is_name(dict["object"]) or not _is_name(dict.get("action")):
+			return null
+		a.object_id = dict["object"]
+		a.action_id = dict["action"]
+		a.skill_id = ContextAction.skill_id_for(a.object_id, a.action_id)
 	elif dict.get("skill") is String:
 		a.skill_id = dict["skill"]
 	else:
@@ -68,6 +86,9 @@ func to_dict() -> Dictionary:
 	var d := {"skill": skill_id}
 	if item_id != "":
 		d["item"] = item_id
+	if object_id != "":
+		d["object"] = object_id
+		d["action"] = action_id
 	if not path.is_empty():
 		d["path"] = path.duplicate()
 	if facing >= 0:

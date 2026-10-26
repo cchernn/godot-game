@@ -18,6 +18,7 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 		return _fail("Too many actions")
 	var pos := c.cell
 	var queued := {} # item id -> copies planned so far
+	var sim_state := {} # object id -> state after the context actions queued so far
 	var total := 0
 	var beats := 0
 	var max_step: int = cfg.get_value("combat", "max_step_height")
@@ -25,7 +26,11 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 	var surcharge: int = cfg.get_value("movement", "difficult_terrain_surcharge")
 	for a in actions:
 		var sk := battle.skills.get_skill(a.skill_id)
-		if a.item_id != "":
+		if a.object_id != "":
+			var why := _context_problem(battle, a, pos, sim_state)
+			if why != "":
+				return _fail(why)
+		elif a.item_id != "":
 			if sk == null or not battle.skills.items.has(a.item_id):
 				return _fail("Unknown item")
 			queued[a.item_id] = int(queued.get(a.item_id, 0)) + 1
@@ -63,6 +68,23 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 	if beats > battle.beats_per_round:
 		return _fail("Plan is too long for one round")
 	return {"ok": true, "error": "", "costs": costs}
+
+
+## Why this context action cannot be planned from `pos`, or "" if it can. `sim_state` carries the state changes of the actions
+## already queued, so "unlock" then "open" can be planned together.
+static func _context_problem(battle: Battle, a: PlannedAction, pos: Vector2i, sim_state: Dictionary) -> String:
+	var o := battle.objects.get(a.object_id) as ContextObject
+	var act: ContextAction = o.def.action(a.action_id) if o != null else null
+	if o == null or act == null or battle.skills.get_skill(a.skill_id) == null:
+		return "Unknown object action"
+	if not o.in_reach(pos):
+		return "%s is out of reach" % o.def.display_name
+	var now: String = sim_state.get(o.id, o.state)
+	if act.requires_state != "" and act.requires_state != now:
+		return "%s cannot be done now" % act.display_name
+	if act.sets_state != "":
+		sim_state[o.id] = act.sets_state
+	return ""
 
 
 static func _fail(msg: String) -> Dictionary:
