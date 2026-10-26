@@ -7,6 +7,8 @@ const DEFAULT_PATH := "res://game/content/skills/skill_set.tres"
 const ITEMS_PATH := "res://game/content/items/item_set.tres"
 
 var skills: Dictionary = {}
+## Ids of the basic actions every player character gets (from the skill set's Basic list).
+var basic_ids: Array[String] = []
 ## item id -> ItemDef. Each item's use skill is also in `skills` under "item:<id>", so plans and the rules treat it like any skill.
 var items: Dictionary = {}
 
@@ -18,6 +20,8 @@ static func load_file(path: String = DEFAULT_PATH) -> SkillDb:
 	for s in set.skills:
 		var copy := s.duplicate(true) as SkillDef
 		db.skills[copy.id] = copy
+	for b in set.basic:
+		db.basic_ids.append(b.id)
 	var item_set := load(ITEMS_PATH) as ItemSet
 	assert(item_set != null, "Cannot load the item set: %s" % ITEMS_PATH)
 	for it in item_set.items:

@@ -63,7 +63,7 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 				raw as Dictionary if raw is Dictionary else {}, cfg, _list((builds[i] as Dictionary).get("learned_skills", [])),
 				_list((builds[i] as Dictionary).get("flags", [])))
 		battle.add_combatant(tpl.make_combatant("pc%d" % i, Enums.Team.PLAYERS, Enums.Facing.EAST,
-			_spawn(map.player_spawns, i, "player seat P%d" % i), cfg, made))
+			_spawn(map.player_spawns, i, "player seat P%d" % i), cfg, made, skills.basic_ids))
 	for i in def.enemies.size():
 		battle.add_combatant(def.enemies[i].make_combatant("e%d" % i, Enums.Team.ENEMIES, Enums.Facing.WEST,
 			_spawn(map.enemy_spawns, i, "enemy spot E%d" % i), cfg))

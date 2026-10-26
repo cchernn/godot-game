@@ -2,6 +2,8 @@
 # hosted alone, set SITE_ADDRESS to a domain and Caddy obtains the HTTPS certificate itself.
 {$SITE_ADDRESS::80} {
 	encode zstd gzip
+	# Browsers must check for a new build on every load (they still skip the download when nothing changed).
+	header Cache-Control "no-cache"
 	root * /srv/www
 	file_server
 }

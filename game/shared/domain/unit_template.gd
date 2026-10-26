@@ -56,7 +56,7 @@ func problems(known: SkillDb) -> Array[String]:
 			out.append("%s: growth and point values cannot be negative" % id)
 	if stat_points_per_level > 0 and (point_value == null or point_value.is_zero()):
 		out.append("%s: earns stat points but no attribute has a point value" % id)
-	if skills.is_empty():
+	if skills.is_empty() and known.basic_ids.is_empty():
 		out.append("%s: has no skills" % id)
 	for sk in skills:
 		if sk == null:
@@ -88,8 +88,9 @@ func base_attributes() -> Attributes:
 
 
 ## `build` is CharacterBuild.compose(...) for this template (leave empty for the plain class at level 1).
+## `basics` = the basic action ids to give first (player seats pass SkillDb.basic_ids; enemies pass none).
 func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i, cfg: GameConfig,
-		build: Dictionary = {}) -> Combatant:
+		build: Dictionary = {}, basics: Array[String] = []) -> Combatant:
 	if build.is_empty():
 		build = CharacterBuild.compose(self, 1, {}, cfg)
 	var st: Dictionary = build["stats"]
@@ -107,9 +108,9 @@ func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i
 	c.power = st["power"]
 	c.accuracy = st["accuracy"]
 	c.evasion = st["evasion"]
-	if build.has("skills"):
-		c.skills.assign(build["skills"])
-	else:
-		for sk in skills:
-			c.skills.append(sk.id)
+	c.skills.assign(basics)
+	var own: Array = build["skills"] if build.has("skills") else skills.map(func(sk: SkillDef) -> String: return sk.id)
+	for sid: String in own:
+		if not sid in c.skills:
+			c.skills.append(sid)
 	return c

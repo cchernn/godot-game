@@ -7,13 +7,13 @@ extends SceneTree
 const ROOT := "res://game/content/"
 const CLASSES := [
 	{"id": "warrior", "name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15,
-		"skills": ["move", "strike", "power_strike", "disrupt"]},
+		"skills": ["power_strike", "disrupt"]},
 	{"id": "ranger", "name": "Ranger", "might": 1, "dex": 12, "agi": 12, "vit": 9,
-		"skills": ["move", "strike", "bolt", "disrupt"]},
+		"skills": ["bolt", "disrupt"]},
 	{"id": "cleric", "name": "Cleric", "might": 1, "dex": 10, "agi": 10, "vit": 10,
-		"skills": ["move", "strike", "bolt", "revive"]},
+		"skills": ["bolt", "revive"]},
 	{"id": "rogue", "name": "Rogue", "might": 2, "dex": 16, "agi": 16, "vit": 8,
-		"skills": ["move", "strike", "bolt"]},
+		"skills": ["bolt"]},
 ]
 const ENEMIES := [
 	{"id": "ghoul", "name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10,

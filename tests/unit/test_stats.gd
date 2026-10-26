@@ -3,10 +3,10 @@ extends TestCase
 ## The numbers as they were typed into encounter.gd before they became resources.
 ## Attributes and the battle numbers they give with the provisional config (armor is gear-only, so always 0).
 const ORIGINAL := {
-	"warrior": {"name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15, "hp": 40, "power": 3, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike", "disrupt", "defend"]},
-	"ranger": {"name": "Ranger", "might": 1, "dex": 12, "agi": 12, "vit": 9, "hp": 28, "power": 1, "acc": 2, "eva": 1, "skills": ["move", "strike", "bolt", "disrupt", "defend"]},
-	"cleric": {"name": "Cleric", "might": 1, "dex": 10, "agi": 10, "vit": 10, "hp": 30, "power": 1, "acc": 1, "eva": 0, "skills": ["move", "strike", "bolt", "revive", "defend"]},
-	"rogue": {"name": "Rogue", "might": 2, "dex": 16, "agi": 16, "vit": 8, "hp": 26, "power": 2, "acc": 4, "eva": 3, "skills": ["move", "strike", "bolt", "defend"]},
+	"warrior": {"name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15, "hp": 40, "power": 3, "acc": 0, "eva": -1, "skills": ["power_strike", "disrupt"]},
+	"ranger": {"name": "Ranger", "might": 1, "dex": 12, "agi": 12, "vit": 9, "hp": 28, "power": 1, "acc": 2, "eva": 1, "skills": ["bolt", "disrupt"]},
+	"cleric": {"name": "Cleric", "might": 1, "dex": 10, "agi": 10, "vit": 10, "hp": 30, "power": 1, "acc": 1, "eva": 0, "skills": ["bolt", "revive"]},
+	"rogue": {"name": "Rogue", "might": 2, "dex": 16, "agi": 16, "vit": 8, "hp": 26, "power": 2, "acc": 4, "eva": 3, "skills": ["bolt"]},
 	"ghoul": {"name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10, "hp": 30, "power": 2, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
 	"cultist": {"name": "Cultist", "might": 1, "dex": 10, "agi": 10, "vit": 5, "hp": 20, "power": 1, "acc": 1, "eva": 0, "skills": ["move", "bolt", "strike"]},
 }
@@ -116,7 +116,7 @@ func test_editing_a_template_changes_the_battle() -> void:
 	assert_eq(c.max_hp, 100)
 	assert_eq(c.hp, 100)
 	assert_eq(c.power, 7)
-	assert_eq(c.skills, ["move", "strike"] as Array[String])
+	assert_eq(c.skills, ["move", "strike", "defend"] as Array[String], "the basics are added to the seat's own skills, once")
 	assert_eq(b.state.get_c("pc1").max_hp, 28, "other seats are untouched")
 	var original := Encounter.build(GameConfig.load_file(), SkillDb.load_file(), 1, 1)
 	assert_eq(original.state.get_c("pc0").max_hp, 40, "the shared resource itself was not changed")
@@ -138,7 +138,7 @@ func test_problems_are_reported_with_the_unit_named() -> void:
 	var t := UnitTemplate.new()
 	t.id = "Bad Id"
 	var issues := t.problems(known)
-	assert_true(issues.size() >= 3, str(issues))
+	assert_true(issues.size() >= 2, str(issues))
 	t.id = "archer"
 	t.display_name = "Archer"
 	var ghost := SkillDef.new()
@@ -154,3 +154,16 @@ func test_problems_are_reported_with_the_unit_named() -> void:
 	var doubled: Array[UnitTemplate] = [twice.classes[0], twice.classes[0]]
 	twice.classes = doubled
 	assert_true(str(twice.problems(known)).contains("twice"))
+
+
+func test_every_player_seat_gets_the_basic_actions_and_enemies_do_not() -> void:
+	var skills := SkillDb.load_file()
+	assert_eq(skills.basic_ids, ["move", "strike", "defend"] as Array[String])
+	var b := Encounter.build(GameConfig.load_file(), skills, 4, 1)
+	for i in 4:
+		var have := b.state.get_c("pc%d" % i).skills
+		for basic in skills.basic_ids:
+			assert_true(basic in have, "pc%d has %s" % [i, basic])
+	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "defend", "power_strike", "disrupt"] as Array[String])
+	assert_true(not "defend" in b.state.get_c("e0").skills, "enemies list their own actions")
+	assert_eq(SkillSet.new().problems(), [] as Array[String])

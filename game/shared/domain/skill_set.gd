@@ -4,6 +4,9 @@ extends Resource
 ## then add it to this list.
 
 @export var skills: Array[SkillDef] = []
+## The basic actions every player character has automatically (Move, Attack, Defend), so classes do not list them. Each must also be in
+## the list above. Enemies do not get them: an enemy lists whatever it can do.
+@export var basic: Array[SkillDef] = []
 
 
 func problems() -> Array[String]:
@@ -17,4 +20,7 @@ func problems() -> Array[String]:
 			out.append("skill '%s' appears twice" % s.id)
 		seen[s.id] = true
 		out.append_array(s.problems())
+	for b in basic:
+		if b == null or not seen.has(b.id):
+			out.append("a basic skill is not in the skill list")
 	return out

@@ -128,7 +128,8 @@ func _caster() -> UnitTemplate:
 	var p2: Array[UnlockCondition] = [_level(4)]
 	t.unlocks = [_unlock("bolt", SkillUnlock.Mode.GRANTED, g), _unlock("revive", SkillUnlock.Mode.GRANTED, a),
 		_unlock("disrupt", SkillUnlock.Mode.PICK, p1), _unlock("power_strike", SkillUnlock.Mode.PICK, p2)]
-	t.skills = t.skills.filter(func(s: SkillDef) -> bool: return s.id in ["move", "strike"])
+	var start: Array[SkillDef] = [load("res://game/content/skills/move.tres") as SkillDef, load("res://game/content/skills/strike.tres") as SkillDef]
+	t.skills = start
 	t.skill_picks_per_level = 1
 	return t
 
@@ -173,7 +174,7 @@ func test_battle_uses_the_composed_skills() -> void:
 	tpls.append_array(def.classes.slice(1))
 	def.classes = tpls
 	var b := Encounter.build(cfg, SkillDb.load_file(), 2, 1, [], def, [{"level": 3, "learned_skills": ["disrupt"], "flags": []}])
-	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "bolt", "disrupt"] as Array[String])
+	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "defend", "bolt", "disrupt"] as Array[String])
 	assert_true(b.state.get_c("pc1").skills.size() > 0, "a seat with no build keeps the class's skills")
 
 
