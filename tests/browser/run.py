@@ -103,7 +103,7 @@ def open_world(player, wait=6):
 
 
 def party_flow(b):
-    """The host (a party of one at Hollowmere) and the tester meet on the map: the tester asks the host's party to let
+    """The host (a party of one at Kampung Lama) and the tester meet on the map: the tester asks the host's party to let
     them in (Party window), the host approves and starts an activity (Activity window), the tester is taken into the
     battle by itself, drops out and comes back (Party window > Return to battle), and both play to the result and return
     to the map. Needs both accounts to be members of the world with a character each, both parties idle at the same place

@@ -238,7 +238,7 @@ def test_starting_needs_discovery_leadership_and_the_right_place(client, pool):
     assert start(client, p1, t1, "ashen_keep_siege").status_code == 403, "location not discovered"
     reveal(client, w["id"], "node", "ashen_keep", "world")
     assert start(client, p1, t1, "ashen_keep_siege").status_code == 403, "the party is not at the keep"
-    assert start(client, p1, t1, "wolf_hunt").status_code == 403, "wolf_hunt is in the Blackwood"
+    assert start(client, p1, t1, "wolf_hunt").status_code == 403, "wolf_hunt is in Hutan Lipur"
     assert start(client, p1, t2).status_code == 403, "only the leader starts"
     assert start(client, p1, t1, "no_such_thing").status_code == 404
     outsider, _ = new_user()
@@ -405,7 +405,7 @@ def test_party_list_shows_every_party_and_my_relation(client, pool):
     client.post(f"/parties/{a}/requests", headers=auth(t3))
     rows = {p["id"]: p for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t3)).json()}
     assert a in rows and b in rows and len(rows) == 3
-    assert (rows[a]["relation"], rows[a]["leader"]["name"], rows[a]["node_name"], rows[a]["here"]) == ("pending", "C0", "Hollowmere", True)
+    assert (rows[a]["relation"], rows[a]["leader"]["name"], rows[a]["node_name"], rows[a]["here"]) == ("pending", "C0", "Kampung Lama", True)
     assert (rows[b]["relation"], rows[b]["open"], rows[b]["max_size"]) == ("none", True, 4)
     mine = {p["id"]: p["relation"] for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t1)).json()}
     assert mine[a] == "leader" and mine[b] == "none"

@@ -75,7 +75,7 @@ try:
     for u in users[1:3]:  # the party leader lets the others in
         rid = httpx.post(f"{api}/parties/{pid}/requests", headers=h(u)).json()["id"]
         assert httpx.post(f"{api}/parties/{pid}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
-    # The route to the keep is found too (a second world-wide reveal), then the party walks there: Hollowmere -> Blackwood -> Ashen Keep.
+    # The route to the keep is found too (a second world-wide reveal), then the party walks there: Kampung Lama -> Hutan Lipur -> Ashen Keep.
     assert httpx.post(f"{api}/internal/worlds/{world['id']}/reveal", headers=svc,
                       json={"kind": "route", "target_id": "trail_bw_ak", "scope": "world"}).json()["revision"] == 2
     for node in ("blackwood", "ashen_keep"):

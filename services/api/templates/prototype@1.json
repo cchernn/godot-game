@@ -5,8 +5,8 @@
   "start_node": "hollowmere",
   "rules": {"discovery_scope": "character", "require_location": true, "max_party_size": 4, "reset_xp_after_battle": true},
   "nodes": [
-    {"id": "hollowmere", "name": "Hollowmere", "kind": "settlement", "initially_visible": true},
-    {"id": "blackwood", "name": "The Blackwood", "kind": "wilderness", "initially_visible": true},
+    {"id": "hollowmere", "name": "Kampung Lama", "kind": "settlement", "initially_visible": true},
+    {"id": "blackwood", "name": "Hutan Lipur", "kind": "wilderness", "initially_visible": true},
     {"id": "ashen_keep", "name": "Ashen Keep", "kind": "dungeon", "initially_visible": false},
     {"id": "old_shrine", "name": "Old Shrine", "kind": "landmark", "initially_visible": false},
     {"id": "sunken_crypt", "name": "Sunken Crypt", "kind": "dungeon", "initially_visible": false}

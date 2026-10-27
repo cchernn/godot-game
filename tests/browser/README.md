@@ -12,7 +12,7 @@ docker run --rm --add-host host.docker.internal:host-gateway \
   -v "$PWD/render_out/browser:/out" \
   -e STAGE=party -e HOST_EMAIL=you@example.com -e HOST_PASSWORD=... unnamed-browser-test
 ```
-- `STAGE=party`: the host and the tester (both members of Test World with a character, each a party of one at Hollowmere) meet on the map (the dock opens the Party and Activity windows). The tester
+- `STAGE=party`: the host and the tester (both members of Test World with a character, each a party of one at Kampung Lama) meet on the map (the dock opens the Party and Activity windows). The tester
   asks to join the host's party, the host approves and starts Training skirmish, the tester is taken into the battle, reloads their tab mid-battle and returns
   from the Party window (Return to battle), both play to the result (a defeat is fine) and Continue. It takes up to about 12 minutes. **Start clean**: both parties idle at the same place,
   no pending asks, the tester not in the host's party. `uv run --project services/api python tests/browser/parties.py <email> <password> [--clean]` lists the
