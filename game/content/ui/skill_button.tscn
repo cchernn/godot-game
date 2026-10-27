@@ -1,6 +1,0 @@
-[gd_scene format=3]
-
-[node name="SkillButton" type="Button"]
-toggle_mode = true
-text = "Skill"
-alignment = 0

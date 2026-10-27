@@ -318,15 +318,17 @@ class PartyMixin:
         return out
 
     def list_parties(self, world_id: uuid.UUID, user_id: uuid.UUID) -> list[dict]:
-        """Every party in the world, with the caller's relation to each (leader | member | pending | none)."""
+        """Every party in the world with someone about (and the caller's own), with the caller's relation to each (leader | member | pending | none)."""
         if not self.is_member(world_id, user_id):
             raise Forbidden("Not a member of this world")
         with self.pool.connection() as conn:
             char = conn.execute("select * from characters where world_id=%s and user_id=%s and status='active' for update", (world_id, user_id)).fetchone()
-            if char is not None:
-                self._party_of(conn, char)  # the caller's own party exists before they look at the list
+            mine = self._party_of(conn, char)["id"] if char is not None else None  # the caller's own party exists before they look at the list
             self._sweep_offline_parties(conn, world_id)
             rows = conn.execute("select * from parties where world_id=%s and status='open' order by created_at", (world_id,)).fetchall()
+            # Nobody to ask in a party whose members are all away (a closed tab, a sign-out): it is left out until one of them comes back.
+            rows = [p for p in rows if p["id"] == mine or self._live_run(conn, p["id"]) is not None
+                    or any(self._online(conn, m["id"]) for m in self._members(conn, p["id"]))]
             return self._party_rows(conn, rows, world_id, user_id)
 
     def get_party(self, party_id: uuid.UUID, user_id: uuid.UUID) -> dict:

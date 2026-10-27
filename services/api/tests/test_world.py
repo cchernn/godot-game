@@ -770,8 +770,20 @@ def test_listing_disbands_idle_parties_whose_members_are_all_offline(client, poo
     go_offline(pool, c1["id"])
     go_offline(pool, c2["id"])
     listed = client.get(f"/worlds/{w['id']}/parties", headers=auth(t3)).json()
-    assert sorted(len(p["members"]) for p in listed) == [1, 1, 1]
+    assert sorted(len(p["members"]) for p in listed) == [1], "the two who went away are on their own now, and not listed while away"
     assert [m["name"] for m in my_party(client, w["id"], t2)["members"]] == ["C1"]
+
+
+def test_a_party_whose_members_are_all_away_is_not_listed_until_one_returns(client, pool):
+    w, [t1, t2], [c1, c2] = party(client, pool)
+    for t in (t1, t2):
+        beat(client, w["id"], t)
+    names = lambda: sorted(m["name"] for p in client.get(f"/worlds/{w['id']}/parties", headers=auth(t2)).json() for m in p["members"])
+    assert names() == ["C0", "C1"]
+    go_offline(pool, c1["id"])
+    assert names() == ["C1"], "C0 has gone: nobody to ask there (your own party always shows)"
+    beat(client, w["id"], t1)
+    assert names() == ["C0", "C1"], "back again"
 
 
 def test_presence_needs_membership(client, pool):
