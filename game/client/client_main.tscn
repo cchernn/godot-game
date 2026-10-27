@@ -4,7 +4,8 @@
 [ext_resource type="PackedScene" path="res://game/content/board/board_3d.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://game/client/account_flow.tscn" id="3"]
 [ext_resource type="Theme" path="res://game/content/ui/theme.tres" id="4"]
-[ext_resource type="PackedScene" path="res://game/content/ui/skill_button.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://game/content/ui/action_menu.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://game/content/ui/hover_card.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://game/content/ui/unit_card.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/content/ui/menu_background.tscn" id="7"]
 
@@ -16,7 +17,6 @@ anchor_bottom = 1.0
 theme = ExtResource("4")
 script = ExtResource("1")
 unit_card_scene = ExtResource("6")
-skill_button_scene = ExtResource("5")
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -102,82 +102,8 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="ActionBar" type="GridContainer" parent="SidePanel/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-columns = 3
-
-[node name="MoveButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-toggle_mode = true
-text = "Move"
-
-[node name="AttackButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-toggle_mode = true
-tooltip_text = "Pick a basic attack"
-text = "Attack"
-
-[node name="SkillsButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-toggle_mode = true
-tooltip_text = "Pick one of your class skills"
-text = "Skills"
-
-[node name="DefendButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Defend"
-
-[node name="ItemButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-toggle_mode = true
-disabled = true
-tooltip_text = "Use one of the items you carry"
-text = "Item"
-
-[node name="RetreatButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-tooltip_text = "Leave the fight. You keep watching until it ends."
-text = "Retreat"
-
-[node name="ContextButton" type="Button" parent="SidePanel/Layout/ActionBar"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-toggle_mode = true
-disabled = true
-tooltip_text = "Actions for what is around you, like opening a chest"
-text = "Context"
-
-[node name="AttackBox" type="VBoxContainer" parent="SidePanel/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="SkillBox" type="VBoxContainer" parent="SidePanel/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ItemBox" type="VBoxContainer" parent="SidePanel/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ContextBox" type="VBoxContainer" parent="SidePanel/Layout"]
-unique_name_in_owner = true
-layout_mode = 2
-
 [node name="FacingRow" type="HBoxContainer" parent="SidePanel/Layout"]
+unique_name_in_owner = true
 layout_mode = 2
 
 [node name="FacingLabel" type="Label" parent="SidePanel/Layout/FacingRow"]
@@ -237,6 +163,12 @@ layout_mode = 2
 toggle_mode = true
 text = "Ready"
 
+[node name="RetreatButton" type="Button" parent="SidePanel/Layout/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Leave the fight. You keep watching until it ends."
+text = "Retreat"
+
 [node name="ErrorLabel" type="Label" parent="SidePanel/Layout"]
 unique_name_in_owner = true
 modulate = Color(1, 0.5, 0.4, 1)
@@ -250,6 +182,14 @@ layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
 scroll_following = true
+
+[node name="HoverCard" parent="." instance=ExtResource("8")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="ActionMenu" parent="." instance=ExtResource("5")]
+unique_name_in_owner = true
+layout_mode = 1
 
 [node name="Banner" type="Label" parent="."]
 unique_name_in_owner = true

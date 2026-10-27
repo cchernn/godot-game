@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/action_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" path="res://game/content/ui/action_button.tscn" id="2_button"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.1, 0.11, 0.15, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.42, 0.6, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+
+[node name="ActionMenu" type="PanelContainer" node_paths=PackedStringArray("title_label", "entries")]
+visible = false
+custom_minimum_size = Vector2(250, 0)
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("1_menu")
+entry_scene = ExtResource("2_button")
+title_label = NodePath("Layout/Title")
+entries = NodePath("Layout/Entries")
+
+[node name="Layout" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Layout"]
+layout_mode = 2
+modulate = Color(0.75, 0.85, 1, 1)
+text = "Choose an action"
+
+[node name="Entries" type="VBoxContainer" parent="Layout"]
+layout_mode = 2
+theme_override_constants/separation = 2

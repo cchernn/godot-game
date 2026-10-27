@@ -316,7 +316,7 @@ func public_events_since(seq: int) -> Array[Dictionary]:
 		var pe := {"seq": e["seq"], "round": e["round"], "beat": e["beat"], "type": e["type"],
 			"text": e["public_text"],
 			"actor": "" if e["actor"] in hidden else e["actor"],
-			"target": "" if e["target"] in hidden else e["target"]}
+			"target": "" if e["target"] in hidden else e["target"], "data": e["data"]}
 		out.append(pe)
 	return out
 
@@ -337,13 +337,14 @@ func snapshot_for(cid: String) -> Dictionary:
 		var u := {"id": c.id, "name": c.display_name, "visual": c.visual, "team": c.team, "cell": c.cell, "facing": c.facing,
 			"hp": c.hp, "max_hp": c.max_hp, "shield": c.shield + c.beat_shield, "life": c.life_state, "ready": c.ready,
 			"active": c.is_active(state.round_number), "revived": c.revived_this_encounter,
-			"statuses": _status_view(c), "stunned": c.has_condition("stunned"), "rooted": c.has_condition("rooted")}
+			"armor": c.stat("armor"), "statuses": _status_view(c), "stunned": c.has_condition("stunned"), "rooted": c.has_condition("rooted")}
 		if own:
 			u["skills"] = c.skills
 			u["ap_capacity"] = c.ap_capacity
 			u["ap_reserved"] = c.ap_reserved
 			u["ap_spent"] = c.ap_spent
 			u["ap_forfeited"] = c.ap_forfeited
+			u["power"] = c.stat("power")
 			u["dexterity"] = c.stat("dexterity")
 			u["agility"] = c.stat("agility")
 			u["tiles_per_ap"] = cfg.tiles_per_ap(c.stat("agility"))

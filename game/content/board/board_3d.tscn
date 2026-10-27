@@ -12,6 +12,11 @@
 [ext_resource type="Material" path="res://game/content/board/materials/valid.tres" id="10_valid"]
 [ext_resource type="Material" path="res://game/content/board/materials/area.tres" id="11_area"]
 
+[ext_resource type="Material" path="res://game/content/board/materials/path.tres" id="12_path"]
+[ext_resource type="PackedScene" path="res://game/content/board/markers/target_marker.tscn" id="13_target"]
+[ext_resource type="PackedScene" path="res://game/content/board/markers/select_marker.tscn" id="14_select"]
+[ext_resource type="PackedScene" path="res://game/content/board/markers/floating_text.tscn" id="15_float"]
+
 [sub_resource type="Environment" id="Environment_2kpgk"]
 background_mode = 1
 background_color = Color(0.09, 0.09, 0.11, 1)
@@ -30,6 +35,10 @@ hover_material = ExtResource("7_2scl0")
 range_material = ExtResource("9_range")
 valid_material = ExtResource("10_valid")
 area_material = ExtResource("11_area")
+path_material = ExtResource("12_path")
+target_marker_scene = ExtResource("13_target")
+select_marker_scene = ExtResource("14_select")
+floating_text_scene = ExtResource("15_float")
 camera_rig = NodePath("CameraRig")
 map_root = NodePath("Map")
 units_root = NodePath("Units")

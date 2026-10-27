@@ -375,9 +375,12 @@ func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> b
 			return false
 	var mult := 1.0
 	var note := ""
+	var crit := false
+	var flank := 0
 	if e["can_crit"] as bool:
 		if victim != c:
 			var rel := _relative_facing(c, victim)
+			flank = rel
 			if rel == 2:
 				mult *= b.cfg.get_value("combat", "rear_multiplier") as float
 				note = " (rear attack)"
@@ -387,6 +390,7 @@ func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> b
 		if b.rng.randf() < (b.cfg.get_value("combat", "crit_chance") as float):
 			mult *= b.cfg.get_value("combat", "crit_multiplier") as float
 			note += " CRITICAL"
+			crit = true
 	var raw: int = e["base"] as int
 	if e["uses_power"] as bool:
 		raw += c.stat("power")
@@ -399,7 +403,7 @@ func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> b
 	victim.hp = maxi(0, victim.hp - (dmg - absorbed))
 	if absorbed > 0:
 		note += " (%d absorbed by the shield)" % absorbed
-	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [label, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed})
+	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [label, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed, "crit": crit, "flank": flank})
 	if victim.hp == 0:
 		_defeat(victim)
 		return false # nothing left to interrupt
@@ -515,7 +519,7 @@ func run_turn_end() -> void:
 			if (s["turns_left"] as int) <= 0:
 				c.statuses.erase(s)
 				if c.is_present():
-					b.emit("status_end", "%s fades from {t}." % s["def"]["name"], "", c.id, {"status": s["id"]})
+					b.emit("status_end", "%s fades from {t}." % s["def"]["name"], "", c.id, _status_data(s["def"]))
 
 
 func _apply_status(c: Combatant, e: Dictionary, who: Combatant) -> void:
@@ -527,19 +531,24 @@ func _apply_status(c: Combatant, e: Dictionary, who: Combatant) -> void:
 	if cur.is_empty():
 		who.statuses.append({"id": d["id"], "def": d, "turns_left": turns, "stacks": 1})
 		b.emit("status_apply", "{t} is afflicted by %s (%d turn%s)." % [d["name"], turns, "" if turns == 1 else "s"],
-			c.id, who.id, {"status": d["id"]})
+			c.id, who.id, _status_data(d))
 		return
 	match d["stacking"] as int:
 		StatusDef.Stacking.IGNORE:
 			b.emit("no_effect", "%s is already on {t}." % d["name"], c.id, who.id)
 		StatusDef.Stacking.REFRESH:
 			cur["turns_left"] = maxi(cur["turns_left"] as int, turns)
-			b.emit("status_apply", "%s on {t} is renewed (%d turns)." % [d["name"], cur["turns_left"]], c.id, who.id, {"status": d["id"]})
+			b.emit("status_apply", "%s on {t} is renewed (%d turns)." % [d["name"], cur["turns_left"]], c.id, who.id, _status_data(d))
 		StatusDef.Stacking.STACK:
 			cur["stacks"] = mini(cur["stacks"] as int + 1, d["max_stacks"] as int)
 			cur["turns_left"] = maxi(cur["turns_left"] as int, turns)
 			b.emit("status_apply", "%s on {t} grows to x%d (%d turns)." % [d["name"], cur["stacks"], cur["turns_left"]],
-				c.id, who.id, {"status": d["id"]})
+				c.id, who.id, _status_data(d))
+
+
+## What a client needs to float a status over a unit.
+func _status_data(d: Dictionary) -> Dictionary:
+	return {"status": d["id"], "name": d["name"], "glyph": d["glyph"], "color": d["color"], "kind": d["kind"]}
 
 
 func _remove_status(c: Combatant, e: Dictionary, who: Combatant) -> void:
@@ -556,7 +565,7 @@ func _remove_status(c: Combatant, e: Dictionary, who: Combatant) -> void:
 		if hit:
 			who.statuses.erase(s)
 			removed += 1
-			b.emit("status_end", "%s is removed from {t}." % s["def"]["name"], c.id, who.id, {"status": s["id"]})
+			b.emit("status_end", "%s is removed from {t}." % s["def"]["name"], c.id, who.id, _status_data(s["def"]))
 	if removed == 0:
 		b.emit("no_effect", "Nothing to remove from {t}.", c.id, who.id)
 

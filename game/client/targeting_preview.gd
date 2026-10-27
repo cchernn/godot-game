@@ -110,3 +110,50 @@ static func action_beats(sk: SkillDef, path_len: int, tiles_per_ap: int) -> int:
 	if sk.kind == Enums.SkillKind.MOVE:
 		return ceili(float(path_len) / float(maxi(1, tiles_per_ap)))
 	return sk.stages.size()
+
+
+## The damage a skill can do to a target with `armor` from an attacker with `power`, as {min, max}: the least is a front hit with no
+## crit, the most a rear hit that crits (only for damage that can flank and crit). Every stage adds up. {0, 0} when it deals none.
+static func damage_range(sk: SkillDef, power: int, armor: int, cfg: GameConfig) -> Vector2i:
+	var lo := 0
+	var hi := 0
+	var rear: float = cfg.get_value("combat", "rear_multiplier")
+	var crit: float = cfg.get_value("combat", "crit_multiplier")
+	for st: Dictionary in sk.stages:
+		for e: Dictionary in st["effects"]:
+			if e["type"] != "damage" or e["on"] != SkillEffect.On.TARGET:
+				continue
+			var raw: int = e["base"] + (power if e["uses_power"] else 0)
+			var best := roundi(raw * rear * crit) if e["can_crit"] else raw
+			lo += maxi(1, raw - armor)
+			hi += maxi(1, best - armor)
+	return Vector2i(lo, hi)
+
+
+## What a skill does to whoever it lands on, in words: "Damage 6-12, Frozen". Empty for a preparation step with no effects.
+static func effect_summary(sk: SkillDef, power: int, armor: int, cfg: GameConfig) -> String:
+	var parts: Array[String] = []
+	var dmg := damage_range(sk, power, armor, cfg)
+	if dmg.y > 0:
+		parts.append("Damage %d" % dmg.x if dmg.x == dmg.y else "Damage %d-%d" % [dmg.x, dmg.y])
+	var heal := 0
+	var shield := 0
+	var beat_shield := false
+	var statuses: Array[String] = []
+	for st: Dictionary in sk.stages:
+		for e: Dictionary in st["effects"]:
+			match e["type"]:
+				"heal":
+					heal += e["amount"]
+				"shield":
+					shield = maxi(shield, e["amount"])
+					beat_shield = e.get("lasts", 0) == ShieldEffect.Lasts.BEAT
+				"apply_status":
+					if not (e["status"] as Dictionary).is_empty():
+						statuses.append(str(e["status"]["name"]))
+	if heal > 0:
+		parts.append("Heal %d" % heal)
+	if shield > 0:
+		parts.append("Shield %d (%s)" % [shield, "this beat" if beat_shield else "this round"])
+	parts.append_array(statuses)
+	return ", ".join(parts)

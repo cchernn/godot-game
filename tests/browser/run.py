@@ -1,7 +1,7 @@
 """Drives the deployed web client in headless Chromium (one browser per player) and saves screenshots to /out.
 The UI is drawn on a canvas, so interaction is by coordinates; screenshots show each screen.
 Env: HOST_EMAIL/HOST_PASSWORD (existing host account), TESTER_EMAIL/TESTER_PASSWORD (signs up in the page),
-STAGE (party | pending | reset | session | tour), URL, CLICKS (tour: "x,y,label;x,y,label"),
+STAGE (party | pending | reset | session | tour | solo), URL, CLICKS (tour: "x,y,label;x,y,label"),
 ESCAPE_XY (party: "x,y;x,y" where the Escape button can be (planning, resolving); the tester presses it twice mid-battle), PROBE=request|return|1 (party: stop after the request arrives / the Party window after a reload / at the battle screen)."""
 import os, time
 from playwright.sync_api import sync_playwright
@@ -16,7 +16,6 @@ APPROVE = (1130, 347)  # Approve on the first join request (Party window)
 RETURN = (1050, 286)   # Return to battle in the Party window
 ACTIVITY = (830, 171)  # first activity in the Activity window
 START = (995, 275)     # Start the selected activity
-ATTACK_BTN, SKILLS_BTN = (1090, 93), (1209, 93)   # battle action bar (side panel, top right)
 URL = os.environ.get("URL", "http://localhost:8080")
 STAGE = os.environ.get("STAGE", "party")
 LOGS = []
@@ -75,8 +74,10 @@ def main() -> None:
                 session_flow(b)
             elif STAGE == "tour":
                 tour(b)
+            elif STAGE == "solo":
+                solo_flow(b)
             else:
-                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | reset | session | tour)")
+                raise SystemExit(f"unknown STAGE {STAGE!r} (party | pending | reset | session | tour | solo)")
         finally:
             with open(f"{OUT}/console.log", "w") as f:
                 f.write("\n".join(LOGS))
@@ -93,6 +94,31 @@ def tour(b):
     for i, step in enumerate(filter(None, os.environ.get("CLICKS", "").split(";")), 1):
         x, y, label = step.split(",")
         host.click(int(x), int(y), wait=3)
+        host.shot(f"{i:02d}_{label}")
+
+
+def solo_flow(b):
+    """The host alone: starts the first activity and clicks through CLICKS ("x,y,label;...") on the battle screen, with a screenshot after each.
+    For looking at the battle UI (the click menu, the hover card, the symbols) without a second player. Needs the host to be idle at a place."""
+    host = Player(b, "host")
+    host.sign_in(os.environ["HOST_EMAIL"], os.environ["HOST_PASSWORD"])
+    open_world(host)
+    host.click(*DOCK_ACTIVITY, wait=2)
+    host.click(*ACTIVITY, wait=1)
+    host.click(*START, wait=8)
+    if host.page.evaluate("window.unnamedState") != "battle":   # the party is already in a battle (an earlier run): go back into it
+        host.click(*DOCK_PARTY, wait=3)
+        host.click(*RETURN, wait=1)
+    state(host, "battle", 90)
+    time.sleep(3)
+    host.shot("01_battle")
+    for i, step in enumerate(filter(None, os.environ.get("CLICKS", "").split(";")), 2):
+        x, y, label = step.split(",")
+        if label.startswith("hover"):
+            host.page.mouse.move(int(x), int(y))
+            time.sleep(1.5)
+        else:
+            host.click(int(x), int(y), wait=1.5)
         host.shot(f"{i:02d}_{label}")
 
 
@@ -137,11 +163,6 @@ def party_flow(b):
     state(host, "battle", 90)                 # (the gather lobby can be over before a screen can see it)
     state(tester, "battle", 90)
     host.shot("05_battle")
-    host.click(*ATTACK_BTN, wait=1)           # the Attack submenu (basic attacks), then the Skills submenu (class skills)
-    host.shot("05a_attack_menu")
-    host.click(*SKILLS_BTN, wait=1)
-    host.shot("05b_skills_menu")
-    host.click(*SKILLS_BTN, wait=1)           # close it again: the Ready button moves while a submenu is open
     tester.page.reload()                      # the tester's tab dies mid-battle...
     time.sleep(float(os.environ.get("WAIT", "18")))
     tester.shot("04_after_reload")

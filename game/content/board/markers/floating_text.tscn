@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/board/floating_text.gd" id="1_float"]
+
+[node name="FloatingText" type="Node3D" node_paths=PackedStringArray("label")]
+script = ExtResource("1_float")
+label = NodePath("Text")
+
+[node name="Text" type="Label3D" parent="."]
+pixel_size = 0.008
+billboard = 1
+no_depth_test = true
+render_priority = 10
+outline_render_priority = 9
+text = "0"
+font_size = 64
+outline_size = 14

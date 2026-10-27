@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/board/board_marker.gd" id="1_marker"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_ring"]
+shading_mode = 0
+no_depth_test = true
+albedo_color = Color(0.4, 0.85, 1, 1)
+
+[sub_resource type="TorusMesh" id="Mesh_ring"]
+inner_radius = 0.4
+outer_radius = 0.46
+rings = 4
+ring_segments = 4
+
+[node name="SelectMarker" type="Node3D" node_paths=PackedStringArray("ring", "label")]
+script = ExtResource("1_marker")
+ring = NodePath("Ring")
+label = NodePath("Number")
+spin_speed = 0.8
+
+[node name="Ring" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.25, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("Mesh_ring")
+surface_material_override/0 = SubResource("Mat_ring")
+
+[node name="Number" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+pixel_size = 0.008
+billboard = 1
+no_depth_test = true
+modulate = Color(0.55, 0.9, 1, 1)
+outline_modulate = Color(0.05, 0.08, 0.1, 1)
+text = ""
+font_size = 56
+outline_size = 12

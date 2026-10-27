@@ -15,7 +15,7 @@ in the Godot editor. Every number below is PROVISIONAL, lives in data (`.tres` o
   - Order within a beat is by skill speed, as today.
 - **No ally/foe distinction anywhere.** Any skill can target any present combatant, including the caster. Healing an enemy heals it; an area that covers an ally hits
   the ally. Rules that depend on state still apply (revive needs a downed target; heal does nothing to a downed one).
-- **Basic actions** (the action bar): **Move, Attack, Defend, Item, Retreat, Context.**
+- **Basic actions** (chosen from the click menu on the board, no action bar any more): **Move, Attack, Defend, Item, Context**, plus Retreat as a button.
   - Attack opens the unit's attack skills (the skills in its template). Defend is a default action for every class for now.
   - Retreat is the existing Escape, kept as is (instant, always succeeds, no AP), only relabelled.
   - Item (Phase 4) and Context (Phase 6, later) are shown but disabled until then. Context = situation/tile actions, e.g. "Open" when next to a chest (Fire Emblem style).

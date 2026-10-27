@@ -1,0 +1,33 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/hover_card.gd" id="1_card"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.1, 0.11, 0.15, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.42, 0.6, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+
+[node name="HoverCard" type="PanelContainer" node_paths=PackedStringArray("text_label")]
+visible = false
+custom_minimum_size = Vector2(280, 0)
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("1_card")
+text_label = NodePath("Text")
+
+[node name="Text" type="RichTextLabel" parent="."]
+layout_mode = 2
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true

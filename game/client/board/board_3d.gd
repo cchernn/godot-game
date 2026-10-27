@@ -24,7 +24,29 @@ const MOVE_SPEED := 6.0   ## tiles per second for smoothed unit movement
 @export var valid_material: Material
 ## Tiles an area skill would cover where the mouse is.
 @export var area_material: Material
+## The walk you would make to the hovered tile.
+@export var path_material: Material
 @export var overlay_lift: float = 0.02
+
+@export_group("Symbols")
+## Stands on every tile your plan targets, with its order number above.
+@export var target_marker_scene: PackedScene
+## Stands on the tile you clicked while the action menu is open.
+@export var select_marker_scene: PackedScene
+
+@export_group("Floating text")
+## One scene per number or word that rises from a unit (content/board/markers/floating_text.tscn).
+@export var floating_text_scene: PackedScene
+@export var damage_color: Color = Color(1, 0.4, 0.35)
+@export var crit_color: Color = Color(1, 0.8, 0.25)
+@export var heal_color: Color = Color(0.45, 0.9, 0.5)
+@export var shield_color: Color = Color(0.5, 0.8, 1)
+@export var miss_color: Color = Color(0.75, 0.75, 0.75)
+@export var status_color: Color = Color(0.85, 0.65, 1)
+@export var notice_color: Color = Color(1, 0.85, 0.4)
+## How much bigger a crit is, and how long (seconds) each further text of the same unit waits so they do not overlap.
+@export var crit_scale: float = 1.4
+@export var stagger_seconds: float = 0.3
 
 @export_group("Nodes")
 @export var camera_rig: CameraRig
@@ -40,6 +62,9 @@ var plan_marks: Array[Vector2i] = []   # planned attack targets
 var range_cells: Array[Vector2i] = []  # tiles the picked skill can reach
 var valid_cells: Array[Vector2i] = []  # tiles of units it can target
 var area_cells: Array[Vector2i] = []  # tiles an area skill covers if aimed at the hovered tile
+var path_cells: Array[Vector2i] = []   # the walk to the hovered tile
+var marks: Array[Dictionary] = []      # [{cell, text}] symbols on the tiles your plan targets
+var selected_cell: Vector2i = Vector2i(-1, -1)  # the clicked tile while the action menu is open
 var hover: Vector2i = Vector2i(-1, -1)
 
 var _map_id: String = "<unset>"
@@ -52,6 +77,8 @@ var _disp: Dictionary = {}             # unit id -> smoothed Vector2 cell positi
 var _overlays: Dictionary = {}         # kind -> Array[MeshInstance3D]
 var _overlay_mesh: PlaneMesh
 var _overlay_sig: int = 0
+var _target_nodes: Array[BoardMarker] = []
+var _select_node: BoardMarker
 var _serial: int = 0
 
 
@@ -134,6 +161,12 @@ func reset() -> void:
 	_seen.clear()
 	plan_cells = [] as Array[Vector2i]
 	plan_marks = [] as Array[Vector2i]
+	range_cells = [] as Array[Vector2i]
+	valid_cells = [] as Array[Vector2i]
+	area_cells = [] as Array[Vector2i]
+	path_cells = [] as Array[Vector2i]
+	marks = [] as Array[Dictionary]
+	selected_cell = Vector2i(-1, -1)
 	hover = Vector2i(-1, -1)
 	bf = null
 	_serial += 1
@@ -259,7 +292,7 @@ func _process(delta: float) -> void:
 		var p: Vector2 = _disp[id]
 		node.set_world_position(_unit_position(p, node.position.y, delta), delta)
 		node.visible = _seen.has(Vector2i(p.round())) or u["team"] == Enums.Team.PLAYERS
-	var sig := hash([plan_cells, plan_marks, range_cells, valid_cells, area_cells, hover, _serial])
+	var sig := hash([plan_cells, plan_marks, range_cells, valid_cells, area_cells, path_cells, marks, selected_cell, hover, _serial])
 	if sig != _overlay_sig:
 		_overlay_sig = sig
 		_refresh_overlays()
@@ -277,11 +310,100 @@ func _refresh_overlays() -> void:
 	_show("move", plan_cells, move_material, 0.01)
 	_show("valid", valid_cells, valid_material, 0.015)
 	_show("area", area_cells, area_material, 0.017)
+	_show("path", path_cells, path_material, 0.012)
+	_refresh_markers()
 	_show("target", plan_marks, target_material, 0.02)
 	var hovered: Array[Vector2i] = []
 	if bf != null and bf.in_bounds(hover):
 		hovered.append(hover)
 	_show("hover", hovered, hover_material, 0.03)
+
+
+## Puts the target symbols (with their numbers) and the selected-tile symbol where they belong.
+func _refresh_markers() -> void:
+	if target_marker_scene != null:
+		while _target_nodes.size() < marks.size():
+			var m := target_marker_scene.instantiate() as BoardMarker
+			overlay_root.add_child(m)
+			_target_nodes.append(m)
+		for i in _target_nodes.size():
+			_target_nodes[i].visible = i < marks.size()
+			if i < marks.size():
+				_target_nodes[i].position = cell_surface(marks[i]["cell"]) + Vector3(0.0, overlay_lift + 0.03, 0.0)
+				_target_nodes[i].set_text(str(marks[i]["text"]))
+	if select_marker_scene != null:
+		if _select_node == null:
+			_select_node = select_marker_scene.instantiate() as BoardMarker
+			overlay_root.add_child(_select_node)
+		_select_node.visible = bf != null and bf.in_bounds(selected_cell)
+		if _select_node.visible:
+			_select_node.position = cell_surface(selected_cell) + Vector3(0.0, overlay_lift + 0.04, 0.0)
+
+
+# ---------- Floating text ----------
+
+## Floats a number or word over a unit. `delay` staggers texts that start together.
+func float_text(unit_id: String, text: String, color: Color, size: float = 1.0, delay: float = 0.0) -> void:
+	var node: Unit3D = _unit_nodes.get(unit_id)
+	if node == null or floating_text_scene == null:
+		return
+	var ft := floating_text_scene.instantiate() as FloatingText
+	overlay_root.add_child(ft)
+	ft.position = node.position + Vector3(0.0, 1.2, 0.0)
+	ft.play(text, color, size, delay)
+
+
+## Shows what a battle event did to a unit: damage, a miss, healing, a shield, a status. `slot` counts the texts already started
+## for that unit in this batch.
+func show_event(e: Dictionary, slots: Dictionary) -> void:
+	var id: String = e.get("target", "")
+	if id == "" or not _unit_nodes.has(id):
+		return
+	var d: Dictionary = e.get("data", {})
+	var text := ""
+	var color := notice_color
+	var size := 1.0
+	match e["type"]:
+		"hit":
+			if d.has("amount"):
+				var through: int = d["amount"] - d.get("absorbed", 0)
+				text = "-%d" % through if through > 0 else "Absorbed"
+				color = damage_color if through > 0 else shield_color
+				if d.get("crit", false):
+					text += "!"
+					color = crit_color
+					size = crit_scale
+		"miss":
+			text = "Miss"
+			color = miss_color
+		"heal":
+			text = "+%d" % d.get("amount", 0)
+			color = heal_color
+		"shield":
+			text = "+%d shield" % d.get("amount", 0)
+			color = shield_color
+		"status_apply":
+			text = "%s %s" % [d.get("glyph", ""), d.get("name", "")]
+			color = Color.html(str(d.get("color", "d9a0ff")))
+		"status_end":
+			text = "%s ends" % d.get("name", "")
+			color = miss_color
+		"interrupt":
+			text = "Interrupted"
+		"revived":
+			text = "Revived"
+			color = heal_color
+		"downed":
+			text = "Downed"
+			color = damage_color
+		"eliminated":
+			text = "Defeated"
+			color = damage_color
+	if text == "":
+		return
+	var n: int = slots.get(id, 0)
+	slots[id] = n + 1
+	float_text(id, text.strip_edges(), color, size, n * stagger_seconds)
 
 
 func _show(kind: String, cells: Array[Vector2i], material: Material, extra_lift: float) -> void:

@@ -22,7 +22,8 @@ project from `project.godot`; the first open imports everything.
 | How those screens are put together and switched | `game/client/account_flow.tscn` (+ `account_flow.gd`) | the 2D editor |
 | One join request in the host's list | `game/content/ui/join_request_row.tscn` | the 2D editor |
 | Victory / defeat panel | `ResultPanel` in `game/client/client_main.tscn` | the 2D editor |
-| Skill button look | `game/content/ui/skill_button.tscn` | the 2D editor |
+| Action menu and hover card look | `game/content/ui/action_menu.tscn`, `action_button.tscn`, `hover_card.tscn` | the 2D editor |
+| Target / selected-tile symbols and floating numbers | `game/content/board/markers/*.tscn` (colours and sizes on the `Board3D` node, *Floating text*) | the 3D editor, Inspector |
 | Fonts, colours, panel style (whole UI) | `game/content/ui/theme.tres` | the Theme editor |
 
 **See your changes without a server:** open `game/client/board/board_preview.tscn` and press **F6**. It shows the map
@@ -70,7 +71,7 @@ If they disagree, the client logs a warning and draws the server's layout, and t
 - Colours, health-bar size and pick size are exported on the root (`Look` and `Picking` groups).
 
 ## Highlights and look
-- `board/materials/fog.tres` (unseen tiles), `move.tres` (planned path), `target.tres` (planned attack), `hover.tres` (cursor).
+- `board/materials/fog.tres` (unseen tiles), `move.tres` (planned path), `target.tres` (planned attack), `hover.tres` (cursor), `path.tres` (the walk to the hovered tile).
   They are flat planes laid on the tiles: change colour or transparency in the Inspector.
 - Sun, shadows, ambient light and background colour: `Sun` and `WorldEnvironment` in `board_3d.tscn`.
 - The control hint at the top is the `Hud/Hint` label there.
@@ -96,9 +97,13 @@ The battle view (`BoardHolder`, `SidePanel`) starts hidden and is shown by the c
 - **Move, resize, restyle anything**: containers, margins, fonts, colours, icons, extra decoration labels or images.
 - **Keep the node names that have a `%` marker** (shown as a green percent badge in the Scene tree). The code finds them by name.
   Renaming or deleting one breaks that part of the screen; moving it elsewhere in the tree is fine.
-- **Action bar** (`ActionBar`): Move, Attack, Defend, Item, Retreat, Context. Move and Defend queue the unit's skill in that slot; Attack opens `SkillBox`, the list of its other skills;
-  Retreat is the old Escape; Item and Context are disabled until they exist.
-- **Skill buttons** (the Attack list) are made from `ui/skill_button.tscn` (one per skill, filled in by the code). Restyle that scene.
+- **No action bar:** you click the board and choose from a menu (`ActionMenu`, `ui/action_menu.tscn`, one `ui/action_button.tscn` per entry). Click an empty tile for Move and
+  any tile-aimed skill, an enemy or ally for the attacks and skills that can target them, yourself for Defend, shield skills, items and the actions of map objects in reach, and a
+  map object's tile for its actions. Hovering an entry shades its reach and area on the board; the entry's tooltip is the skill's description. What cannot be used is listed greyed with its reason.
+  Keys: Esc closes the menu, Backspace or Ctrl+Z undoes, Enter toggles Ready. Retreat sits next to Undo, Clear and Ready.
+- **Hover card** (`HoverCard`): follows the mouse over the board. Over a tile it shows the walk (tiles and AP); over a unit its HP, shield, statuses and, for an enemy, what your Attack would do (a damage range) and whether it is in reach.
+- **Symbols on the board:** `markers/target_marker.tscn` stands on every tile your plan targets with its order number, `markers/select_marker.tscn` on the tile you clicked, and `markers/floating_text.tscn` is the number or word that rises from a unit (damage, healing, shield, miss, status).
+  Colours of each kind, the crit size and the stagger are on the `Board3D` node under *Floating text*.
 - **One look for everything:** `ui/theme.tres` is applied on the root; edit it in the Theme editor (default font size, panel style, button styles).
 - The 3D board area is the `BoardHolder` node; its width is set by `SidePanel`'s left offset (360 px), so resize both together.
 - To preview the screens without a server, press **F6** on `client_main.tscn` (guest connect panel). The battle panel fills in once connected.
@@ -140,8 +145,8 @@ there in the Inspector.
 
 ## Skills (Inspector)
 Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tres`); `skills/skill_set.tres` is the list of all of them. Open one:
-- **Identity:** id (the file name), display name, **hint** (the tooltip and the line shown when you pick the skill), the **action slot** (which button of the
-  battle's action bar it belongs to: *Attack* skills are listed under the Attack button; *Defend* is the Defend button; moves always sit on Move) and **kind**
+- **Identity:** id (the file name), display name, **hint** (a one-line fallback) and **description** (the tooltip on its menu entry), the **action slot** (where it sits in the
+  battle's action menu: *Attack* = a basic attack, *Skills* = a class skill, *Defend* = the Defend entry on yourself; moves always sit on Move) and **kind**
   (move, attack, reaction, revive, support; the kind decides how the rules treat it).
 - **Targeting:** what the player clicks (a character, a tile, yourself, or nothing) and the reach in tiles. Hidden for moves and reactions. **Anyone can be aimed at**,
   friend or foe, and you too: a heal on an enemy heals it, a strike on an ally hurts it. *Character* skills follow the target and are checked when they land (still in range = hit);
@@ -168,7 +173,7 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
   *kind* of skill or a new *effect type* is new game logic and is code.
 - Edits need `scripts/stack.sh up game web` to reach the running game (the server resolves skills; the web client lists them).
 
-**Action bar slots:** a skill's **Action slot** decides where it appears in battle. **Attack** = the Attack submenu (basic attacks; for now only the default Attack, whose id is still `strike`), **Skills** = the Skills submenu and the Character page's skill list (class skills), **Defend** = the Defend button. Moves always sit on Move. The basic actions every player character has (Move, Attack, Defend) are listed once, in `skill_set.tres` under **Basic**; classes do not list them, so a class's Skills list holds only its own skills. Enemies do not get the basics automatically: list whatever an enemy can do.
+**Action slots:** a skill's **Action slot** decides how it is grouped. **Attack** = a basic attack (for now only the default Attack, whose id is still `strike`; hovering an enemy shows what it would do), **Skills** = class skills (also the Character page's skill list), **Defend** = the Defend entry. In battle they all come from the click menu. Moves always sit on Move. The basic actions every player character has (Move, Attack, Defend) are listed once, in `skill_set.tres` under **Basic**; classes do not list them, so a class's Skills list holds only its own skills. Enemies do not get the basics automatically: list whatever an enemy can do.
 
 ## Statuses (Inspector)
 A status is a timed condition on a unit: a buff, a debuff, bleeding, a stun. Each is a `StatusDef` resource in `game/content/statuses/` (make the folder when you add the

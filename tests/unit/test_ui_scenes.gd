@@ -2,11 +2,11 @@ extends TestCase
 
 const CLIENT := "res://game/client/client_main.tscn"
 const ACCOUNT := "res://game/client/account_flow.tscn"
-const NAMES := ["StatusLabel", "ApLabel", "SkillBox", "FaceNorth", "FaceEast", "FaceSouth", "FaceWest", "QueueList",
+const NAMES := ["StatusLabel", "ApLabel", "FaceNorth", "FaceEast", "FaceSouth", "FaceWest", "QueueList",
 	"UndoButton", "ClearButton", "ReadyButton", "ErrorLabel", "LogView", "Banner", "ResultPanel", "ResultTitle",
 	"ResultDetail", "ContinueButton", "BoardHolder", "SidePanel", "ConnectPanel",
 	"UrlEdit", "NameEdit", "ConnectButton", "ConnectStatus", "AccountFlow", "UnitStrip", "PartyCards", "EnemyCards", "HoverLabel", "BeatsLabel",
-	"ActionBar", "MoveButton", "AttackButton", "DefendButton", "ItemButton", "RetreatButton", "ContextButton", "ItemBox", "ContextBox", "AttackBox", "SkillsButton"]
+	"RetreatButton", "ActionMenu", "HoverCard", "FacingRow"]
 
 
 func _client() -> Control:
@@ -25,7 +25,6 @@ func test_client_scene_has_every_named_node_the_script_needs() -> void:
 	var c := _client()
 	for n in NAMES:
 		assert_true(c.get_node_or_null("%" + n) != null, n)
-	assert_true(c.get("skill_button_scene") != null, "skill button scene assigned")
 	c.free()
 
 
@@ -37,20 +36,14 @@ func test_guest_connect_panel_is_shown_and_account_flow_is_hidden() -> void:
 	c.free()
 
 
-func test_a_snapshot_fills_the_panel_and_builds_skill_buttons() -> void:
+func test_a_snapshot_fills_the_panel_and_leaves_the_menu_closed() -> void:
 	var c := _client()
 	c._on_snapshot(_snapshot())
 	assert_true(not (c.get_node("%ConnectPanel") as Control).visible, "connect panel hides on the first snapshot")
 	assert_true((c.get_node("%StatusLabel") as Label).text.begins_with("Round 1"))
 	assert_true((c.get_node("%ApLabel") as Label).text.begins_with("AP: 0 planned"))
-	var attacks := c.get_node("%AttackBox") as VBoxContainer
-	assert_eq(attacks.get_child_count(), 1, "the Attack list: the basic attack (Move and Defend have their own buttons)")
-	var first := attacks.get_child(0) as Button
-	assert_true(first.toggle_mode and first.text.begins_with("Attack"))
-	var box := c.get_node("%SkillBox") as VBoxContainer
-	assert_eq(box.get_child_count(), 2, "the Skills list: power strike, shield wall")
-	assert_true((box.get_child(0) as Button).text.begins_with("Power Strike"))
-	assert_true((c.get_node("%MoveButton") as Button).text.begins_with("Move"))
+	assert_true(not (c.get_node("%ActionMenu") as Control).visible, "the action menu waits for a click")
+	assert_true(not (c.get_node("%FacingRow") as Control).visible, "no walk is queued, so no facing row")
 	assert_true(not (c.get_node("%ReadyButton") as Button).disabled)
 	c.free()
 
@@ -98,39 +91,6 @@ func test_unit_card_shows_hp_ap_and_ready_state() -> void:
 	card.free()
 
 
-func test_picking_a_skill_shades_the_board_and_the_queue_shows_beats() -> void:
-	var c := _client()
-	c._on_snapshot(_snapshot())
-	var board := c.board as Board3D
-	assert_eq(board.range_cells.size(), 0, "nothing is shaded until a skill is picked")
-	assert_eq((c.get_node("%BeatsLabel") as Label).text, "Beats used: 0 of 8")
-	c._on_skill_pressed("move")
-	assert_true(board.range_cells.size() > 0, "reachable tiles are shaded")
-	assert_eq(board.valid_cells.size(), 0)
-	c._on_skill_pressed("strike")
-	assert_true(board.range_cells.size() > 0, "a strike's reach is shaded")
-	c._on_skill_pressed("move")
-	c._on_cell_clicked(Vector2i(1, 2), "")
-	assert_true((c.get_node("%QueueList") as ItemList).get_item_text(0).ends_with("[1 AP, beat 1]"))
-	assert_eq((c.get_node("%BeatsLabel") as Label).text, "Beats used: 1 of 8")
-	c.free()
-
-
-func test_pressing_a_skill_and_clicking_a_tile_queues_a_plan() -> void:
-	var c := _client()
-	c._on_snapshot(_snapshot())
-	c._on_skill_pressed("move")
-	assert_eq(c.mode, "move")
-	assert_eq((c.get_node("%ErrorLabel") as Label).text, c.skills.get_skill("move").hint, "the skill's hint is shown")
-	assert_eq((c.get_node("%MoveButton") as Button).tooltip_text, c.skills.get_skill("move").hint)
-	c._on_cell_clicked(Vector2i(1, 2), "")
-	assert_eq((c.plan as Array).size(), 1)
-	assert_eq((c.get_node("%QueueList") as ItemList).item_count, 1)
-	assert_true((c.get_node("%ApLabel") as Label).text.begins_with("AP: 1 planned"))
-	var undo := c.get_node("%UndoButton") as Button
-	undo.pressed.emit()
-	assert_eq((c.plan as Array).size(), 0, "undo button is wired")
-	c.free()
 
 
 func test_events_go_to_the_log() -> void:
@@ -150,8 +110,7 @@ func test_the_battle_view_only_exists_during_a_battle() -> void:
 	c._on_continue_pressed()
 	assert_true(not (c.get_node("%BoardHolder") as Control).visible, "hidden again after Continue")
 	assert_true((c.get_node("%ConnectPanel") as Control).visible, "back on the menu")
-	for b in (c.get_node("%SkillBox") as VBoxContainer).get_children():
-		assert_true(b.is_queued_for_deletion(), "old skill buttons are removed")
+	assert_true(not (c.get_node("%ActionMenu") as Control).visible, "no menu is left open")
 	assert_true(c.snap.is_empty())
 	c.free()
 
@@ -822,7 +781,8 @@ func test_fog_tiles_are_called_out_and_unseen_events_are_tinted() -> void:
 				fogged = Vector2i(x, y)
 	assert_true(fogged.x >= 0, "the opening snapshot leaves some tiles in fog")
 	board.hover = fogged
-	c.call("_update_hover_text")
+	c.set("_preview_sig", 0)
+	c.call("_update_overlays")
 	assert_true("Fog" in (c.get_node("%HoverLabel") as Label).text, "fog hover")
 	c.call("_on_events", [{"type": "hit", "round": 1, "beat": 1, "text": "Something unseen hits Aldric"}])
 	assert_true("Something unseen" in (c.get_node("%LogView") as RichTextLabel).get_parsed_text())
@@ -842,32 +802,6 @@ func test_menu_background_plays_in_the_menus_and_pauses_in_a_battle() -> void:
 	assert_true(s.visible and anim.is_playing())
 	s.free()
 
-
-func test_the_action_bar_has_move_attack_skills_defend_item_retreat_and_context() -> void:
-	var c := _client()
-	c._on_snapshot(_snapshot())
-	var attack := c.get_node("%AttackButton") as Button
-	var skills_btn := c.get_node("%SkillsButton") as Button
-	assert_true(not (c.get_node("%AttackBox") as Control).visible and not (c.get_node("%SkillBox") as Control).visible,
-		"the lists are closed until you open one")
-	attack.button_pressed = true
-	assert_true((c.get_node("%AttackBox") as Control).visible)
-	skills_btn.button_pressed = true
-	assert_true((c.get_node("%SkillBox") as Control).visible and not (c.get_node("%AttackBox") as Control).visible and not attack.button_pressed,
-		"one list at a time")
-	assert_true((c.get_node("%ItemButton") as Button).disabled, "Item waits for its phase")
-	assert_true((c.get_node("%ContextButton") as Button).disabled, "Context waits for its phase")
-	assert_eq((c.get_node("%RetreatButton") as Button).text, "Retreat")
-	# Defend aims at nothing, so it is queued at once
-	(c.get_node("%DefendButton") as Button).pressed.emit()
-	assert_eq((c.plan as Array).size(), 1)
-	assert_eq(c.plan[0]["skill"], "defend")
-	assert_eq(c.mode, "", "no aiming mode is left on")
-	# Move is a mode, and the Attack list does not stay on for it
-	(c.get_node("%MoveButton") as Button).pressed.emit()
-	assert_eq(c.mode, "move")
-	assert_true(not attack.button_pressed)
-	c.free()
 
 
 func test_a_unit_card_shows_its_shield() -> void:
@@ -900,77 +834,4 @@ func test_a_unit_card_lists_statuses_with_turns() -> void:
 	card.free()
 
 
-func test_the_item_button_lists_your_items_and_queues_them() -> void:
-	var c := _client()
-	var potion := ItemDef.new()
-	potion.id = "potion"
-	potion.display_name = "Potion"
-	potion.hint = "Heals a bit"
-	potion.use = SkillDef.new()
-	potion.use.kind = Enums.SkillKind.SUPPORT
-	potion.use.targeting = Enums.Targeting.SELF
-	var st := SkillStage.new()
-	var heal := HealEffect.new()
-	heal.amount = 5
-	var fx: Array[SkillEffect] = [heal]
-	st.effects = fx
-	var stages: Array[SkillStage] = [st]
-	potion.use.stage_defs = stages
-	c.skills.add_item(potion)
-	var s := _snapshot()
-	for u: Dictionary in s["units"]:
-		if u["id"] == "pc0":
-			u["items"] = [{"id": "potion", "name": "Potion", "hint": "Heals a bit", "count": 2}]
-	c._on_snapshot(s)
-	var item := c.get_node("%ItemButton") as Button
-	assert_true(not item.disabled)
-	item.button_pressed = true
-	var box := c.get_node("%ItemBox") as Control
-	assert_true(box.visible)
-	assert_eq(box.get_child_count(), 1)
-	assert_true("Potion ×2" in (box.get_child(0) as Button).text)
-	(box.get_child(0) as Button).pressed.emit() # self-targeting: queued at once
-	assert_eq(c.plan[0]["item"], "potion")
-	assert_eq(c.plan[0]["skill"], "item:potion")
-	assert_true("Potion ×1" in (box.get_child(0) as Button).text, "one is spoken for")
-	c.free()
 
-
-func test_context_button_lists_the_actions_of_objects_in_reach() -> void:
-	var c := _client()
-	var chest := ContextObjectDef.new()
-	chest.id = "chest"
-	chest.display_name = "Chest"
-	var act := ContextAction.new()
-	act.id = "open"
-	act.display_name = "Open"
-	act.requires_state = "closed"
-	act.sets_state = "open"
-	act.use = SkillDef.new()
-	var st := SkillStage.new()
-	st.ap = 2
-	var stages: Array[SkillStage] = [st]
-	act.use.stage_defs = stages
-	chest.actions = [act] as Array[ContextAction]
-	c.skills.add_context("chest", chest)
-	var s := _snapshot()
-	var me_cell := Vector2i(0, 2)
-	for u: Dictionary in s["units"]:
-		if u["id"] == "pc0":
-			me_cell = u["cell"]
-	s["objects"] = [{"id": "chest", "name": "Chest", "cell": me_cell + Vector2i(1, 0), "state": "closed", "blocks": true, "reach": 1,
-		"actions": [{"id": "open", "name": "Open", "hint": "Opens it"}]},
-		{"id": "far", "name": "Far", "cell": me_cell + Vector2i(5, 0), "state": "closed", "blocks": false, "reach": 1,
-		"actions": [{"id": "open", "name": "Open", "hint": ""}]}]
-	c._on_snapshot(s)
-	var btn := c.get_node("%ContextButton") as Button
-	assert_true(not btn.disabled)
-	btn.button_pressed = true
-	var box := c.get_node("%ContextBox") as Control
-	assert_true(box.visible)
-	assert_eq(box.get_child_count(), 1, "only the chest in reach")
-	assert_true("Chest: Open" in (box.get_child(0) as Button).text and "2 AP" in (box.get_child(0) as Button).text)
-	(box.get_child(0) as Button).pressed.emit()
-	assert_eq([c.plan[0]["object"], c.plan[0]["action"], c.plan[0]["skill"]], ["chest", "open", "ctx:chest:open"])
-	assert_true(c.board.bf.object_blocks.has(me_cell + Vector2i(1, 0)), "a blocking object closes its tile on the board")
-	c.free()

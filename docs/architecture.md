@@ -154,6 +154,7 @@ A skill stage is a list of `SkillEffect` resources (`DamageEffect`, `HealEffect`
 No rule distinguishes friend from foe: any skill can target any visible combatant, the caster included (`Targeting.SELF` needs no click); revive only needs a downed target. `CHARACTER`
 skills follow the target and check range when they land; `TILE` skills hit whoever is on the tile then. `Combatant.shield` soaks damage after armor and before HP and is cleared when a round
 begins; the snapshot carries it. `SkillKind.SUPPORT` and `SkillDef.action_slot` (Attack, Move, Defend) place skills on the client's action bar.
+**Battle screen controls:** the client has no per-skill buttons. A click on the board builds a menu with `ActionOptions.build` (pure, from the snapshot: your skills, items, map objects; each option carries its AP, a damage/heal/shield summary from `TargetingPreview.effect_summary`, and the reason when it is not usable), `ActionMenu` shows it and reports the pick, and `client_main.gd` turns the pick into a plan entry. Hover overlays and the hover card come from `_update_overlays`. Snapshot units carry `armor` (everyone) and `power` (you) so the damage range can be previewed; public events now carry their `data` (amount, absorbed, crit, status name/glyph/colour), which `Board3D.show_event` turns into `FloatingText` scenes over the unit.
 
 ## Items (Phase 4)
 `ItemDef` (id, name, hint, max stack, and an embedded `use: SkillDef`) lives in `game/content/items/item_set.tres`. `SkillDb.load_file()` registers each item's use skill under `item:<id>`
