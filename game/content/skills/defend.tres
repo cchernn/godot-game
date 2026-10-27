@@ -8,6 +8,7 @@
 [sub_resource type="Resource" id="Shield_defend"]
 script = ExtResource("4_def")
 amount = 4
+lasts = 1
 
 [sub_resource type="Resource" id="Stage_defend"]
 script = ExtResource("2_def")
@@ -18,9 +19,11 @@ effects = Array[ExtResource("3_def")]([SubResource("Shield_defend")])
 script = ExtResource("1_def")
 id = "defend"
 display_name = "Defend"
-hint = "Brace: a small shield until the end of the round (provisional)"
+hint = "Brace: a small shield for the beat it lands in (provisional)"
+description = "Brace against what lands this beat: a small shield that is gone when the beat ends. Use it timed against an incoming hit."
 action_slot = 2
 kind = 4
 targeting = 3
 speed = 8
+frequency = 0
 stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_defend")])

@@ -8,24 +8,24 @@ const FREQ := Enums.Frequency
 const ORIGINAL := {
 	"move": {"name": "Move", "kind": KIND.MOVE, "targeting": TARGET.NONE, "range": 1, "speed": 5, "freq": FREQ.UNLIMITED,
 		"stability": 3, "stages": [["step", 1, 0, 0]], "reaction": {}},
-	"strike": {"name": "Attack", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 6, "freq": FREQ.ONCE_PER_TURN,
+	"strike": {"name": "Attack", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 6, "freq": FREQ.AUTO,
 		"stability": 1, "stages": [["strike", 1, 6, 1]], "reaction": {}},
-	"power_strike": {"name": "Power Strike", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 4, "freq": FREQ.ONCE_PER_TURN,
+	"power_strike": {"name": "Power Strike", "kind": KIND.ATTACK, "targeting": TARGET.CHARACTER, "range": 1, "speed": 4, "freq": FREQ.AUTO,
 		"stability": 2, "stages": [["wind-up", 1, 0, 0], ["smash", 1, 12, 2]], "reaction": {}},
-	"bolt": {"name": "Bolt", "kind": KIND.ATTACK, "targeting": TARGET.TILE, "range": 5, "speed": 5, "freq": FREQ.ONCE_PER_TURN,
+	"bolt": {"name": "Bolt", "kind": KIND.ATTACK, "targeting": TARGET.TILE, "range": 5, "speed": 5, "freq": FREQ.AUTO,
 		"stability": 1, "stages": [["bolt", 1, 5, 1]], "reaction": {}},
-	"disrupt": {"name": "Disrupt", "kind": KIND.REACTION, "targeting": TARGET.NONE, "range": 1, "speed": 7, "freq": FREQ.ONCE_PER_TURN,
+	"disrupt": {"name": "Disrupt", "kind": KIND.REACTION, "targeting": TARGET.NONE, "range": 1, "speed": 7, "freq": FREQ.AUTO,
 		"stability": 1, "stages": [["ready", 1, 0, 0]], "reaction": {"range": 3, "duration_beats": 6, "interrupt": 2}},
 	"defend": {"name": "Defend", "kind": KIND.SUPPORT, "targeting": TARGET.SELF, "range": 1, "speed": 8, "freq": FREQ.ONCE_PER_TURN,
 		"stability": 1, "stages": [["brace", 1, 0, 0]], "reaction": {}},
-	"revive": {"name": "Revive", "kind": KIND.REVIVE, "targeting": TARGET.CHARACTER, "range": 1, "speed": 5, "freq": FREQ.ONCE_PER_TURN,
+	"revive": {"name": "Revive", "kind": KIND.REVIVE, "targeting": TARGET.CHARACTER, "range": 1, "speed": 5, "freq": FREQ.AUTO,
 		"stability": 1, "stages": [["revive", 2, 0, 0]], "reaction": {}},
 }
 
 
 func test_converted_skills_match_the_original_values() -> void:
 	var db := SkillDb.load_file()
-	assert_eq(db.skills.size(), ORIGINAL.size())
+	assert_true(db.skills.size() >= ORIGINAL.size(), "the original skills are all still there")
 	for id: String in ORIGINAL:
 		var want: Dictionary = ORIGINAL[id]
 		var s := db.get_skill(id)
@@ -42,6 +42,23 @@ func test_converted_skills_match_the_original_values() -> void:
 		for st: Dictionary in s.stages:
 			got.append([st["name"], st["ap"], st["damage"], st["interrupt"]])
 		assert_eq(got, want["stages"], "%s stages" % id)
+
+
+func test_only_skills_over_one_ap_are_limited_to_once_per_turn() -> void:
+	var db := SkillDb.load_file()
+	assert_true(not db.get_skill("strike").once_per_turn(), "1 AP: repeatable")
+	assert_true(not db.get_skill("bolt").once_per_turn(), "1 AP: repeatable")
+	assert_true(db.get_skill("power_strike").once_per_turn(), "2 AP: once per turn")
+	assert_true(db.get_skill("revive").once_per_turn(), "2 AP: once per turn")
+	assert_true(db.get_skill("defend").once_per_turn(), "forced once per turn")
+	assert_true(db.get_skill("shield_wall").once_per_turn(), "forced once per turn")
+	assert_true(not db.get_skill("move").once_per_turn(), "forced unlimited")
+
+
+func test_the_tooltip_gives_the_description_cost_range_and_limit() -> void:
+	var sk := SkillDb.load_file().get_skill("power_strike")
+	sk.description = "A heavy blow."
+	assert_eq(sk.tooltip(), "A heavy blow.\n2 AP · range 1 · once per turn")
 
 
 func test_the_skill_set_is_valid_and_file_names_match_ids() -> void:

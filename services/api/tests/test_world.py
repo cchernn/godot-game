@@ -160,7 +160,7 @@ def reveal(client, wid, kind, target, scope, cid=None):
 def test_discovery_scopes_and_revision_rules(client):
     w, host, _ = make_world(client)
     other, _ = join(client, w["id"], host)
-    a, b = char(client, w["id"], host, "A"), char(client, w["id"], other, "B", "rogue")
+    a, b = char(client, w["id"], host, "A"), char(client, w["id"], other, "B", "hunter")
     r = reveal(client, w["id"], "node", "ashen_keep", "character", a["id"]).json()
     assert r["new"] and r["revision"] == 0, "character-only discovery does not advance the world revision"
     assert "ashen_keep" in {n["id"] for n in overview(client, w["id"], host)["nodes"]}
@@ -636,7 +636,7 @@ def test_world_characters_show_owners_and_fallen_ones(client):
     char(client, w["id"], host, "Aldric")
     old = char(client, w["id"], tok, "Tessa")
     client.post(f"/characters/{old['id']}/retire", headers=auth(tok))
-    char(client, w["id"], tok, "Tessa II", "rogue")
+    char(client, w["id"], tok, "Tessa II", "hunter")
     rows = client.get(f"/worlds/{w['id']}/characters", headers=auth(tok)).json()
     assert [(r["name"], r["status"], r["mine"]) for r in rows] == [
         ("Aldric", "active", False), ("Tessa II", "active", True), ("Tessa", "retired", True)]

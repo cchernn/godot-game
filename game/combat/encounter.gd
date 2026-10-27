@@ -51,7 +51,7 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 		assert(issues.is_empty(), "; ".join(issues))
 		battle.add_object(o["def"], o["id"], o["cell"])
 	for i in mini(player_count, def.max_players()):
-		var tpl: UnitTemplate = def.classes[i]
+		var tpl: UnitTemplate = def.classes[i % def.classes.size()]
 		if i < classes.size():
 			var chosen := def.class_by_id(str(classes[i]))
 			if chosen != null:

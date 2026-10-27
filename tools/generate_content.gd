@@ -25,8 +25,8 @@ const WALL_BLOCKS := 4
 
 # visual id -> body_scale, so each unit is visibly different until real models exist
 const UNITS := {
-	"warrior": Vector3(1.15, 1.0, 1.15), "ranger": Vector3(0.85, 1.15, 0.85), "cleric": Vector3(1.0, 1.0, 1.0),
-	"rogue": Vector3(0.8, 0.9, 0.8), "ghoul": Vector3(1.25, 1.1, 1.25), "cultist": Vector3(0.95, 1.05, 0.95),
+	"warrior": Vector3(1.15, 1.0, 1.15), "hunter": Vector3(0.85, 1.15, 0.85), "mage": Vector3(1.0, 1.0, 1.0),
+	"ghoul": Vector3(1.25, 1.1, 1.25), "cultist": Vector3(0.95, 1.05, 0.95),
 }
 
 var _force := false

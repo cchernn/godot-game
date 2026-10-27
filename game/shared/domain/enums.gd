@@ -7,7 +7,8 @@ enum Team { PLAYERS, ENEMIES }
 ## Escaped: the character left the fight by choice; they are off the board and spectate.
 enum LifeState { ALIVE, DOWNED, ELIMINATED, ESCAPED }
 enum RoundPhase { PLANNING, RESOLVING, FINISHED }
-enum Frequency { ONCE_PER_TURN, UNLIMITED }
+## AUTO: once per turn when the skill costs more than 1 AP, otherwise as often as the unit has AP for.
+enum Frequency { ONCE_PER_TURN, UNLIMITED, AUTO }
 enum TerrainKind { NORMAL, DIFFICULT, BLOCKED }
 ## SUPPORT: heals, shields and the like. Like ATTACK, it can be aimed at anyone; the kind only says what the skill is for.
 enum SkillKind { MOVE, ATTACK, REACTION, REVIVE, SUPPORT }

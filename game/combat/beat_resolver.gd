@@ -15,6 +15,8 @@ func _init(battle: Battle) -> void:
 func run_beat() -> void:
 	var st := b.state
 	for c: Combatant in st.combatants.values():
+		c.beat_shield = 0 # a one-beat shield ends when its beat does
+	for c: Combatant in st.combatants.values():
 		if not c.reaction.is_empty() and (b.beat > (c.reaction["expires_beat"] as int) or c.has_condition("stunned")):
 			c.reaction = {}
 	var ids: Array = st.combatants.keys()
@@ -70,7 +72,7 @@ func _step(c: Combatant) -> void:
 				c.move_index = 0
 				c.interrupt_points = 0
 				# Usage is consumed when the skill begins executing. Reaction preparation does not consume it.
-				if sk.frequency == Enums.Frequency.ONCE_PER_TURN and sk.kind != Enums.SkillKind.REACTION:
+				if sk.once_per_turn() and sk.kind != Enums.SkillKind.REACTION:
 					c.skills_used[sk.id] = true
 				if a.item_id != "": # an item is used up when it begins, never when it was skipped
 					c.items_used[a.item_id] = int(c.items_used.get(a.item_id, 0)) + 1
@@ -100,7 +102,7 @@ func _can_begin(c: Combatant, a: PlannedAction, sk: SkillDef) -> String:
 			return "no item left"
 	elif sk == null or not c.skills.has(a.skill_id):
 		return "unknown skill"
-	if sk.frequency == Enums.Frequency.ONCE_PER_TURN and c.skills_used.has(sk.id):
+	if sk.once_per_turn() and c.skills_used.has(sk.id):
 		return "already used this round"
 	if sk.kind == Enums.SkillKind.MOVE:
 		if c.has_condition("rooted"):
@@ -156,7 +158,7 @@ func _stage_problem(c: Combatant, a: PlannedAction, sk: SkillDef, stage_index: i
 				to = a.target_cell
 			if Enums.manhattan(from, to) > sk.attack_range:
 				return "out of range"
-			if not b.bf.has_los(from, to):
+			if sk.requires_los and not b.bf.has_los(from, to):
 				return "no line of sight"
 	return ""
 
@@ -389,8 +391,11 @@ func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> b
 	if e["uses_power"] as bool:
 		raw += c.stat("power")
 	var dmg := maxi(1, roundi(raw * mult) - victim.stat("armor"))
-	var absorbed := mini(victim.shield, dmg)
-	victim.shield -= absorbed
+	var from_beat := mini(victim.beat_shield, dmg)
+	victim.beat_shield -= from_beat
+	var from_round := mini(victim.shield, dmg - from_beat)
+	victim.shield -= from_round
+	var absorbed := from_beat + from_round
 	victim.hp = maxi(0, victim.hp - (dmg - absorbed))
 	if absorbed > 0:
 		note += " (%d absorbed by the shield)" % absorbed
@@ -414,8 +419,12 @@ func _shield(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> v
 	if victim.life_state != Enums.LifeState.ALIVE:
 		b.emit("no_effect", "{a}'s %s has no effect on {t}." % label, c.id, victim.id)
 		return
-	victim.shield = maxi(victim.shield, e["amount"] as int) # does not stack: only a higher shield replaces it
-	b.emit("shield", "{a}'s %s shields {t} (%d)." % [label, victim.shield], c.id, victim.id, {"amount": victim.shield})
+	var amount := e["amount"] as int
+	if (e.get("lasts", ShieldEffect.Lasts.ROUND) as int) == ShieldEffect.Lasts.BEAT:
+		victim.beat_shield = maxi(victim.beat_shield, amount) # does not stack: only a higher shield replaces it
+	else:
+		victim.shield = maxi(victim.shield, amount)
+	b.emit("shield", "{a}'s %s shields {t} (%d)." % [label, amount], c.id, victim.id, {"amount": amount})
 
 
 ## 0 = front, 1 = side, 2 = rear.
@@ -440,6 +449,7 @@ func _revive(c: Combatant, a: PlannedAction) -> void:
 func _defeat(v: Combatant) -> void:
 	clear_queue(v)
 	v.shield = 0
+	v.beat_shield = 0
 	v.statuses.clear()
 	if v.team == Enums.Team.ENEMIES or v.life_state == Enums.LifeState.DOWNED or v.revived_this_encounter:
 		v.life_state = Enums.LifeState.ELIMINATED

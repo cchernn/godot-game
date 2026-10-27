@@ -48,7 +48,7 @@ func test_a_snapshot_fills_the_panel_and_builds_skill_buttons() -> void:
 	var first := attacks.get_child(0) as Button
 	assert_true(first.toggle_mode and first.text.begins_with("Attack"))
 	var box := c.get_node("%SkillBox") as VBoxContainer
-	assert_eq(box.get_child_count(), 2, "the Skills list: power strike, disrupt")
+	assert_eq(box.get_child_count(), 2, "the Skills list: power strike, shield wall")
 	assert_true((box.get_child(0) as Button).text.begins_with("Power Strike"))
 	assert_true((c.get_node("%MoveButton") as Button).text.begins_with("Move"))
 	assert_true(not (c.get_node("%ReadyButton") as Button).disabled)
@@ -75,17 +75,17 @@ func test_the_strip_shows_one_card_per_visible_unit_with_you_first() -> void:
 func test_unit_card_shows_hp_ap_and_ready_state() -> void:
 	var card := (load("res://game/content/ui/unit_card.tscn") as PackedScene).instantiate() as UnitCard
 	(Engine.get_main_loop() as SceneTree).root.add_child(card)
-	var u := {"id": "pc1", "name": "Brea", "visual": "ranger", "team": Enums.Team.PLAYERS, "hp": 12, "max_hp": 28,
+	var u := {"id": "pc1", "name": "Brea", "visual": "hunter", "team": Enums.Team.PLAYERS, "hp": 12, "max_hp": 28,
 		"life": Enums.LifeState.ALIVE, "ready": false, "active": true, "ap_capacity": 4, "ap_reserved": 0}
 	card.show_unit(u, Enums.RoundPhase.PLANNING, false)
-	assert_eq((card.get_node("%NameLabel") as Label).text, "Brea - Ranger")
+	assert_eq((card.get_node("%NameLabel") as Label).text, "Brea - Hunter")
 	assert_eq((card.get_node("%HpLabel") as Label).text, "HP 12/28")
 	assert_eq((card.get_node("%HpBar") as ProgressBar).value, 12.0)
 	assert_eq((card.get_node("%StatusLabel") as Label).text, "AP 4 - Planning")
 	u["ready"] = true
 	u["ap_reserved"] = 2
 	card.show_unit(u, Enums.RoundPhase.PLANNING, true)
-	assert_eq((card.get_node("%NameLabel") as Label).text, "Brea (you) - Ranger")
+	assert_eq((card.get_node("%NameLabel") as Label).text, "Brea (you) - Hunter")
 	assert_eq((card.get_node("%StatusLabel") as Label).text, "AP 4 (2 reserved) - Ready")
 	u["life"] = Enums.LifeState.DOWNED
 	card.show_unit(u, Enums.RoundPhase.RESOLVING, false)
@@ -379,16 +379,16 @@ func test_character_screen_shows_stats_skills_battles_and_everyones_characters()
 	assert_true((s.get_node("%StatsLabel") as Label).text.begins_with("Might "), "stats come from the class resource")
 	var list := s.get_node("%SkillsList") as ItemList
 	assert_eq(list.item_count, 2, "and so do the skills: only the class skills, not Move, Attack or Defend")
-	assert_true(list.get_item_text(0).begins_with("Power Strike") and list.get_item_text(1).begins_with("Disrupt"))
+	assert_true(list.get_item_text(0).begins_with("Power Strike") and list.get_item_text(1).begins_with("Shield Wall"))
 	s.show_battles([{"created_at": "2026-10-25T12:00:00+00:00", "result": "players_win", "outcome": "survived", "xp_awarded": 100}])
 	assert_eq((s.get_node("%BattlesList") as ItemList).get_item_text(0), "2026-10-25  Victory - survived, +100 XP")
 	s.show_battles([])
 	assert_eq((s.get_node("%BattlesLabel") as Label).text, "No battles yet.")
 	s.show_world_characters([
 		{"name": "Aldric", "class": "warrior", "owner": "Host", "mine": true, "status": "active"},
-		{"name": "Tessa", "class": "rogue", "owner": "tess@example.com", "mine": false, "status": "retired"}])
+		{"name": "Tessa", "class": "hunter", "owner": "tess@example.com", "mine": false, "status": "retired"}])
 	assert_eq((s.get_node("%RosterList") as ItemList).get_item_text(0), "Aldric - Warrior, Host (you)")
-	assert_eq((s.get_node("%FallenList") as ItemList).get_item_text(0), "Tessa - Rogue, tess@example.com")
+	assert_eq((s.get_node("%FallenList") as ItemList).get_item_text(0), "Tessa - Hunter, tess@example.com")
 	var retire := s.get_node("%RetireButton") as Button
 	var edit := s.get_node("%RetireConfirmEdit") as LineEdit
 	assert_true(retire.disabled)
@@ -419,7 +419,7 @@ func test_character_creator_announces_the_choice() -> void:
 	(s.get_node("%CharacterNameEdit") as LineEdit).text = " Tessa "
 	(s.get_node("%ClassOption") as OptionButton).select(2)
 	_press(s, "CreateCharacterButton")
-	assert_eq(made, [["Tessa", "cleric"]])
+	assert_eq(made, [["Tessa", "mage"]])
 	s.reset()
 	assert_eq((s.get_node("%CharacterNameEdit") as LineEdit).text, "")
 	assert_eq((s.get_node("%ClassOption") as OptionButton).selected, 0)
@@ -535,7 +535,7 @@ func test_game_view_opens_windows_from_the_dock_and_the_menu_announces_its_doors
 func test_party_requests_show_on_the_party_dock_button() -> void:
 	var s := _screen("res://game/client/screens/overworld_screen.tscn") as OverworldScreen
 	s.show_world(_overview(), [_pview("leader", 1)])
-	s.show_requests([{"id": "r1", "name": "Tessa", "class": "rogue"}, {"id": "r2", "name": "Bran", "class": "warrior"}])
+	s.show_requests([{"id": "r1", "name": "Tessa", "class": "hunter"}, {"id": "r2", "name": "Bran", "class": "warrior"}])
 	assert_eq((s.get_node("%PartyToggle") as Button).text, "Party (2)")
 	s.show_requests([])
 	assert_eq((s.get_node("%PartyToggle") as Button).text, "Party")
@@ -735,7 +735,7 @@ func test_overworld_lists_join_requests_for_the_leader() -> void:
 	s.decision_made.connect(func(id: String, ok: bool, _row: JoinRequestRow) -> void: got.append([id, ok]))
 	s.show_world(_overview(), [_pview("leader", 1)])
 	assert_true(not (s.get_node("%RequestsBox") as Control).visible, "nothing to decide yet")
-	s.show_requests([{"id": "r1", "name": "Tessa", "class": "rogue"}])
+	s.show_requests([{"id": "r1", "name": "Tessa", "class": "hunter"}])
 	assert_true((s.get_node("%RequestsBox") as Control).visible)
 	var rows := s.get_node("%PartyRequestRows") as VBoxContainer
 	assert_eq(rows.get_child_count(), 1)

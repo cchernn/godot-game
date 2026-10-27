@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/shield_effect.gd" id="4_def"]
+
+[sub_resource type="Resource" id="Shield_wall"]
+script = ExtResource("4_def")
+amount = 8
+
+[sub_resource type="Resource" id="Stage_wall"]
+script = ExtResource("2_def")
+stage_name = "raise"
+effects = Array[ExtResource("3_def")]([SubResource("Shield_wall")])
+
+[resource]
+script = ExtResource("1_def")
+id = "shield_wall"
+display_name = "Shield Wall"
+hint = "Queued immediately: a large shield for the rest of the round"
+description = "Plant your feet and raise a large shield that holds until the end of the round."
+action_slot = 3
+kind = 4
+targeting = 3
+speed = 8
+frequency = 0
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_wall")])

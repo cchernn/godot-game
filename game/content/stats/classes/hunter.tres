@@ -2,15 +2,16 @@
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q7u1k"]
 [ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
-[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
-[ext_resource type="Resource" path="res://game/content/skills/disrupt.tres" id="s_disrupt"]
+
+[ext_resource type="Resource" path="res://game/content/skills/aimed_shot.tres" id="s_aimed_shot"]
+[ext_resource type="Resource" path="res://game/content/skills/lob_shot.tres" id="s_lob_shot"]
 
 [resource]
 script = ExtResource("1_q7u1k")
-id = "ranger"
-display_name = "Ranger"
+id = "hunter"
+display_name = "Hunter"
 vitality = 9
 might = 1
 dexterity = 12
 agility = 12
-skills = Array[ExtResource("skilldef")]([ExtResource("s_bolt"), ExtResource("s_disrupt")])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_aimed_shot"), ExtResource("s_lob_shot")])

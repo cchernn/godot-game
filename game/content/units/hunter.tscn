@@ -2,5 +2,5 @@
 
 [ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1"]
 
-[node name="Ranger" instance=ExtResource("1")]
+[node name="Hunter" instance=ExtResource("1")]
 body_scale = Vector3(0.85000002384186, 1.14999997615814, 0.85000002384186)

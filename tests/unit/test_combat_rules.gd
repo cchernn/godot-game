@@ -35,13 +35,28 @@ func test_invalid_action_is_skipped_and_queue_continues() -> void:
 
 
 func test_once_per_turn_limit_consumed_on_execution_not_when_queued_or_skipped() -> void:
-	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1)), Fx.enemy("e", V(1, 1)), Fx.enemy("far", V(4, 1))])
-	# the first strike is skipped (target out of range), so it does not use up the limit
-	Fx.plan(b, "a", [Fx.act("strike", "far"), Fx.act("strike", "e"), Fx.act("strike", "e")])
+	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1), {"dex": 16}), Fx.enemy("e", V(1, 1)), Fx.enemy("far", V(4, 1))])
+	# the first power strike (2 AP, so limited) is skipped (target out of range), so it does not use up the limit
+	var r1 := Fx.plan(b, "a", [Fx.act("power_strike", "far"), Fx.act("power_strike", "e")])
+	assert_true(r1["ok"], str(r1))
+	b.begin_resolution()
+	Fx.run_beats(b, 8)
+	assert_eq(b.state.get_c("e").hp, 8, "the second power strike landed")
+	var again := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1), {"dex": 16}), Fx.enemy("e", V(1, 1))])
+	Fx.plan(again, "a", [Fx.act("power_strike", "e"), Fx.act("power_strike", "e")])
+	again.begin_resolution()
+	Fx.run_beats(again, 8)
+	assert_eq(again.state.get_c("e").hp, 8, "exactly one power strike landed ")
+	assert_true("already used this round" in " ".join(Fx.texts(again)))
+
+
+func test_one_ap_skills_can_be_used_repeatedly() -> void:
+	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1)), Fx.enemy("e", V(1, 1))])
+	Fx.plan(b, "a", [Fx.act("strike", "e"), Fx.act("strike", "e")])
 	b.begin_resolution()
 	Fx.run_beats(b, 4)
-	assert_eq(b.state.get_c("e").hp, 14, "exactly one strike landed")
-	assert_true("already used this round" in " ".join(Fx.texts(b)))
+	assert_eq(b.state.get_c("e").hp, 8, "both strikes landed")
+	assert_true(not ("already used this round" in " ".join(Fx.texts(b))))
 
 
 func test_power_strike_interrupted_by_accumulated_hits() -> void:

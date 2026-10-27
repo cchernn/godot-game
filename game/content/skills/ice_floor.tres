@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/apply_status_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/area_shape.gd" id="5_def"]
+[ext_resource type="Resource" path="res://game/content/statuses/frozen.tres" id="6_def"]
+
+[sub_resource type="Resource" id="Stage_charge"]
+script = ExtResource("2_def")
+stage_name = "charge"
+
+[sub_resource type="Resource" id="Freeze"]
+script = ExtResource("4_def")
+status = ExtResource("6_def")
+
+[sub_resource type="Resource" id="Stage_cast"]
+script = ExtResource("2_def")
+stage_name = "cast"
+effects = Array[ExtResource("3_def")]([SubResource("Freeze")])
+
+[sub_resource type="Resource" id="Area_line"]
+script = ExtResource("5_def")
+shape = 2
+size = 3
+
+[resource]
+script = ExtResource("1_def")
+id = "ice_floor"
+display_name = "Ice Floor"
+hint = "Click a tile to aim the line (2 stages)"
+description = "Gather frost, then freeze the ground in a straight line of 3 tiles toward the tile you pick. Everyone standing on it is frozen in place, friend or foe."
+action_slot = 3
+targeting = 2
+attack_range = 4
+speed = 5
+area = SubResource("Area_line")
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_charge"), SubResource("Stage_cast")])

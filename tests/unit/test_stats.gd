@@ -3,10 +3,9 @@ extends TestCase
 ## The numbers as they were typed into encounter.gd before they became resources.
 ## Attributes and the battle numbers they give with the provisional config (armor is gear-only, so always 0).
 const ORIGINAL := {
-	"warrior": {"name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15, "hp": 40, "power": 3, "acc": 0, "eva": -1, "skills": ["power_strike", "disrupt"]},
-	"ranger": {"name": "Ranger", "might": 1, "dex": 12, "agi": 12, "vit": 9, "hp": 28, "power": 1, "acc": 2, "eva": 1, "skills": ["bolt", "disrupt"]},
-	"cleric": {"name": "Cleric", "might": 1, "dex": 10, "agi": 10, "vit": 10, "hp": 30, "power": 1, "acc": 1, "eva": 0, "skills": ["bolt", "revive"]},
-	"rogue": {"name": "Rogue", "might": 2, "dex": 16, "agi": 16, "vit": 8, "hp": 26, "power": 2, "acc": 4, "eva": 3, "skills": ["bolt"]},
+	"warrior": {"name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15, "hp": 40, "power": 3, "acc": 0, "eva": -1, "skills": ["power_strike", "shield_wall"]},
+	"hunter": {"name": "Hunter", "might": 1, "dex": 12, "agi": 12, "vit": 9, "hp": 28, "power": 1, "acc": 2, "eva": 1, "skills": ["aimed_shot", "lob_shot"]},
+	"mage": {"name": "Mage", "might": 1, "dex": 10, "agi": 10, "vit": 10, "hp": 30, "power": 1, "acc": 1, "eva": 0, "skills": ["fireball", "ice_floor"]},
 	"ghoul": {"name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10, "hp": 30, "power": 2, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
 	"cultist": {"name": "Cultist", "might": 1, "dex": 10, "agi": 10, "vit": 5, "hp": 20, "power": 1, "acc": 1, "eva": 0, "skills": ["move", "bolt", "strike"]},
 }
@@ -65,7 +64,7 @@ func test_encounter_definition_lists_the_expected_cast() -> void:
 	var enemies: Array[String] = []
 	for t in def.enemies:
 		enemies.append(t.id)
-	assert_eq(classes, ["warrior", "ranger", "cleric", "rogue"] as Array[String])
+	assert_eq(classes, ["warrior", "hunter", "mage"] as Array[String])
 	assert_eq(enemies, ["ghoul", "ghoul", "cultist"] as Array[String])
 	assert_eq(def.map_id(), "prototype")
 	assert_eq(def.max_players(), 4)
@@ -125,11 +124,11 @@ func test_editing_a_template_changes_the_battle() -> void:
 func test_a_character_class_picks_its_template_and_unknown_ones_fall_back_to_the_seat() -> void:
 	var cfg := GameConfig.load_file()
 	var skills := SkillDb.load_file()
-	var b := Encounter.build(cfg, skills, 3, 1, ["rogue", "", "paladin"])
-	assert_eq(b.state.get_c("pc0").visual, "rogue")
+	var b := Encounter.build(cfg, skills, 3, 1, ["mage", "", "paladin"])
+	assert_eq(b.state.get_c("pc0").visual, "mage")
 	assert_eq(b.state.get_c("pc0").cell, Vector2i(0, 2), "seats keep their own spawn tile")
-	assert_eq(b.state.get_c("pc1").visual, "ranger", "no class: the seat's default")
-	assert_eq(b.state.get_c("pc2").visual, "cleric", "unknown class: the seat's default")
+	assert_eq(b.state.get_c("pc1").visual, "hunter", "no class: the seat's default")
+	assert_eq(b.state.get_c("pc2").visual, "mage", "unknown class: the seat's default")
 	assert_eq(b.state.get_c("e2").visual, "cultist")
 
 
@@ -142,12 +141,12 @@ func test_problems_are_reported_with_the_unit_named() -> void:
 	t.id = "archer"
 	t.display_name = "Archer"
 	var ghost := SkillDef.new()
-	ghost.id = "fireball"
+	ghost.id = "phantom"
 	var mixed: Array[SkillDef] = [_skill("move"), ghost]
 	t.skills = mixed
 	issues = t.problems(known)
 	assert_eq(issues.size(), 1)
-	assert_true(issues[0].contains("fireball") and issues[0].contains("archer"), issues[0])
+	assert_true(issues[0].contains("phantom") and issues[0].contains("archer"), issues[0])
 	var def := EncounterDef.new()
 	assert_true(def.problems(known).size() >= 3, "no map, no classes, no enemies")
 	var twice := Encounter.definition().duplicate() as EncounterDef
@@ -164,6 +163,6 @@ func test_every_player_seat_gets_the_basic_actions_and_enemies_do_not() -> void:
 		var have := b.state.get_c("pc%d" % i).skills
 		for basic in skills.basic_ids:
 			assert_true(basic in have, "pc%d has %s" % [i, basic])
-	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "defend", "power_strike", "disrupt"] as Array[String])
+	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "defend", "power_strike", "shield_wall"] as Array[String])
 	assert_true(not "defend" in b.state.get_c("e0").skills, "enemies list their own actions")
 	assert_eq(SkillSet.new().problems(), [] as Array[String])

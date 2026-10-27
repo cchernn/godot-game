@@ -10,7 +10,13 @@
 [ext_resource type="Resource" path="res://game/content/skills/revive.tres" id="8_7we32"]
 [ext_resource type="Resource" path="res://game/content/skills/defend.tres" id="9_defend"]
 
+[ext_resource type="Resource" path="res://game/content/skills/shield_wall.tres" id="10_wall"]
+[ext_resource type="Resource" path="res://game/content/skills/aimed_shot.tres" id="11_aimed"]
+[ext_resource type="Resource" path="res://game/content/skills/lob_shot.tres" id="12_lob"]
+[ext_resource type="Resource" path="res://game/content/skills/fireball.tres" id="13_fire"]
+[ext_resource type="Resource" path="res://game/content/skills/ice_floor.tres" id="14_ice"]
+
 [resource]
 script = ExtResource("1_ba6hb")
-skills = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("4_drtuy"), ExtResource("5_r8irq"), ExtResource("6_xckuu"), ExtResource("7_ucasc"), ExtResource("8_7we32"), ExtResource("9_defend")])
+skills = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("4_drtuy"), ExtResource("5_r8irq"), ExtResource("6_xckuu"), ExtResource("7_ucasc"), ExtResource("8_7we32"), ExtResource("9_defend"), ExtResource("10_wall"), ExtResource("11_aimed"), ExtResource("12_lob"), ExtResource("13_fire"), ExtResource("14_ice")])
 basic = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("4_drtuy"), ExtResource("9_defend")])

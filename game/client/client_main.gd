@@ -433,7 +433,7 @@ func _update_preview() -> void:
 		board.range_cells.assign(TargetingPreview.reachable(board.bf, from, _blocked_cells(from), me["tiles_per_ap"], 1,
 			me["ap_capacity"] - _plan_cost()))
 	else:
-		board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, sk.attack_range))
+		board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, sk.attack_range, sk.requires_los))
 		var ids := TargetingPreview.valid_targets(board.bf, snap["units"], me, sk, from)
 		for u: Dictionary in snap["units"]:
 			if u["id"] in ids:
@@ -765,7 +765,7 @@ func _rebuild_skill_buttons() -> void:
 			continue # Move and Defend have their own buttons on the action bar
 		var b := skill_button_scene.instantiate() as Button
 		b.text = "%s  (%d AP)" % [sk.display_name, sk.total_ap()]
-		b.tooltip_text = sk.hint
+		b.tooltip_text = sk.tooltip()
 		b.pressed.connect(_on_skill_pressed.bind(id))
 		(attack_box if sk.slot() == Enums.ActionSlot.ATTACK else skill_box).add_child(b)
 		_skill_buttons[id] = b

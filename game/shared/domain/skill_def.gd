@@ -9,8 +9,10 @@ extends Resource
 @export var id: String = ""
 ## Shown on buttons and in the combat log.
 @export var display_name: String = ""
-## One line shown as the button tooltip and under the skill list when the skill is picked.
+## One line shown under the skill list when the skill is picked, and the fallback tooltip.
 @export var hint: String = ""
+## What the skill does, in the player's words. Shown as the tooltip on its button, above its AP, range and limit.
+@export_multiline var description: String = ""
 ## Where it sits in the action bar. Moves always sit on Move; basic attacks sit in the Attack list; class skills sit in the Skills list; the default Defend sits on Defend.
 @export var action_slot: Enums.ActionSlot = Enums.ActionSlot.ATTACK
 @export var kind: Enums.SkillKind = Enums.SkillKind.ATTACK:
@@ -24,6 +26,8 @@ extends Resource
 @export var targeting: Enums.Targeting = Enums.Targeting.NONE
 ## Reach in tiles (Manhattan distance) for attacks and revives.
 @export_range(0, 20) var attack_range: int = 1
+## Off = the skill can be aimed and lands at a tile the user cannot see (lobbed over walls and into the fog). Only the range still applies.
+@export var requires_los: bool = true
 
 @export_group("Area")
 ## Empty (or Single) = hits one target. Otherwise everyone on the covered tiles is hit, friend or foe. A character-targeted skill
@@ -33,8 +37,9 @@ extends Resource
 @export_group("Timing")
 ## Higher resolves first within a beat.
 @export_range(0, 20) var speed: int = 5
-## Once per turn, or as often as the unit has action points for.
-@export var frequency: Enums.Frequency = Enums.Frequency.ONCE_PER_TURN
+## Auto = once per turn when the skill costs more than 1 AP, otherwise as often as the unit has action points for.
+## Once per turn / Unlimited force one or the other.
+@export var frequency: Enums.Frequency = Enums.Frequency.AUTO
 ## Interruption points needed to cancel this skill while it is in progress.
 @export_range(0, 20) var stability: int = 1
 
@@ -101,6 +106,24 @@ func total_ap() -> int:
 	for s in stages:
 		t += s["ap"] as int
 	return t
+
+
+## True when the skill may begin only once a round.
+func once_per_turn() -> bool:
+	if frequency == Enums.Frequency.AUTO:
+		return total_ap() > 1
+	return frequency == Enums.Frequency.ONCE_PER_TURN
+
+
+## The button tooltip: the description (or the hint), then the cost, reach and limit.
+func tooltip() -> String:
+	var facts: Array[String] = ["%d AP" % total_ap()]
+	if kind in [Enums.SkillKind.ATTACK, Enums.SkillKind.SUPPORT, Enums.SkillKind.REVIVE] and targeting in [Enums.Targeting.CHARACTER, Enums.Targeting.TILE]:
+		facts.append("range %d" % attack_range)
+	if kind != Enums.SkillKind.MOVE and once_per_turn():
+		facts.append("once per turn")
+	var text := description if description != "" else hint
+	return "%s\n%s" % [text, " · ".join(facts)] if text != "" else " · ".join(facts)
 
 
 func is_multistage() -> bool:

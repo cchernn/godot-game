@@ -6,8 +6,11 @@ extends Resource
 ## The painted map scene (game/content/maps/*.tscn). Its file name is the id the clients use to draw it.
 @export var map: PackedScene
 ## Player classes. Seat 0 defaults to the first, seat 1 to the second, and so on; a player whose character
-## class matches one of these (by id) gets that class instead. The list length is also the maximum party size.
+## class matches one of these (by id) gets that class instead. The list length is also the maximum party size, unless Max Party is higher.
 @export var classes: Array[UnitTemplate] = []
+## The most players the battle seats. 0 = one seat per class. Seats beyond the class list start as the classes again, in order
+## (a seat's class is replaced by the character's own anyway).
+@export_range(0, 8) var max_party: int = 0
 ## Enemies in order: the first stands on spawn marker E0, the second on E1, and so on.
 @export var enemies: Array[UnitTemplate] = []
 
@@ -17,7 +20,7 @@ func map_id() -> String:
 
 
 func max_players() -> int:
-	return classes.size()
+	return maxi(classes.size(), max_party)
 
 
 ## The class template for a character class id, or null.

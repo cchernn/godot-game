@@ -14,7 +14,7 @@ project from `project.godot`; the first open imports everything.
 | Which scene draws which unit | `game/content/units/unit_visuals.tres` | Inspector |
 | What each skill does (damage, AP, range, speed, stages, hint text) | `game/content/skills/*.tres`, listed in `skills/skill_set.tres` | Inspector |
 | Class and enemy attributes (might, dexterity, agility, vitality), progression fields and skills | `game/content/stats/classes/*.tres`, `stats/enemies/*.tres` | Inspector |
-| Which classes and enemies a battle uses | `game/content/encounters/prototype.tres` | Inspector |
+| Which classes and enemies a battle uses | `game/content/encounters/prototype.tres` | Inspector (Max Party seats more players than there are classes) |
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
 | Fog / move / target / hover highlights | `game/content/board/materials/*.tres` | Inspector |
 | Battle screen: side panel, log, result text, guest connect panel | `game/client/client_main.tscn` | the 2D editor |
@@ -65,8 +65,8 @@ If they disagree, the client logs a warning and draws the server's layout, and t
   StandardMaterial3D override.
 - **Animations:** the AnimationPlayer already has `idle`, `walk` and `downed`. Edit or replace them; the script plays them by those names.
 - **Giving a class or enemy its own look:** create a new scene (Scene > New Inherited Scene > `unit.tscn`), save it in `units/`, then open
-  `unit_visuals.tres` and add an entry under **Scenes**. The key is the **lower-case template name** (`warrior`, `ranger`, `cleric`,
-  `rogue`, `ghoul`, `cultist`); anything without an entry uses the default scene.
+  `unit_visuals.tres` and add an entry under **Scenes**. The key is the **lower-case template name** (`warrior`, `hunter`, `mage`,
+  `ghoul`, `cultist`); anything without an entry uses the default scene.
 - Colours, health-bar size and pick size are exported on the root (`Look` and `Picking` groups).
 
 ## Highlights and look
@@ -151,12 +151,13 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
   centre, a line or cone from the user. Everyone on a covered tile is hit: friend, foe and the user too. A *tile* skill's area is shown on the board while the player picks; a *character*
   skill's area is centred on the target when it lands, so it follows a target that moved, and only the single target is visible while planning. Each victim gets its own hit and crit
   roll (in id order); effects aimed at the target apply to every victim, effects *On = Caster* apply once. Area skills hitting the caster's own tile (Targeting = self) make a nova.
-- **Timing:** speed (higher resolves first in a beat), frequency (once per turn or unlimited) and stability (interruption points that cancel it).
+- **Description** is the tooltip text on the skill's button; the game adds its AP, range and limit under it. **Requires LOS** (Targeting) off lets a tile-aimed skill land on tiles the user cannot see (Lob Shot); the range still applies.
+- **Timing:** speed (higher resolves first in a beat), frequency (Auto = once per turn when the skill costs more than 1 AP, otherwise unlimited; or force one) and stability (interruption points that cancel it).
 - **Stages:** the steps of the skill, each with its own **AP** and a list of **effects** (below). Power Strike has two stages: a wind-up (no effects) and a smash (damage and an interrupt).
 - **Effects** (`SkillStage > Effects`, pick the type, then fill it in; every effect has *On*: the skill's target, or the caster):
   - **Damage:** base damage, whether it can miss, whether it can crit/flank, whether the attacker's power is added. Order: hit roll, bonuses, minus armor, then the target's shield, then HP.
   - **Heal:** HP restored, never above the maximum. Does nothing to a downed unit (use a revive skill).
-  - **Shield:** points that absorb damage after armor and before HP, until the end of the round. They do not stack: a new shield only replaces a lower one.
+  - **Shield:** points that absorb damage after armor and before HP, until the end of the round or (Lasts = Beat) only for the beat they were raised in. They do not stack: a new shield only replaces a lower one.
   - **Interrupt:** points against the skill the target is in the middle of. Only lands if the damage in the same stage connected.
   - **Apply Status:** puts a status (a `StatusDef`, see below) on its target. Optional *duration turns* overrides the status's own. After a damage effect it only lands if the damage connected.
   - **Remove Status:** a cleanse. *Mode*: one named status, all buffs, all debuffs, or everything.

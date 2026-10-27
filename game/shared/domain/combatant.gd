@@ -13,6 +13,8 @@ var max_hp: int = 20
 var hp: int = 20
 ## Soaks damage after armor, before HP; cleared at the end of every round.
 var shield: int = 0
+## A shield that only lasts the beat it was raised in; soaks damage before `shield` does.
+var beat_shield: int = 0
 ## Sets action points (see config "ap").
 var dexterity: int = 8
 ## Sets tiles moved per AP (see config "movement").

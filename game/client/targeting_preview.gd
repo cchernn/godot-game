@@ -19,14 +19,14 @@ static func reachable(bf: Battlefield, start: Vector2i, blocked: Dictionary, til
 	return out
 
 
-## Tiles within the skill's reach that `from` can see.
-static func tiles_in_range(bf: Battlefield, from: Vector2i, reach: int) -> Array[Vector2i]:
+## Tiles within the skill's reach that `from` can see (all of them when the skill does not need line of sight).
+static func tiles_in_range(bf: Battlefield, from: Vector2i, reach: int, requires_los: bool = true) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for y in bf.height:
 		for x in bf.width:
 			var c := Vector2i(x, y)
 			var d := Enums.manhattan(from, c)
-			if d >= 1 and d <= reach and bf.has_los(from, c):
+			if d >= 1 and d <= reach and (not requires_los or bf.has_los(from, c)):
 				out.append(c)
 	return out
 
@@ -41,7 +41,7 @@ static func target_problem(bf: Battlefield, _me: Dictionary, u: Dictionary, sk: 
 	var d := Enums.manhattan(from, u["cell"])
 	if d > sk.attack_range:
 		return "out of range (%d tiles, reach %d)" % [d, sk.attack_range]
-	if not bf.has_los(from, u["cell"]):
+	if sk.requires_los and not bf.has_los(from, u["cell"]):
 		return "no line of sight"
 	return ""
 
@@ -62,7 +62,7 @@ static func valid_targets(bf: Battlefield, units: Array, me: Dictionary, sk: Ski
 static func area_cells(bf: Battlefield, sk: SkillDef, from: Vector2i, aim: Vector2i, facing: int) -> Array[Vector2i]:
 	if sk == null or not sk.is_area() or sk.targeting != Enums.Targeting.TILE or not bf.in_bounds(aim):
 		return []
-	if Enums.manhattan(from, aim) > sk.attack_range or not bf.has_los(from, aim):
+	if Enums.manhattan(from, aim) > sk.attack_range or (sk.requires_los and not bf.has_los(from, aim)):
 		return []
 	return sk.area.cells(bf, from, aim, facing)
 
@@ -92,7 +92,7 @@ static func hover_text(sk: SkillDef, units: Array, me: Dictionary, bf: Battlefie
 		var d := Enums.manhattan(from, hover)
 		if d > sk.attack_range:
 			return "Out of range (%d tiles, reach %d)" % [d, sk.attack_range]
-		if not bf.has_los(from, hover):
+		if sk.requires_los and not bf.has_los(from, hover):
 			return "No line of sight"
 		if sk.is_area():
 			var covered := area_cells(bf, sk, from, hover, int(me.get("facing", Enums.Facing.SOUTH)))

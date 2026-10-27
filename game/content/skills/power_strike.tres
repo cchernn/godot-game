@@ -28,6 +28,7 @@ script = ExtResource("1_def")
 id = "power_strike"
 display_name = "Power Strike"
 hint = "Click a character (2 stages)"
+description = "Wind up, then smash a character next to you for heavy damage. Slow, and it can stagger what it hits."
 action_slot = 3
 targeting = 1
 speed = 4

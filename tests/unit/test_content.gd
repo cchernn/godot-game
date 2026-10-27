@@ -1,6 +1,6 @@
 extends TestCase
 
-const UNITS := ["unit", "warrior", "ranger", "cleric", "rogue", "ghoul", "cultist"]
+const UNITS := ["unit", "warrior", "hunter", "mage", "ghoul", "cultist"]
 
 
 func _unit_dict(visual: String, team: int, life: int, hp: int) -> Dictionary:

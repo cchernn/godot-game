@@ -24,6 +24,7 @@ script = ExtResource("1_def")
 id = "bolt"
 display_name = "Bolt"
 hint = "Click a tile (it hits whoever stands there)"
+description = "A bolt at a tile you can see. It hits whoever stands there when it lands."
 action_slot = 3
 targeting = 2
 attack_range = 5

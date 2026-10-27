@@ -24,6 +24,7 @@ script = ExtResource("1_def")
 id = "strike"
 display_name = "Attack"
 hint = "The basic attack. Click a character"
+description = "A basic melee attack on a character next to you."
 targeting = 1
 speed = 6
 stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_strike")])

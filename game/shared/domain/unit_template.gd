@@ -1,6 +1,6 @@
 class_name UnitTemplate
 extends Resource
-## The stats of one kind of combatant: a player class (warrior, ranger...) or an enemy (ghoul...).
+## The stats of one kind of combatant: a player class (warrior, hunter...) or an enemy (ghoul...).
 ## Edit the .tres files under game/content/stats in the Inspector. All numbers are PROVISIONAL.
 ## Rules that use them (hit chance, damage formulas, AP) are in code and in config/balance.json ("stats" turns attributes into battle numbers); what each skill does is in
 ## game/content/skills.

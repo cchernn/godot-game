@@ -7,7 +7,7 @@ signal back_pressed
 signal message(text: String)
 
 ## Mirrors services/api/app/rules.py (provisional); the API rejects anything else.
-const CLASSES: Array[String] = ["warrior", "ranger", "cleric", "rogue"]
+const CLASSES: Array[String] = ["warrior", "hunter", "mage"]
 
 @onready var _name: LineEdit = %CharacterNameEdit
 @onready var _class: OptionButton = %ClassOption

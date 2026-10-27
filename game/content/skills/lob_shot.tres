@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/interrupt_effect.gd" id="5_def"]
+
+[sub_resource type="Resource" id="Stage_draw"]
+script = ExtResource("2_def")
+stage_name = "draw"
+
+[sub_resource type="Resource" id="Damage_lob"]
+script = ExtResource("4_def")
+base = 8
+
+[sub_resource type="Resource" id="Interrupt_lob"]
+script = ExtResource("5_def")
+points = 1
+
+[sub_resource type="Resource" id="Stage_lob"]
+script = ExtResource("2_def")
+stage_name = "shoot"
+effects = Array[ExtResource("3_def")]([SubResource("Damage_lob"), SubResource("Interrupt_lob")])
+
+[resource]
+script = ExtResource("1_def")
+id = "lob_shot"
+display_name = "Lob Shot"
+hint = "Click a tile, even one you cannot see (2 stages)"
+description = "Draw your bow and lob a shot at a tile. It reaches farther than an aimed shot and needs no line of sight, so you can hit what the fog hides."
+action_slot = 3
+targeting = 2
+attack_range = 9
+requires_los = false
+speed = 5
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_draw"), SubResource("Stage_lob")])

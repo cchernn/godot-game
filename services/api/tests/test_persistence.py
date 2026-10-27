@@ -27,7 +27,7 @@ def test_one_active_character_per_player_per_world_and_retirement(client):
     assert client.get(f"/worlds/{w['id']}/characters/me", headers=auth(tok)).json()["id"] == r.json()["id"]
     assert client.post(f"/characters/{r.json()['id']}/retire", headers=auth(tok)).json()["status"] == "retired"
     assert client.get(f"/worlds/{w['id']}/characters/me", headers=auth(tok)).status_code == 404
-    again = make_char(client, w["id"], tok, "Replacement", "rogue")
+    again = make_char(client, w["id"], tok, "Replacement", "hunter")
     assert again.status_code == 201, "replacement allowed after retirement"
     assert again.json()["xp"] == 0, "no inheritance"
 
@@ -71,7 +71,7 @@ def test_combat_result_commit_is_atomic_and_idempotent(keep_xp_client, pool):
     w, [(a, _), (b, b_id)] = setup_world(client)
     add_member(pool, w["id"], b_id)
     ca = make_char(client, w["id"], a).json()["id"]
-    cb = make_char(client, w["id"], b, "B", "cleric").json()["id"]
+    cb = make_char(client, w["id"], b, "B", "mage").json()["id"]
     body = result_body(w["id"], [ca, cb], key="battle-0001")
     first = client.post("/internal/combat-results", json=body, headers=SERVER)
     assert first.status_code == 200 and first.json()["duplicate"] is False

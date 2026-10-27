@@ -2,15 +2,16 @@
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_rhuw4"]
 [ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
-[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
-[ext_resource type="Resource" path="res://game/content/skills/revive.tres" id="s_revive"]
+
+[ext_resource type="Resource" path="res://game/content/skills/fireball.tres" id="s_fireball"]
+[ext_resource type="Resource" path="res://game/content/skills/ice_floor.tres" id="s_ice_floor"]
 
 [resource]
 script = ExtResource("1_rhuw4")
-id = "cleric"
-display_name = "Cleric"
+id = "mage"
+display_name = "Mage"
 vitality = 10
 might = 1
 dexterity = 10
 agility = 10
-skills = Array[ExtResource("skilldef")]([ExtResource("s_bolt"), ExtResource("s_revive")])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_fireball"), ExtResource("s_ice_floor")])

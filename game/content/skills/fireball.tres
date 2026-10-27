@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/area_shape.gd" id="5_def"]
+
+[sub_resource type="Resource" id="Stage_charge1"]
+script = ExtResource("2_def")
+stage_name = "charge"
+
+[sub_resource type="Resource" id="Stage_charge2"]
+script = ExtResource("2_def")
+stage_name = "charge"
+
+[sub_resource type="Resource" id="Damage_fire"]
+script = ExtResource("4_def")
+base = 14
+
+[sub_resource type="Resource" id="Stage_cast"]
+script = ExtResource("2_def")
+stage_name = "cast"
+effects = Array[ExtResource("3_def")]([SubResource("Damage_fire")])
+
+[sub_resource type="Resource" id="Area_star"]
+script = ExtResource("5_def")
+shape = 1
+size = 1
+
+[resource]
+script = ExtResource("1_def")
+id = "fireball"
+display_name = "Fireball"
+hint = "Click a tile (3 stages, burns a star of 5 tiles)"
+description = "Spend two beats gathering fire, then hurl it at a tile. It burns that tile and the four beside it, friend or foe."
+action_slot = 3
+targeting = 2
+attack_range = 5
+speed = 4
+stability = 2
+area = SubResource("Area_star")
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_charge1"), SubResource("Stage_charge2"), SubResource("Stage_cast")])

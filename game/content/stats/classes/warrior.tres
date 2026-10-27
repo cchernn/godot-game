@@ -2,8 +2,9 @@
 
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q6e1f"]
 [ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+
 [ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="s_power_strike"]
-[ext_resource type="Resource" path="res://game/content/skills/disrupt.tres" id="s_disrupt"]
+[ext_resource type="Resource" path="res://game/content/skills/shield_wall.tres" id="s_shield_wall"]
 
 [resource]
 script = ExtResource("1_q6e1f")
@@ -13,4 +14,4 @@ vitality = 15
 might = 3
 dexterity = 8
 agility = 8
-skills = Array[ExtResource("skilldef")]([ExtResource("s_power_strike"), ExtResource("s_disrupt")])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_power_strike"), ExtResource("s_shield_wall")])
