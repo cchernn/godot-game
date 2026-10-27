@@ -38,6 +38,17 @@ billboard_keep_scale = true
 [sub_resource type="QuadMesh" id="QuadMesh_sv57b"]
 size = Vector2(0.8, 0.08)
 
+[sub_resource type="StandardMaterial3D" id="Mat_hover_ring"]
+shading_mode = 0
+no_depth_test = true
+albedo_color = Color(1, 0.88, 0.35, 1)
+
+[sub_resource type="TorusMesh" id="Mesh_hover_ring"]
+inner_radius = 0.46
+outer_radius = 0.56
+rings = 24
+ring_segments = 8
+
 [sub_resource type="Animation" id="Animation_7wx88"]
 length = 0.4
 tracks/0/type = "value"
@@ -128,7 +139,7 @@ _data = {
 &"walk": SubResource("Animation_j2goh")
 }
 
-[node name="Unit" type="Node3D" unique_id=1936796094 node_paths=PackedStringArray("body", "facing_pivot", "name_label", "status_label", "hp_fill", "animation_player", "status_row")]
+[node name="Unit" type="Node3D" unique_id=1936796094 node_paths=PackedStringArray("body", "facing_pivot", "name_label", "status_label", "hp_fill", "animation_player", "status_row", "hover_ring")]
 script = ExtResource("1_jg08v")
 body = NodePath("Body")
 facing_pivot = NodePath("Facing")
@@ -137,6 +148,7 @@ status_label = NodePath("StatusLabel")
 hp_fill = NodePath("HealthBar/Fill")
 animation_player = NodePath("AnimationPlayer")
 status_row = NodePath("StatusRow")
+hover_ring = NodePath("HoverRing")
 status_icon_scene = ExtResource("2_status")
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=1272398236]
@@ -169,6 +181,12 @@ modulate = Color(1, 0.65, 0.25, 1)
 
 [node name="StatusRow" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, 0)
+
+[node name="HoverRing" type="MeshInstance3D" parent="."]
+visible = false
+transform = Transform3D(1, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("Mesh_hover_ring")
+surface_material_override/0 = SubResource("Mat_hover_ring")
 
 [node name="HealthBar" type="Node3D" parent="." unique_id=1174080430]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)

@@ -27,6 +27,8 @@ const MOVE_SPEED := 6.0   ## tiles per second for smoothed unit movement
 ## The walk you would make to the hovered tile.
 @export var path_material: Material
 @export var overlay_lift: float = 0.02
+## How thick the border drawn on the hovered tile is, in tiles.
+@export_range(0.01, 0.3) var hover_border_width: float = 0.08
 
 @export_group("Symbols")
 ## Stands on every tile your plan targets, with its order number above.
@@ -66,6 +68,8 @@ var path_cells: Array[Vector2i] = []   # the walk to the hovered tile
 var marks: Array[Dictionary] = []      # [{cell, text}] symbols on the tiles your plan targets
 var selected_cell: Vector2i = Vector2i(-1, -1)  # the clicked tile while the action menu is open
 var hover: Vector2i = Vector2i(-1, -1)
+var hover_unit: String = ""            # the unit under the mouse ("" when it is over a tile): it is highlighted instead of the tile
+var selected_unit: String = ""         # the unit whose action menu is open
 
 var _map_id: String = "<unset>"
 var _gm: GridMap
@@ -76,6 +80,7 @@ var _unit_nodes: Dictionary = {}       # unit id -> Unit3D
 var _disp: Dictionary = {}             # unit id -> smoothed Vector2 cell position
 var _overlays: Dictionary = {}         # kind -> Array[MeshInstance3D]
 var _overlay_mesh: PlaneMesh
+var _frame_mesh: ArrayMesh
 var _overlay_sig: int = 0
 var _target_nodes: Array[BoardMarker] = []
 var _select_node: BoardMarker
@@ -168,6 +173,8 @@ func reset() -> void:
 	marks = [] as Array[Dictionary]
 	selected_cell = Vector2i(-1, -1)
 	hover = Vector2i(-1, -1)
+	hover_unit = ""
+	selected_unit = ""
 	bf = null
 	_serial += 1
 
@@ -292,7 +299,7 @@ func _process(delta: float) -> void:
 		var p: Vector2 = _disp[id]
 		node.set_world_position(_unit_position(p, node.position.y, delta), delta)
 		node.visible = _seen.has(Vector2i(p.round())) or u["team"] == Enums.Team.PLAYERS
-	var sig := hash([plan_cells, plan_marks, range_cells, valid_cells, area_cells, path_cells, marks, selected_cell, hover, _serial])
+	var sig := hash([plan_cells, plan_marks, range_cells, valid_cells, area_cells, path_cells, marks, selected_cell, hover, hover_unit, selected_unit, _serial])
 	if sig != _overlay_sig:
 		_overlay_sig = sig
 		_refresh_overlays()
@@ -314,9 +321,11 @@ func _refresh_overlays() -> void:
 	_refresh_markers()
 	_show("target", plan_marks, target_material, 0.02)
 	var hovered: Array[Vector2i] = []
-	if bf != null and bf.in_bounds(hover):
-		hovered.append(hover)
-	_show("hover", hovered, hover_material, 0.03)
+	if bf != null and bf.in_bounds(hover) and hover_unit == "":
+		hovered.append(hover) # over a tile: its border; over a unit the unit glows instead
+	_show("hover", hovered, hover_material, 0.03, _frame())
+	for id: String in _unit_nodes:
+		(_unit_nodes[id] as Unit3D).set_hovered(id == hover_unit or id == selected_unit)
 
 
 ## Puts the target symbols (with their numbers) and the selected-tile symbol where they belong.
@@ -406,7 +415,34 @@ func show_event(e: Dictionary, slots: Dictionary) -> void:
 	float_text(id, text.strip_edges(), color, size, n * stagger_seconds)
 
 
-func _show(kind: String, cells: Array[Vector2i], material: Material, extra_lift: float) -> void:
+## A square border the size of a tile (a frame, not a filled square).
+func _frame() -> ArrayMesh:
+	if _frame_mesh == null:
+		var half := Vector2(_gm.cell_size.x, _gm.cell_size.z) * 0.49
+		var inner := half - Vector2(hover_border_width, hover_border_width) * Vector2(_gm.cell_size.x, _gm.cell_size.z)
+		var v := PackedVector3Array()
+		for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			v.append(Vector3(corner.x * half.x, 0.0, corner.y * half.y))
+		for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+			v.append(Vector3(corner.x * inner.x, 0.0, corner.y * inner.y))
+		var idx := PackedInt32Array()
+		for i in 4:
+			var j := (i + 1) % 4
+			idx.append_array([i, j, 4 + j, i, 4 + j, 4 + i])
+		var normals := PackedVector3Array()
+		for i in 8:
+			normals.append(Vector3.UP)
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = v
+		arrays[Mesh.ARRAY_NORMAL] = normals
+		arrays[Mesh.ARRAY_INDEX] = idx
+		_frame_mesh = ArrayMesh.new()
+		_frame_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return _frame_mesh
+
+
+func _show(kind: String, cells: Array[Vector2i], material: Material, extra_lift: float, mesh: Mesh = null) -> void:
 	if _overlay_mesh == null:
 		_overlay_mesh = PlaneMesh.new()
 		_overlay_mesh.size = Vector2(_gm.cell_size.x * 0.98, _gm.cell_size.z * 0.98)
@@ -414,7 +450,7 @@ func _show(kind: String, cells: Array[Vector2i], material: Material, extra_lift:
 	_overlays[kind] = list
 	while list.size() < cells.size():
 		var mi := MeshInstance3D.new()
-		mi.mesh = _overlay_mesh
+		mi.mesh = mesh if mesh != null else _overlay_mesh
 		mi.material_override = material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		overlay_root.add_child(mi)
@@ -492,7 +528,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		if not (mm.button_mask & MOUSE_BUTTON_MASK_MIDDLE):
-			hover = pick(mm.position).get("cell", Vector2i(-1, -1))
+			var h := pick(mm.position)
+			hover = h.get("cell", Vector2i(-1, -1))
+			hover_unit = h.get("unit", "")
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:

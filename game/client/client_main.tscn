@@ -6,6 +6,7 @@
 [ext_resource type="Theme" path="res://game/content/ui/theme.tres" id="4"]
 [ext_resource type="PackedScene" path="res://game/content/ui/action_menu.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://game/content/ui/hover_card.tscn" id="8"]
+[ext_resource type="PackedScene" path="res://game/content/ui/action_button.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://game/content/ui/unit_card.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/content/ui/menu_background.tscn" id="7"]
 
@@ -17,6 +18,7 @@ anchor_bottom = 1.0
 theme = ExtResource("4")
 script = ExtResource("1")
 unit_card_scene = ExtResource("6")
+action_button_scene = ExtResource("9")
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -101,6 +103,16 @@ layout_mode = 2
 [node name="ApLabel" type="Label" parent="SidePanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
+
+[node name="AbilityTitle" type="Label" parent="SidePanel/Layout"]
+layout_mode = 2
+modulate = Color(0.75, 0.85, 1, 1)
+text = "Abilities (click one, then a target)"
+
+[node name="AbilityList" type="GridContainer" parent="SidePanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 2
 
 [node name="FacingRow" type="HBoxContainer" parent="SidePanel/Layout"]
 unique_name_in_owner = true

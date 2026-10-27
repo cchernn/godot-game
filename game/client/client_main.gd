@@ -6,6 +6,8 @@ extends Control
 
 ## The strip of cards under the board (game/content/ui/unit_card.tscn): your party, and the enemies in sight.
 @export var unit_card_scene: PackedScene
+## The abilities list in the side panel is made of this scene (game/content/ui/action_button.tscn), one per ability.
+@export var action_button_scene: PackedScene
 ## Turn off to always use the plain guest connect screen, even when client_env.json exists.
 @export var account_mode_enabled: bool = true
 
@@ -26,6 +28,9 @@ var _prev_plan: Array[Dictionary] = []
 var _menu_cell: Vector2i = Vector2i(-1, -1)
 var _menu_unit: String = ""
 var _preview: Dictionary = {}
+## The ability picked in the list (its reach stays shaded and the next click on a valid target queues it), or "".
+var _armed: String = ""
+var _ability_sig: int = 0
 var _card_text: String = ""
 var _cfg: GameConfig
 var _snap_time_ms: int = 0
@@ -54,6 +59,7 @@ var _preview_sig: int = 0
 @onready var ready_btn: Button = %ReadyButton
 @onready var escape_btn: Button = %RetreatButton
 @onready var menu: ActionMenu = %ActionMenu
+@onready var ability_list: GridContainer = %AbilityList
 @onready var hover_card: HoverCard = %HoverCard
 @onready var facing_row: Control = %FacingRow
 @onready var error_label: Label = %ErrorLabel
@@ -217,6 +223,7 @@ func _on_snapshot(s: Dictionary) -> void:
 			plan.append(copy)
 		_prev_plan = plan.duplicate(true)
 		menu.close()
+		_armed = ""
 	_register_map_objects(str(s["map"].get("id", "")))
 	board.set_snapshot(s)
 	_refresh()
@@ -327,6 +334,7 @@ func _on_continue_pressed() -> void:
 	plan.clear()
 	_prev_plan.clear()
 	menu.close()
+	_armed = ""
 	_plan_round = -1
 	_in_battle = false
 	_objects_map = "<unset>"
@@ -387,11 +395,11 @@ func _action_beats(a: Dictionary) -> int:
 	return TargetingPreview.action_beats(sk, path_len, me.get("tiles_per_ap", 1)) if sk != null else 1
 
 
-## Shades the board for what the mouse is on: the walk and reach under the cursor, or the reach and area of the menu entry being hovered.
-## Also fills the hover card and the one-line hint in the side panel.
+## Shades the board: the entry under the mouse in the menu or in the ability list, else the armed ability, else (with a menu open) what the
+## clicked target offers, else what is under the mouse. Also fills the hover card and the hint in the side panel.
 func _update_overlays() -> void:
-	var sig := hash([board.hover, _menu_cell, _preview.get("id", ""), plan, snap["round"], snap["phase"], me.get("cell"), me.get("ready"),
-		snap["units"]])
+	var sig := hash([board.hover, board.hover_unit, _menu_cell, _preview.get("id", ""), _armed, plan, snap["round"], snap["phase"],
+		me.get("cell"), me.get("ready"), snap["units"]])
 	if sig == _preview_sig:
 		return
 	_preview_sig = sig
@@ -400,6 +408,7 @@ func _update_overlays() -> void:
 	board.area_cells.clear()
 	board.path_cells.clear()
 	board.selected_cell = _menu_cell
+	board.selected_unit = _menu_unit
 	hover_label.text = ""
 	_card_text = ""
 	var hovered_cell := board.hover
@@ -414,29 +423,73 @@ func _update_overlays() -> void:
 	if not _preview.is_empty():
 		_show_preview_of_option(from, ap_left)
 		return
-	if _menu_cell != Vector2i(-1, -1) or _hover_on_menu():
+	if _armed != "":
+		_show_armed(from, ap_left, hovered_cell if in_bounds else Vector2i(-1, -1), fog)
 		return
-	hover_label.text = "Fog: not visible to your team" if fog else "Click a tile or a unit to choose an action"
-	if not in_bounds:
+	if _menu_cell != Vector2i(-1, -1):
+		_show_for_target(from, ap_left, _menu_cell) # the reach and the walk stay on while you pick from the menu
 		return
-	var u := _unit_at(hovered_cell)
+	if _hover_on_menu():
+		return
+	hover_label.text = "Fog: not visible to your team" if fog else "Click a tile or a unit to choose an action, or pick an ability from the list"
+	if in_bounds:
+		_card_text = _show_for_target(from, ap_left, hovered_cell) + ("\n[color=#9a9a9a]Fog: not visible to your team[/color]" if fog else "")
+
+
+## The walk and reach for a tile or unit: where you can walk and the way to an empty tile, or what your basic attack reaches for a unit.
+## Returns the hover card text for it.
+func _show_for_target(from: Vector2i, ap_left: int, cell: Vector2i) -> String:
+	var u := _unit_at(cell)
 	var blocked := _blocked_cells(from)
 	if u.is_empty():
-		var reach := TargetingPreview.reachable(board.bf, from, blocked, me["tiles_per_ap"], 1, ap_left)
-		board.range_cells.assign(reach)
-		var path := Pathfinder.path_to(Pathfinder.search(board.bf, from, blocked, 1), from, hovered_cell)
-		board.path_cells.assign(path)
-		_card_text = _tile_card_text(hovered_cell, path, ap_left) + ("\n[color=#9a9a9a]Fog: not visible to your team[/color]" if fog else "")
-	elif u["id"] == me["id"]:
 		board.range_cells.assign(TargetingPreview.reachable(board.bf, from, blocked, me["tiles_per_ap"], 1, ap_left))
-		_card_text = _unit_card_text(u, true)
+		var path := Pathfinder.path_to(Pathfinder.search(board.bf, from, blocked, 1), from, cell)
+		board.path_cells.assign(path)
+		return _tile_card_text(cell, path, ap_left)
+	if u["id"] == me["id"]:
+		board.range_cells.assign(TargetingPreview.reachable(board.bf, from, blocked, me["tiles_per_ap"], 1, ap_left))
+		return _unit_card_text(u, true)
+	var attack := skills.get_skill(_basic_attack_id())
+	if attack != null and u["team"] != me["team"]:
+		board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, attack.attack_range, attack.requires_los))
+		if TargetingPreview.target_problem(board.bf, me, u, attack, from) == "":
+			board.valid_cells.append(u["cell"])
+	return _unit_card_text(u, true)
+
+
+## While an ability from the list is armed: its reach and valid targets stay shaded, and over the board you see what a click would do.
+func _show_armed(from: Vector2i, ap_left: int, cell: Vector2i, fog: bool) -> void:
+	var sk := skills.get_skill(_armed)
+	if sk == null:
+		return
+	_shade_skill(sk, from, ap_left, cell)
+	hover_label.text = "%s armed: %s. Esc or click it again to cancel." % [sk.display_name, "click a tile to walk" if sk.kind == Enums.SkillKind.MOVE else sk.hint]
+	if cell == Vector2i(-1, -1):
+		return
+	var u := _unit_at(cell)
+	if sk.kind == Enums.SkillKind.MOVE:
+		var blocked := _blocked_cells(from)
+		var path := Pathfinder.path_to(Pathfinder.search(board.bf, from, blocked, 1), from, cell)
+		board.path_cells.assign(path)
+		_card_text = _tile_card_text(cell, path, ap_left) if u.is_empty() else _unit_card_text(u, false)
 	else:
-		var attack := skills.get_skill(_basic_attack_id())
-		if attack != null and u["team"] != me["team"]:
-			board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, attack.attack_range, attack.requires_los))
-			if TargetingPreview.target_problem(board.bf, me, u, attack, from) == "":
-				board.valid_cells.append(u["cell"])
-		_card_text = _unit_card_text(u, true)
+		_card_text = _unit_card_text(u, true) if not u.is_empty() else ""
+	if fog:
+		_card_text += "\n[color=#9a9a9a]Fog: not visible to your team[/color]"
+
+
+## Shades the reach, the targets that can be hit and (aimed at tiles) the area of a skill.
+func _shade_skill(sk: SkillDef, from: Vector2i, ap_left: int, aim: Vector2i) -> void:
+	if sk.kind == Enums.SkillKind.MOVE:
+		board.range_cells.assign(TargetingPreview.reachable(board.bf, from, _blocked_cells(from), me["tiles_per_ap"], 1, ap_left))
+		return
+	if sk.kind == Enums.SkillKind.REACTION or sk.targeting == Enums.Targeting.SELF or sk.targeting == Enums.Targeting.NONE:
+		return
+	board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, sk.attack_range, sk.requires_los))
+	for id: String in TargetingPreview.valid_targets(board.bf, snap["units"], me, sk, from):
+		board.valid_cells.append(_unit_at_id(id).get("cell", Vector2i(-1, -1)))
+	if sk.targeting == Enums.Targeting.TILE and aim != Vector2i(-1, -1):
+		board.area_cells.assign(TargetingPreview.area_cells(board.bf, sk, from, aim, int(me.get("facing", Enums.Facing.SOUTH))))
 
 
 ## While the menu is open: shades the reach, the valid targets and the area of the entry under the mouse.
@@ -445,17 +498,145 @@ func _show_preview_of_option(from: Vector2i, ap_left: int) -> void:
 	if sk == null:
 		return
 	hover_label.text = "%s: %s" % [_preview["label"], _preview["summary"] if _preview["enabled"] else _preview["reason"]]
+	_shade_skill(sk, from, ap_left, _menu_cell if _menu_cell != Vector2i(-1, -1) else board.hover)
 	if sk.kind == Enums.SkillKind.MOVE:
-		board.range_cells.assign(TargetingPreview.reachable(board.bf, from, _blocked_cells(from), me["tiles_per_ap"], 1, ap_left))
 		board.path_cells.assign(_preview.get("path", []))
+
+
+## ---------- The ability list ----------
+
+## Your abilities in the order Move, attacks, skills, Defend, then items, each with its cost and, when it cannot be used now, why.
+func _ability_entries() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ap_left: int = me["ap_capacity"] - _plan_cost()
+	var planned: Array = []
+	for a in plan:
+		planned.append(a["skill"])
+	var ranked: Array[Array] = []
+	for id: String in me.get("skills", []):
+		var sk := skills.get_skill(id)
+		if sk == null:
+			continue
+		var rank := 0
+		match sk.slot():
+			Enums.ActionSlot.MOVE: rank = 0
+			Enums.ActionSlot.ATTACK: rank = 1
+			Enums.ActionSlot.SKILL: rank = 2
+			Enums.ActionSlot.DEFEND: rank = 3
+		ranked.append([rank, id])
+	ranked.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
+	for pair: Array in ranked:
+		var sk := skills.get_skill(pair[1])
+		var cost := 1 if sk.kind == Enums.SkillKind.MOVE else sk.total_ap()
+		var why := ""
+		if sk.kind != Enums.SkillKind.MOVE and me.get("maimed", false) and sk.is_attack_or_skill():
+			why = "maimed: no attacks or skills"
+		elif sk.kind != Enums.SkillKind.MOVE and planned.has(sk.id) and sk.once_per_turn():
+			why = "already planned this round"
+		elif cost > ap_left:
+			why = "needs %d AP, %d left" % [cost, ap_left]
+		var label := "Move  1 AP/%d tile%s" % [me["tiles_per_ap"], "" if me["tiles_per_ap"] == 1 else "s"] if sk.kind == Enums.SkillKind.MOVE else "%s  %d AP" % [sk.display_name, cost]
+		out.append({"id": sk.id, "label": label, "name": sk.display_name, "enabled": why == "", "reason": why,
+			"summary": TargetingPreview.effect_summary(sk, int(me.get("power", 0)), 0, _cfg),
+			"hint": sk.description if sk.description != "" else sk.hint})
+	for it: Dictionary in me.get("items", []):
+		var sk := skills.get_skill(ItemDef.skill_id_for(it["id"]))
+		if sk == null:
+			continue
+		var left := _items_left(it["id"])
+		var why := "none left" if left <= 0 else ("needs %d AP, %d left" % [sk.total_ap(), ap_left] if sk.total_ap() > ap_left else "")
+		out.append({"id": sk.id, "label": "%s ×%d  %d AP" % [sk.display_name, left, sk.total_ap()], "name": sk.display_name, "enabled": why == "",
+			"reason": why, "summary": TargetingPreview.effect_summary(sk, 0, 0, _cfg), "hint": sk.description if sk.description != "" else sk.hint})
+	return out
+
+
+func _rebuild_abilities() -> void:
+	if action_button_scene == null or me.is_empty():
 		return
-	if sk.kind == Enums.SkillKind.REACTION or sk.targeting == Enums.Targeting.SELF or sk.targeting == Enums.Targeting.NONE:
+	var entries := _ability_entries()
+	var sig := hash([entries, _armed, _can_edit()])
+	if sig == _ability_sig:
 		return
-	board.range_cells.assign(TargetingPreview.tiles_in_range(board.bf, from, sk.attack_range, sk.requires_los))
-	for id: String in TargetingPreview.valid_targets(board.bf, snap["units"], me, sk, from):
-		board.valid_cells.append(_unit_at_id(id).get("cell", Vector2i(-1, -1)))
-	if sk.targeting == Enums.Targeting.TILE:
-		board.area_cells.assign(TargetingPreview.area_cells(board.bf, sk, from, _menu_cell, int(me.get("facing", Enums.Facing.SOUTH))))
+	_ability_sig = sig
+	for ch in ability_list.get_children():
+		ability_list.remove_child(ch)
+		ch.queue_free()
+	var can := _can_edit()
+	for e in entries:
+		var b := action_button_scene.instantiate() as Button
+		b.text = e["label"]
+		b.toggle_mode = true
+		b.button_pressed = e["id"] == _armed
+		b.disabled = not can or not e["enabled"]
+		var tip: Array[String] = []
+		for part: String in [str(e["hint"]), str(e["summary"]), "" if e["enabled"] else "Not now: %s" % e["reason"]]:
+			if part != "":
+				tip.append(part)
+		b.tooltip_text = "\n".join(tip)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(_on_ability_pressed.bind(e["id"]))
+		b.mouse_entered.connect(_on_ability_hover.bind(e))
+		b.mouse_exited.connect(_on_ability_hover.bind({}))
+		ability_list.add_child(b)
+
+
+## Hovering an ability shades its reach, like hovering an entry of the menu.
+func _on_ability_hover(entry: Dictionary) -> void:
+	_preview = entry if not entry.is_empty() and entry["enabled"] else {}
+	if not _preview.is_empty():
+		_preview = {"id": entry["id"], "label": entry["name"], "summary": entry["summary"], "enabled": true, "reason": ""}
+	_preview_sig = 0
+	if not snap.is_empty():
+		_update_overlays()
+
+
+## Picking an ability: one that needs no aim is queued at once; any other is armed, and the next click on a valid target queues it.
+func _on_ability_pressed(id: String) -> void:
+	if not _can_edit():
+		return
+	var sk := skills.get_skill(id)
+	if sk == null:
+		return
+	menu.close()
+	if _armed == id:
+		_disarm()
+		return
+	if sk.kind != Enums.SkillKind.MOVE and (sk.kind == Enums.SkillKind.REACTION or sk.targeting == Enums.Targeting.SELF or sk.targeting == Enums.Targeting.NONE):
+		_disarm()
+		_prev_plan = plan.duplicate(true)
+		plan.append(_new_action(id))
+		error_label.text = ""
+		_push_plan()
+		return
+	_armed = id
+	error_label.text = ""
+	_preview_sig = 0
+	_ability_sig = 0
+	_refresh()
+
+
+func _disarm() -> void:
+	_armed = ""
+	_preview_sig = 0
+	_ability_sig = 0
+	if not snap.is_empty():
+		_refresh()
+
+
+## A click on the board while an ability is armed: queue it on that target if it is valid, else say why not.
+func _use_armed_on(cell: Vector2i, unit_id: String) -> void:
+	var pick: Dictionary = {}
+	for o in _options_at(cell, unit_id):
+		if o["id"] == _armed:
+			pick = o
+	if pick.is_empty():
+		error_label.text = "%s cannot be used on that" % skills.get_skill(_armed).display_name
+		return
+	if not pick["enabled"]:
+		error_label.text = "%s: %s" % [pick["label"], pick["reason"]]
+		return
+	_disarm()
+	_on_option_chosen(pick)
 
 
 func _unit_at(cell: Vector2i) -> Dictionary:
@@ -489,7 +670,7 @@ func _unit_card_text(u: Dictionary, show_attack: bool) -> String:
 	for st: Dictionary in u["statuses"]:
 		lines.append("[color=#%s]%s %s[/color] (%d turn%s)" % [str(st["color"]), st["glyph"], st["name"], st["turns"], "" if st["turns"] == 1 else "s"])
 	if show_attack and u["team"] != me.get("team", -1) and u["life"] != Enums.LifeState.DOWNED:
-		var attack := skills.get_skill(_basic_attack_id())
+		var attack := skills.get_skill(_card_attack_id())
 		if attack != null:
 			var d := Enums.manhattan(_predicted_cell(), u["cell"])
 			var dmg := TargetingPreview.damage_range(attack, int(me.get("power", 0)), int(u.get("armor", 0)), _cfg)
@@ -515,6 +696,14 @@ func _tile_card_text(cell: Vector2i, path: Array[Vector2i], ap_left: int) -> Str
 	return "\n".join(lines)
 
 
+## The skill the hover card measures an enemy against: the armed ability if it hits something, else your basic attack.
+func _card_attack_id() -> String:
+	var sk := skills.get_skill(_armed) if _armed != "" else null
+	if sk != null and sk.kind != Enums.SkillKind.MOVE and sk.targeting in [Enums.Targeting.CHARACTER, Enums.Targeting.TILE]:
+		return _armed
+	return _basic_attack_id()
+
+
 ## The id of your basic attack: the first of your skills that sits in the Attack slot.
 func _basic_attack_id() -> String:
 	return _slot_skill(Enums.ActionSlot.ATTACK)
@@ -538,6 +727,9 @@ func _push_plan() -> void:
 ## A click on the board opens the action menu there: every action that makes sense on that tile or unit.
 func _on_cell_clicked(cell: Vector2i, unit_id: String) -> void:
 	if not _can_edit():
+		return
+	if _armed != "":
+		_use_armed_on(cell, unit_id)
 		return
 	var opts := _options_at(cell, unit_id)
 	if opts.is_empty():
@@ -776,6 +968,8 @@ func _refresh() -> void:
 	facing_row.visible = can and not plan.is_empty() and plan.back()["skill"] == "move" # only a walk can end facing another way
 	if not can:
 		menu.close()
+		_armed = ""
+	_rebuild_abilities()
 
 
 ## One card per visible unit, reused between snapshots: allies (you first) in the party row, enemies in sight above it.
@@ -860,7 +1054,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	match k.keycode:
 		KEY_ESCAPE:
-			menu.close()
+			if menu.visible:
+				menu.close()
+			elif _armed != "":
+				_disarm()
 		KEY_BACKSPACE:
 			_undo()
 		KEY_Z:

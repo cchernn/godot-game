@@ -273,3 +273,106 @@ func test_statuses_show_as_badges_over_the_unit_with_their_turns() -> void:
 	u.apply(unit, true)
 	assert_eq(u.status_row.get_children().filter(func(n: Node) -> bool: return (n as Node3D).visible).size(), 0, "gone with the status")
 	u.free()
+
+
+func _ability(c: Control, id: String) -> Button:
+	for b in (c.get_node("%AbilityList") as GridContainer).get_children():
+		if b is Button and (b as Button).text.begins_with(id):
+			return b
+	return null
+
+
+func test_the_ability_list_shows_what_you_can_do_with_its_cost() -> void:
+	var c := _client()
+	var list := c.get_node("%AbilityList") as GridContainer
+	var names: Array[String] = []
+	for b in list.get_children():
+		names.append((b as Button).text)
+	assert_eq(names, ["Move  1 AP/1 tile", "Attack  1 AP", "Power Strike  2 AP", "Shield Wall  1 AP", "Lob Shot  2 AP", "Fireball  3 AP", "Defend  1 AP"] as Array[String],
+		"Move, the attack, the class skills, then Defend")
+	assert_true(not _ability(c, "Power Strike").disabled)
+	c.call("_on_ability_pressed", "shield_wall")
+	assert_true(_ability(c, "Shield Wall").disabled, "once per turn")
+	assert_true("already planned" in _ability(c, "Shield Wall").tooltip_text)
+	c.free()
+
+
+func test_an_armed_ability_keeps_its_reach_shaded_and_the_next_click_queues_it() -> void:
+	var c := _client()
+	c.call("_on_ability_pressed", "power_strike")
+	assert_eq(c.get("_armed"), "power_strike")
+	assert_true(c.board.range_cells.size() > 0, "its reach stays on")
+	assert_true(c.board.valid_cells.has(V(3, 1)), "and the enemy it can hit is picked out")
+	c.call("_on_cell_clicked", V(5, 3), "")
+	assert_eq(c.plan.size(), 0, "a tile is not a valid target for it")
+	assert_true("cannot be used" in (c.get_node("%ErrorLabel") as Label).text)
+	assert_eq(c.get("_armed"), "power_strike", "still armed")
+	c.call("_on_cell_clicked", V(3, 1), "e0")
+	assert_eq([c.plan[0]["skill"], c.plan[0]["target"]], ["power_strike", "e0"], "one click, no menu")
+	assert_eq(c.get("_armed"), "", "used up")
+	assert_true(not (c.get_node("%ActionMenu") as Control).visible)
+	c.free()
+
+
+func test_an_armed_move_walks_with_one_click_and_esc_or_the_same_ability_cancels() -> void:
+	var c := _client()
+	c.call("_on_ability_pressed", "move")
+	assert_true(c.board.range_cells.size() > 0)
+	c.board.hover = V(1, 1)
+	c.set("_preview_sig", 0)
+	c.call("_update_overlays")
+	assert_true(c.board.path_cells.size() > 0, "the way to the tile under the mouse")
+	c.call("_on_cell_clicked", V(1, 1), "")
+	assert_eq(c.plan[0]["skill"], "move")
+	c.call("_on_ability_pressed", "strike")
+	assert_eq(c.get("_armed"), "strike")
+	c.call("_on_ability_pressed", "strike")
+	assert_eq(c.get("_armed"), "", "the same ability again cancels")
+	c.call("_on_ability_pressed", "strike")
+	var esc := InputEventKey.new()
+	esc.keycode = KEY_ESCAPE
+	esc.pressed = true
+	c.set("_state", "battle")
+	c.call("_unhandled_key_input", esc)
+	assert_eq(c.get("_armed"), "", "Esc cancels")
+	c.free()
+
+
+func test_an_ability_that_needs_no_aim_is_queued_at_once() -> void:
+	var c := _client()
+	c.call("_on_ability_pressed", "defend")
+	assert_eq(c.plan[0]["skill"], "defend")
+	assert_eq(c.get("_armed"), "")
+	c.free()
+
+
+func test_the_reach_stays_shaded_while_the_menu_is_open() -> void:
+	var c := _client()
+	c.call("_on_cell_clicked", V(1, 3), "")
+	assert_true(_menu(c).visible)
+	assert_true(c.board.range_cells.size() > 0, "where you can walk stays on")
+	assert_true(c.board.path_cells.size() > 0, "and the way to the tile you clicked")
+	c.call("_on_menu_closed")
+	c.call("_on_cell_clicked", V(3, 1), "e0")
+	assert_true(c.board.range_cells.size() > 0, "an enemy: your attack's reach")
+	assert_eq(c.board.valid_cells, [V(3, 1)] as Array[Vector2i], "and the target")
+	assert_eq(c.board.selected_unit, "e0", "the clicked unit stays highlighted")
+	c.free()
+
+
+func test_hovering_a_unit_highlights_the_unit_and_a_tile_gets_a_border() -> void:
+	var c := _client()
+	var board := c.board as Board3D
+	var enemy := board._unit_nodes["e0"] as Unit3D
+	board.hover = V(3, 1)
+	board.hover_unit = "e0"
+	board.call("_refresh_overlays")
+	assert_true(enemy.hover_ring.visible, "the unit's ring is on")
+	assert_true(not (board._unit_nodes["pc1"] as Unit3D).hover_ring.visible, "only that unit")
+	assert_eq(board._overlays["hover"].filter(func(m: MeshInstance3D) -> bool: return m.visible).size(), 0, "no tile border while a unit is hovered")
+	board.hover = V(5, 3)
+	board.hover_unit = ""
+	board.call("_refresh_overlays")
+	assert_true(not enemy.hover_ring.visible)
+	assert_eq(board._overlays["hover"].filter(func(m: MeshInstance3D) -> bool: return m.visible).size(), 1, "a tile gets its border")
+	c.free()

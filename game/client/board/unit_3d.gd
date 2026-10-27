@@ -14,6 +14,8 @@ extends Node3D
 ## Where the status badges stand (above the head, centred) and the scene each one is made from (content/board/markers/status_icon.tscn).
 @export var status_row: Node3D
 @export var status_icon_scene: PackedScene
+## A ring on the ground (and a glow on the body) shown while the mouse is over the unit or its menu is open.
+@export var hover_ring: Node3D
 
 @export_group("Look")
 ## Multiplies the Body's own scale: a quick way to make a unit broader, taller or smaller.
@@ -28,6 +30,9 @@ extends Node3D
 @export_range(0.0, 1.0) var inactive_darken: float = 0.4
 ## Distance between neighbouring status badges.
 @export var status_icon_spacing: float = 0.34
+## How strongly the body glows while hovered (0 = no glow, only the ring).
+@export_range(0.0, 2.0) var hover_glow: float = 0.6
+@export var hover_glow_color: Color = Color(1, 0.9, 0.5)
 
 @export_group("Picking")
 @export var pick_height: float = 0.6
@@ -40,6 +45,7 @@ var _fill_material: StandardMaterial3D
 var _last_pos: Vector3
 var _moving_for: float = 0.0
 var _status_sig: int = 0
+var _hovered: bool = false
 var _status_icons: Array[StatusIcon] = []
 
 
@@ -89,6 +95,19 @@ func apply(u: Dictionary, is_you: bool) -> void:
 	_show_statuses(u.get("statuses", []))
 	if downed:
 		_play("downed")
+
+
+## Shows or hides the hover highlight (ring and glow).
+func set_hovered(on: bool) -> void:
+	if on == _hovered:
+		return
+	_hovered = on
+	if hover_ring != null:
+		hover_ring.visible = on
+	if _body_material != null:
+		_body_material.emission_enabled = on and hover_glow > 0.0
+		_body_material.emission = hover_glow_color
+		_body_material.emission_energy_multiplier = hover_glow
 
 
 ## One badge per status, side by side above the head, rebuilt only when the statuses change.
