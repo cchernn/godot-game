@@ -14,8 +14,9 @@ OTHERS = (950, 360)    # first row of "Other parties here" in the Party window
 ASK = (1050, 442)      # Ask to join
 APPROVE = (1130, 347)  # Approve on the first join request (Party window)
 RETURN = (1050, 286)   # Return to battle in the Party window
-ACTIVITY = (200, 171)  # first activity in the Activity window
-START = (218, 275)     # Start the selected activity
+ACTIVITY = (830, 171)  # first activity in the Activity window
+START = (995, 275)     # Start the selected activity
+ATTACK_BTN, SKILLS_BTN = (1090, 93), (1209, 93)   # battle action bar (side panel, top right)
 URL = os.environ.get("URL", "http://localhost:8080")
 STAGE = os.environ.get("STAGE", "party")
 LOGS = []
@@ -136,6 +137,11 @@ def party_flow(b):
     state(host, "battle", 90)                 # (the gather lobby can be over before a screen can see it)
     state(tester, "battle", 90)
     host.shot("05_battle")
+    host.click(*ATTACK_BTN, wait=1)           # the Attack submenu (basic attacks), then the Skills submenu (class skills)
+    host.shot("05a_attack_menu")
+    host.click(*SKILLS_BTN, wait=1)
+    host.shot("05b_skills_menu")
+    host.click(*SKILLS_BTN, wait=1)           # close it again: the Ready button moves while a submenu is open
     tester.page.reload()                      # the tester's tab dies mid-battle...
     time.sleep(float(os.environ.get("WAIT", "18")))
     tester.shot("04_after_reload")

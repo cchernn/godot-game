@@ -19,8 +19,7 @@ docker run --rm --add-host host.docker.internal:host-gateway \
   parties and, with `--clean`, withdraws that account's pending asks and leaves a party it is only a member of (run it for the tester before every run). A battle
   nobody is connected to is cancelled by the game server after its 5-minute grace, so after a failed run wait that long. The click positions of the
   dock and windows are the constants at the top of `run.py`; they move when a window's content changes (a party of two is taller).
-  With `ESCAPE_XY="1112,425;1200,425"` the tester also presses Escape after returning to the battle and watches to the end (the button sits further right while beats
-  resolve, so each press tries both spots). `PROBE=1` stops at the battle screen, to find click positions.
+  With `ESCAPE_XY="1210,132"` (the Retreat button, top right of the side panel; this was 1112,425 / 1200,425 before the action bar grew) the tester also presses Escape after returning to the battle and watches to the end (each press tries every listed spot). `PROBE=1` stops at the battle screen, to find click positions.
 - `STAGE=session`: two browsers sign in with the tester's credentials; the second must be refused ("signed in on another device") and the first must stay signed in. Needs only `TESTER_EMAIL` and `TESTER_PASSWORD`.
 - `STAGE=reset`: the tester opens the world after being away longer than the presence window while in the host's party; the Party window should show a party of one. Set it up by
   putting the tester in the host's party over the API, then wait a minute with nobody signed in.
