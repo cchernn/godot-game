@@ -389,8 +389,7 @@ func _start_battle(room: Room) -> void:
 	var builds: Array = []
 	for rec in members:
 		classes.append(rec.character.get("class", ""))
-		builds.append({"level": int(rec.character.get("level", 1)), "allocated": rec.character.get("allocated", {}),
-			"learned_skills": rec.character.get("learned_skills", []), "flags": rec.character.get("flags", [])})
+		builds.append({"flags": rec.character.get("flags", [])})
 	room.battle = Encounter.build(cfg, skills, members.size(), seed, classes, room.def, builds)
 	room.battle_key = "battle-" + Crypto.new().generate_random_bytes(12).hex_encode()
 	var i := 0
@@ -602,7 +601,6 @@ func _result_for(room: Room, rec: PlayerRec) -> Dictionary:
 	var info := room.result_info.duplicate()
 	var c := room.battle.state.get_c(rec.combatant_id)
 	info["you"] = _fate(c)
-	info["xp"] = _xp_for(room.battle, c) if persistence != null else 0
 	return info
 
 
@@ -617,13 +615,6 @@ func _fate(c: Combatant) -> String:
 	return "survived"
 
 
-## XP for one character: everyone gets the participation share; the victory bonus goes to those still in the fight at the end.
-func _xp_for(battle: Battle, c: Combatant) -> int:
-	var bonus: int = cfg.get_value("rewards", "xp_victory_bonus")
-	var won := battle.outcome == Enums.Outcome.PLAYERS_WIN and c.life_state != Enums.LifeState.ESCAPED
-	return (cfg.get_value("rewards", "xp_participation") as int) + (bonus if won else 0)
-
-
 ## Commits the finished encounter once. Retried with the same idempotency key, so a retry after a
 ## lost response can never apply rewards twice.
 func _commit_results(room: Room, battle: Battle, key: String) -> void:
@@ -632,7 +623,7 @@ func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	var participants: Array = []
 	for rec in _members(room):
 		var c := battle.state.get_c(rec.combatant_id)
-		participants.append({"character_id": rec.character["id"], "outcome": _fate(c), "xp": _xp_for(battle, c),
+		participants.append({"character_id": rec.character["id"], "outcome": _fate(c),
 			"items_used": c.items_used.duplicate(), "items_gained": c.items_gained.duplicate(), "flags_set": c.flags_gained.duplicate()})
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String

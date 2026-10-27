@@ -353,16 +353,16 @@ def test_the_run_takes_the_roster_and_locks_it(client, pool):
     assert (inst["encounter"], inst["max_players"], inst["activity_name"]) == ("prototype", 4, "Clear the cellar")
 
 
-def test_the_roster_carries_each_characters_level_and_allocated_points(client, pool):
+def test_the_roster_carries_each_characters_flags(client, pool):
     w, [t1, t2], _ = party(client, pool)
     pid = my_party(client, w["id"], t1)["id"]
     join_party(client, pid, t1, t2)
     iid = start(client, pid, t1).json()["id"]
     mine = client.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()
-    assert client.put(f"/internal/characters/{mine['id']}/allocation", json={"allocated": {"might": 2}}, headers=SERVER).status_code == 200
+    assert client.post(f"/internal/characters/{mine['id']}/flags", json={"add": ["trained_might"]}, headers=SERVER).status_code == 200
     roster = client.get(f"/internal/instances/{iid}", headers=SERVER).json()["roster"]
-    assert {r["id"]: (r["level"], r["allocated"]) for r in roster}[mine["id"]] == (1, {"might": 2})
-    assert sorted(str(r["allocated"]) for r in roster) == ["{'might': 2}", "{}"]
+    assert {r["id"]: r["flags"] for r in roster}[mine["id"]] == ["trained_might"]
+    assert sorted(str(r["flags"]) for r in roster) == ["['trained_might']", "[]"]
 
 
 def test_asks_pending_at_the_start_are_withdrawn(client, pool):
@@ -625,9 +625,9 @@ def test_deleting_a_world_is_permanent_and_guarded(client, pool):
 
 # ---------- character page: roster, history, retirement, XP reset, party leadership ----------
 
-def result(wid, cid, key, outcome="players_win", xp=100):
+def result(wid, cid, key, outcome="players_win"):
     return {"idempotency_key": key, "world_id": wid, "outcome": outcome, "rounds": 3,
-            "participants": [{"character_id": cid, "outcome": "survived", "xp": xp}]}
+            "participants": [{"character_id": cid, "outcome": "survived"}]}
 
 
 def test_world_characters_show_owners_and_fallen_ones(client):
@@ -650,15 +650,13 @@ def test_world_characters_show_owners_and_fallen_ones(client):
     assert client.get(f"/worlds/{w['id']}/characters", headers=auth(new_user()[0])).status_code == 403
 
 
-def test_battle_history_and_the_xp_reset_rule(client):
+def test_battle_history_keeps_the_latest_five(client):
     w, host, _ = make_world(client)
     c = char(client, w["id"], host)
     for i in range(7):
         assert client.post("/internal/combat-results", json=result(w["id"], c["id"], f"battle-{i}"), headers=SERVER).status_code == 200
-    me = client.get(f"/worlds/{w['id']}/characters/me", headers=auth(host)).json()
-    assert me["xp"] == 0 and me["level"] == 1, "the prototype template resets XP after every battle"
     h = client.get(f"/worlds/{w['id']}/characters/me/battles", headers=auth(host)).json()
-    assert len(h) == 5 and h[0]["xp_awarded"] == 100 and h[0]["result"] == "players_win" and h[0]["outcome"] == "survived"
+    assert len(h) == 5 and h[0]["result"] == "players_win" and h[0]["outcome"] == "survived"
     assert client.get(f"/worlds/{w['id']}/characters/me/battles", headers=auth(new_user()[0])).status_code in (403, 404)
 
 

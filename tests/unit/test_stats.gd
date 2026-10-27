@@ -3,11 +3,11 @@ extends TestCase
 ## The numbers as they were typed into encounter.gd before they became resources.
 ## Attributes and the battle numbers they give with the provisional config (armor is gear-only, so always 0).
 const ORIGINAL := {
-	"warrior": {"name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15, "hp": 40, "power": 3, "acc": 0, "eva": -1, "skills": ["power_strike", "shield_wall"]},
-	"hunter": {"name": "Hunter", "might": 1, "dex": 12, "agi": 12, "vit": 9, "hp": 28, "power": 1, "acc": 2, "eva": 1, "skills": ["aimed_shot", "lob_shot"]},
-	"mage": {"name": "Mage", "might": 1, "dex": 10, "agi": 10, "vit": 10, "hp": 30, "power": 1, "acc": 1, "eva": 0, "skills": ["fireball", "ice_floor"]},
-	"ghoul": {"name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10, "hp": 30, "power": 2, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
-	"cultist": {"name": "Cultist", "might": 1, "dex": 10, "agi": 10, "vit": 5, "hp": 20, "power": 1, "acc": 1, "eva": 0, "skills": ["move", "bolt", "strike"]},
+	"warrior": {"name": "Warrior", "might": 3, "dex": 4, "agi": 3, "vit": 8, "hp": 38, "power": 3, "acc": 0, "eva": -2, "skills": ["power_strike", "shield_wall"]},
+	"hunter": {"name": "Hunter", "might": 2, "dex": 7, "agi": 6, "vit": 4, "hp": 26, "power": 2, "acc": 3, "eva": 1, "skills": ["aimed_shot", "lob_shot"]},
+	"mage": {"name": "Mage", "might": 3, "dex": 6, "agi": 4, "vit": 3, "hp": 23, "power": 3, "acc": 2, "eva": -1, "skills": ["fireball", "ice_floor"]},
+	"ghoul": {"name": "Ghoul", "might": 2, "dex": 4, "agi": 4, "vit": 5, "hp": 29, "power": 2, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
+	"cultist": {"name": "Cultist", "might": 1, "dex": 6, "agi": 5, "vit": 2, "hp": 20, "power": 1, "acc": 2, "eva": 0, "skills": ["move", "bolt", "strike"]},
 }
 
 
@@ -103,7 +103,7 @@ func test_class_ids_match_the_account_screen_and_every_unit_has_a_look() -> void
 func test_editing_a_template_changes_the_battle() -> void:
 	var def := Encounter.definition().duplicate() as EncounterDef
 	var tough := def.classes[0].duplicate() as UnitTemplate
-	tough.vitality = 45
+	tough.vitality = 9
 	tough.might = 7
 	var few: Array[SkillDef] = [_skill("move"), _skill("strike")]
 	tough.skills = few
@@ -112,13 +112,13 @@ func test_editing_a_template_changes_the_battle() -> void:
 	def.classes = swapped
 	var b := Encounter.build(GameConfig.load_file(), SkillDb.load_file(), 2, 1, [], def)
 	var c := b.state.get_c("pc0")
-	assert_eq(c.max_hp, 100)
-	assert_eq(c.hp, 100)
+	assert_eq(c.max_hp, 41)
+	assert_eq(c.hp, 41)
 	assert_eq(c.power, 7)
 	assert_eq(c.skills, ["move", "strike", "defend"] as Array[String], "the basics are added to the seat's own skills, once")
-	assert_eq(b.state.get_c("pc1").max_hp, 28, "other seats are untouched")
+	assert_eq(b.state.get_c("pc1").max_hp, 26, "other seats are untouched")
 	var original := Encounter.build(GameConfig.load_file(), SkillDb.load_file(), 1, 1)
-	assert_eq(original.state.get_c("pc0").max_hp, 40, "the shared resource itself was not changed")
+	assert_eq(original.state.get_c("pc0").max_hp, 38, "the shared resource itself was not changed")
 
 
 func test_a_character_class_picks_its_template_and_unknown_ones_fall_back_to_the_seat() -> void:

@@ -1,6 +1,6 @@
 class_name AttributeCondition
 extends UnlockCondition
-## Met once the character's attribute (class base + growth + allocated points; not statuses or items) is at least this value.
+## Met once the character's attribute (class base + earned grants; not statuses or items) is at least this value.
 
 @export_enum("might", "dexterity", "agility", "vitality") var attribute: String = "might"
 @export_range(1, 99) var min_value: int = 10

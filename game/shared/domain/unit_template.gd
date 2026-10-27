@@ -22,24 +22,17 @@ extends Resource
 ## Sets tiles moved per AP (config "movement") and subtracts from the enemy's chance to hit.
 @export_range(1, 99) var agility: int = 8
 
-@export_group("Progression")
-## Attributes gained per level above 1. Only used when config "progression.enabled" is true. Leave empty for none.
-@export var growth: Attributes
-## What one allocated point is worth, per attribute. An attribute at 0 here cannot take points.
-@export var point_value: Attributes
-## Points a character earns at each level above 1.
-@export_range(0, 20) var stat_points_per_level: int = 0
-## The most points a character can put in one attribute. 0 = no limit.
-@export_range(0, 99) var max_points_per_stat: int = 0
+@export_group("Growth")
+## Permanent attribute gains the character earns by holding an event flag (set by an activity, an item or a story event). The attributes
+## never go past the cap in config "stats.attribute_cap". There are no levels or experience.
+@export var attribute_grants: Array[AttributeGrant] = []
 
 @export_group("Skills")
 ## The skills this unit starts with. Pick skill resources from game/content/skills (move, strike, power_strike, bolt,
 ## disrupt, revive, or your own). A skill must also be listed in skills/skill_set.tres.
 @export var skills: Array[SkillDef] = []
-## Skills gained later, and what it takes (level, attribute, event). Only used when config "progression.enabled" is true.
+## Skills gained later, and what it takes (an attribute reaching a value, or an event flag).
 @export var unlocks: Array[SkillUnlock] = []
-## Skill picks earned at each level above 1 (spent on unlocks whose mode is Pick).
-@export_range(0, 20) var skill_picks_per_level: int = 0
 
 
 ## What is wrong with this template, if anything (empty = fine). `known` is the SkillDb.
@@ -51,11 +44,11 @@ func problems(known: SkillDb) -> Array[String]:
 		out.append("%s: display_name is empty" % id)
 	if vitality < 1 or dexterity < 1 or agility < 1:
 		out.append("%s: vitality, dexterity and agility must be at least 1" % id)
-	for part: Attributes in [growth, point_value]:
-		if part != null and (part.might < 0 or part.dexterity < 0 or part.agility < 0 or part.vitality < 0):
-			out.append("%s: growth and point values cannot be negative" % id)
-	if stat_points_per_level > 0 and (point_value == null or point_value.is_zero()):
-		out.append("%s: earns stat points but no attribute has a point value" % id)
+	for g in attribute_grants:
+		if g == null:
+			out.append("%s: an attribute grant slot is empty" % id)
+		else:
+			out.append_array(g.problems(id))
 	if skills.is_empty() and known.basic_ids.is_empty():
 		out.append("%s: has no skills" % id)
 	for sk in skills:
@@ -73,8 +66,6 @@ func problems(known: SkillDb) -> Array[String]:
 			if unlocked.has(u.skill.id) or u.skill in skills:
 				out.append("%s: skill '%s' is listed twice (starting skills and unlocks)" % [id, u.skill.id])
 			unlocked[u.skill.id] = true
-	if skill_picks_per_level > 0 and not unlocks.any(func(u: SkillUnlock) -> bool: return u != null and u.mode == SkillUnlock.Mode.PICK):
-		out.append("%s: earns skill picks but has no Pick unlock" % id)
 	return out
 
 
@@ -87,12 +78,12 @@ func base_attributes() -> Attributes:
 	return a
 
 
-## `build` is CharacterBuild.compose(...) for this template (leave empty for the plain class at level 1).
+## `build` is CharacterBuild.compose(...) for this template (leave empty for the plain class with nothing earned).
 ## `basics` = the basic action ids to give first (player seats pass SkillDb.basic_ids; enemies pass none).
 func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i, cfg: GameConfig,
 		build: Dictionary = {}, basics: Array[String] = []) -> Combatant:
 	if build.is_empty():
-		build = CharacterBuild.compose(self, 1, {}, cfg)
+		build = CharacterBuild.compose(self, cfg)
 	var st: Dictionary = build["stats"]
 	var c := Combatant.new()
 	c.id = combatant_id

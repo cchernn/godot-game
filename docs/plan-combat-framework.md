@@ -23,8 +23,7 @@ in the Godot editor. Every number below is PROVISIONAL, lives in data (`.tres` o
   as a small shield (Phase 1); what it finally does is decided in the content discussion after the phases.
 - **Statuses count turns (rounds), not beats**, and apply across the whole turn. **Stun is a status** (by turn), not an interruption. **Interrupt belongs to skills**
   (interruption points against a skill's stability), independent of statuses.
-- **Progression** (Phase 5): level-ups will give stat points and skill picks; skills also unlock at attribute thresholds and through events. For now everything is
-  static (level-ups switched off); the data model and the one resolver function exist so it can be expanded without rework.
+- **Progression** (Phase 5, revised in 5c): there is no XP and there are no levels. A player attribute runs 0-10 and grows only through Attribute Grants (event flags earned in activities, from items or in the story); skills unlock from an event flag or an attribute value.
 
 ## Cross-cutting rules for every phase
 
@@ -154,6 +153,13 @@ Rules:
 - API: the session payload includes `level`, `allocated`, `learned_skills`, `flags`; an internal, server-key endpoint sets event flags (the hook for events). No player-facing picking or allocation endpoints in this plan.
 
 Tests: `compose` with synthetic states (growth, thresholds, events, picks), unknown skill ids rejected by `problems()`, the disabled path equals today, API payload and flag endpoint.
+
+## Phase 5c: no XP, capped attributes, flag-driven growth (implemented)
+
+Replaces the level, XP, free-point and skill-pick design of 5a/5b. Attributes run 0-10 for a player (`stats.attribute_cap`); the rules in `balance.json` were rescaled to that range (HP 14 + 3 per Vitality, AP thresholds at Dexterity 6 and 10, tiles per AP at Agility 6 and 10, accuracy and evasion 1 per point over 4 and 5). Gear and statuses add on top of the cap later.
+`UnitTemplate.attribute_grants: Array[AttributeGrant]` (a flag and a bonus) is the only growth: a character holding the flag gets the bonus, never past the cap; `unlocks` (attribute or event conditions) are the only skill gain.
+`CharacterBuild.compose(template, cfg, flags)`. Removed: levels, XP awards and the result screen's XP line, `growth`, `point_value`, `stat_points_per_level`, `skill_picks_per_level`, the Pick unlock mode, `LevelCondition`, the allocation and learned-skills endpoints.
+The columns `characters.level`, `xp`, `allocated`, `learned_skills` and `combat_result_participants.xp_awarded` stay in the database, unused. Not built yet: how activities and items set the flags (activity rewards), and the real grants and unlocks for each class.
 
 ## Phase 6: context actions (implemented, mechanism only)
 

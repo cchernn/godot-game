@@ -13,7 +13,6 @@ const RESULT_TEXT := {"players_win": "Victory", "players_lose": "Defeat", "draw"
 
 @onready var _world: Label = %WorldLabel
 @onready var _character: Label = %CharacterLabel
-@onready var _xp: Label = %XpLabel
 @onready var _stats: Label = %StatsLabel
 @onready var _skills: ItemList = %SkillsList
 @onready var _confirm: LineEdit = %RetireConfirmEdit
@@ -38,7 +37,6 @@ func _ready() -> void:
 func show_checking(world_name: String) -> void:
 	_world.text = "World: %s" % world_name
 	_character.text = "Loading your character…"
-	_xp.text = ""
 	_stats.text = ""
 	_skills.clear()
 	_battles.clear()
@@ -51,8 +49,7 @@ func show_checking(world_name: String) -> void:
 
 func show_character(c: Dictionary) -> void:
 	_name = str(c["name"])
-	_character.text = "%s\nLevel %d %s" % [c["name"], c["level"], str(c["class"]).capitalize()]
-	_xp.text = "%d XP" % c["xp"]
+	_character.text = "%s\n%s" % [c["name"], str(c["class"]).capitalize()]
 	_confirm.text = ""
 	_sync_retire()
 	_skills.clear()
@@ -62,20 +59,13 @@ func show_character(c: Dictionary) -> void:
 	if t == null:
 		return
 	var cfg := GameConfig.load_file()
-	var allocated: Variant = c.get("allocated", {})
-	var learned: Variant = c.get("learned_skills", [])
 	var flags: Variant = c.get("flags", [])
-	var build := CharacterBuild.compose(t, int(c.get("level", 1)), allocated as Dictionary if allocated is Dictionary else {}, cfg,
-		learned as Array if learned is Array else [], flags as Array if flags is Array else [])
+	var build := CharacterBuild.compose(t, cfg, flags as Array if flags is Array else [])
 	var at: Dictionary = build["attributes"]
 	var st: Dictionary = build["stats"]
 	_stats.text = "Might %d   Dexterity %d   Agility %d   Vitality %d\nHP %d   Damage +%d   Accuracy %d   Evasion %d   AP %d" \
 		% [at["might"], at["dexterity"], at["agility"], at["vitality"], st["max_hp"], st["power"], st["accuracy"], st["evasion"],
 		cfg.ap_capacity(st["dexterity"])]
-	if int(build["points_left"]) > 0:
-		_stats.text += "\n%d points to spend" % build["points_left"]
-	if int(build["picks_left"]) > 0 and not (build["pickable"] as Array).is_empty():
-		_stats.text += "\n%d skill picks to spend" % build["picks_left"]
 	var db := SkillDb.load_file()
 	for sid: String in build["skills"]:
 		var sk := db.get_skill(sid)
@@ -88,8 +78,7 @@ func show_battles(battles: Array) -> void:
 	_battles.clear()
 	_battles_label.text = "Recent battles" if not battles.is_empty() else "No battles yet."
 	for b: Dictionary in battles:
-		_battles.add_item("%s  %s - %s, +%d XP" % [str(b["created_at"]).left(10), RESULT_TEXT.get(b["result"], b["result"]),
-			b["outcome"], b["xp_awarded"]])
+		_battles.add_item("%s  %s - %s" % [str(b["created_at"]).left(10), RESULT_TEXT.get(b["result"], b["result"]), b["outcome"]])
 
 
 ## rows: the API's /characters list. Active ones and fallen (retired) ones go in separate lists, each with its owner.
@@ -107,7 +96,6 @@ func show_world_characters(rows: Array) -> void:
 ## When the character could not be loaded (the reason goes to the flow's status line).
 func show_unavailable() -> void:
 	_character.text = ""
-	_xp.text = ""
 
 
 func _sync_retire() -> void:

@@ -34,7 +34,7 @@ All in `game/shared/config/balance.json` (AP thresholds, movement bonus, beats p
 - **Escape:** any player character (alive or downed) can leave the fight with `c_escape` (the Escape button asks twice). It always succeeds for now (PROVISIONAL, no chance
   and no cost). While planning it takes effect at once; during resolution it takes effect before the next beat. The escaped character leaves the board, is not waited for, and
   watches until the battle ends. When no player character is left standing and at least one escaped, the outcome is `escaped` (the run is cancelled, as for a defeat); otherwise the usual
-  win/lose rules apply, and an escaped character gets the participation XP but not the victory bonus.
+  win/lose rules apply,.
 - **Disconnects:** committed plans stand; a not-Ready player gets their current valid queue at the timeout. With nobody connected, timers freeze and the 5‑minute monotonic grace period runs; after it the party's battle is abandoned and the API cancels the party.
 - **Identity:** guests are accepted only when the server runs with `--env=local --allow-guests` (default env is `production`); reconnect uses a server-issued secret token, never a client-chosen id. Supabase auth replaces this in Phase 5.
 
@@ -48,7 +48,7 @@ All in `game/shared/config/balance.json` (AP thresholds, movement bonus, beats p
 - **Local Postgres:** tests and the e2e script use `pgserver` (an embedded Postgres 16 wheel), so no Docker or system Postgres is needed. For a persistent dev DB point `GAME_API_DATABASE_URL` at any Postgres; migrations run on API startup. Moving to Supabase = a different connection string (plus an optional FK to `auth.users`).
 - **Auth:** `app/auth.py` accepts HS256 (legacy shared secret) or asymmetric (JWKS) Supabase tokens; the algorithm family comes from server config, never from the token header. `aud`/`exp`/`sub` required. Guest tokens are rejected unless `environment=local` and guests are enabled. **Verify against the real Supabase project's signing-key setting before Phase 7.**
 - **Boundary:** the Godot server holds only a service key (`GAME_API_SERVER_KEY` env var). It forwards the client's token to `POST /internal/auth/session` (identity + world membership + active character) and commits results via `POST /internal/combat-results`. Gameplay code sees only `Persistence` (`game/server/persistence.gd`); `HttpPersistence` is the HTTP implementation.
-- **Results:** XP rewards are decided by the Godot server (provisional values in `balance.json`); the API records them atomically with the result row, idempotent per `idempotency_key` (same payload → returns stored result; different payload → 409; any failure rolls everything back).
+- **Results:** the API records the outcome, the items used and gained, and the flags set, atomically with the result row, idempotent per `idempotency_key` (same payload → returns stored result; different payload → 409; any failure rolls everything back).
 - **Not yet built:** world membership approval flow (members are inserted directly in tests/e2e), sign-in UI in the client (use `--token=` for now), shared-world revision bumps (nothing in Phase 5 changes shared world state), retirement blocking during travel/activities.
 
 Checks: `uv run --project services/api pytest` (16 API tests, real Postgres), `uv run --project services/api python scripts/e2e_persistence.py` (API + Godot server + 3 bots + a bad-token bot).
@@ -99,7 +99,7 @@ party playing one activity; the battle server runs it, and when it ends the part
 - **Reconnecting:** a party's seat belongs to the character, so a closed tab can return from the Party window (**Return to battle**) while the party is active. If the
   server restarted and lost the room, the next arrival builds a fresh room and battle for the same roster. If nobody comes back within the grace period the
   server cancels the party.
-- **The end:** the server sends `s_result` ({outcome, rounds, xp, you, saved}) at once (saved=false) and again after the API stored the result (saved=true), and
+- **The end:** the server sends `s_result` ({outcome, rounds, you, saved}) at once (saved=false) and again after the API stored the result (saved=true), and
   completes the instance on victory (applying world changes) or cancels it otherwise. Players press Continue (disconnecting); when the last one leaves, the room
   is dropped. A player who reconnects to the result screen is sent the result again. After `RESULT_HOLD_MS` (120 s) any stragglers are removed.
 - **Activities say what to run:** each activity in the world template names an `encounter` (a file in `game/content/encounters`) and a `max_players`.
@@ -131,8 +131,7 @@ hovering one says so, and events about an unseen enemy are tinted purple in the 
 - The Character page (`character_screen.tscn`, tabs: Overview, Battles, Characters) reads stats and skills from the class resource in
   `game/content/stats/classes`, so editing the resource changes the page. Retiring needs the character's name typed and is refused (409) while the
   character is in a running activity; retiring takes them out of their party; the retired character stays in the world's "Fallen" list and the player can create a new one.
-- Levels do not move yet (all level 1). The prototype template sets the world rule `reset_xp_after_battle` (PROVISIONAL, testing aid): the award is
-  recorded in the battle history, then the character's XP goes back to 0. Remove the rule from the template to keep XP.
+- There is no XP and there are no levels: nothing about a battle changes a character except the items it used or picked up and the event flags it earned (`flags_set`).
 - A party leader can hand the party to another member while it is idle (`POST /parties/{id}/leader`).
 
 ## Worlds and rooms

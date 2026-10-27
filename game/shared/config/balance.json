@@ -4,16 +4,16 @@
     "base_capacity": 3,
     "max_capacity": 5,
     "dexterity_thresholds": [
-      10,
-      16
+      6,
+      10
     ]
   },
   "movement": {
     "tiles_per_ap": 1,
     "max_agility_bonus": 2,
     "agility_bonus_thresholds": [
-      12,
-      18
+      6,
+      10
     ],
     "difficult_terrain_surcharge": 1
   },
@@ -48,27 +48,18 @@
     "gather_seconds": 30
   },
   "stats": {
-    "_note": "PROVISIONAL: how the four attributes (might, dexterity, agility, vitality) become battle numbers. Armor comes from gear only (later), so it is not here.",
-    "hp_base": 10,
-    "hp_per_vitality": 2,
+    "_note": "PROVISIONAL: how the four attributes (might, dexterity, agility, vitality) become battle numbers. Attributes run 0-10 for a player character (class base plus what it has earned; gear and statuses go on top). Armor comes from gear only (later), so it is not here.",
+    "attribute_cap": 10,
+    "hp_base": 14,
+    "hp_per_vitality": 3,
     "power_per_might": 1,
-    "accuracy_baseline": 8,
-    "accuracy_per_dexterity": 0.5,
-    "evasion_baseline": 10,
-    "evasion_per_agility": 0.5
-  },
-  "progression": {
-    "_note": "PROVISIONAL and switched OFF: while disabled every character fights at level 1 with its class attributes. xp_to_level[i] = total XP to reach level i+2.",
-    "enabled": false,
-    "xp_to_level": [100, 250, 450, 700, 1000]
+    "accuracy_baseline": 4,
+    "accuracy_per_dexterity": 1.0,
+    "evasion_baseline": 5,
+    "evasion_per_agility": 1.0
   },
   "items": {
     "_note": "PROVISIONAL: how many different kinds of item a character brings into a battle.",
     "battle_slots": 4
-  },
-  "rewards": {
-    "_note": "PROVISIONAL XP: participation plus a victory bonus.",
-    "xp_participation": 20,
-    "xp_victory_bonus": 80
   }
 }

@@ -52,7 +52,7 @@ func _ready() -> void:
 		print("[%s] welcomed #%d as %s" % [nm, _welcomes, i["combatant_id"]]))
 	net.notice.connect(func(t: String) -> void: print("[%s] notice: %s" % [nm, t]))
 	net.lobby.connect(func(i: Dictionary) -> void: print("[%s] lobby: %s (need %d)" % [nm, str(i["players"]), i["needed"]]))
-	net.result.connect(func(i: Dictionary) -> void: print("[bot] RESULT %s xp=%d you=%s saved=%s" % [i["outcome"], i["xp"], i["you"], str(i["saved"])]))
+	net.result.connect(func(i: Dictionary) -> void: print("[bot] RESULT %s you=%s saved=%s" % [i["outcome"], i["you"], str(i["saved"])]))
 	net.rejected.connect(func(t: String) -> void:
 		print("[%s] rejected: %s" % [nm, t])
 		if t.begins_with("Sign-in failed") or t.begins_with("Create a character") or t.begins_with("Guest access") \

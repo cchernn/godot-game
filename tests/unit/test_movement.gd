@@ -57,7 +57,7 @@ func test_both_winners_possible_across_seeds() -> void:
 
 
 func test_agility_moves_multiple_tiles_per_ap() -> void:
-	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1), {"agi": 12}), Fx.enemy("e", V(7, 3))])
+	var b := Fx.battle(Fx.OPEN, [Fx.player("a", V(0, 1), {"agi": 6}), Fx.enemy("e", V(7, 3))])
 	Fx.plan(b, "a", [Fx.move([V(1, 1), V(2, 1)])])
 	b.begin_resolution()
 	Fx.run_beats(b, 1)

@@ -133,26 +133,6 @@ class Repository(PartyMixin, WorldMixin):
                 "returning quantity", (character_id, item_id, min(quantity, max_stack), max_stack)).fetchone()
         return {"character_id": str(character_id), "item_id": item_id, "quantity": row["quantity"]}
 
-    def set_allocation(self, character_id: uuid.UUID, allocated: dict[str, int]) -> dict:
-        """Dev/admin: replaces the points a character has put into its attributes. Only the shape is checked here (the API has
-        no class content); the game server trims it to the class's budget when it builds a battle."""
-        with self.pool.connection() as conn:
-            row = conn.execute("update characters set allocated=%s where id=%s and status='active' returning id, allocated",
-                               (Jsonb(allocated), character_id)).fetchone()
-            if row is None:
-                raise NotFound("Character not found")
-        return {"character_id": str(row["id"]), "allocated": row["allocated"]}
-
-    def set_learned_skills(self, character_id: uuid.UUID, learned: list[str]) -> dict:
-        """Dev/admin: replaces the skills a character picked. Only the shape is checked; the game server keeps the ones the
-        class's unlock rules and skill picks allow."""
-        with self.pool.connection() as conn:
-            row = conn.execute("update characters set learned_skills=%s where id=%s and status='active' returning id, learned_skills",
-                               (Jsonb(learned), character_id)).fetchone()
-            if row is None:
-                raise NotFound("Character not found")
-        return {"character_id": str(row["id"]), "learned_skills": row["learned_skills"]}
-
     def change_flags(self, character_id: uuid.UUID, add: list[str], remove: list[str]) -> dict:
         """Dev/admin (later: the game, on story events): sets and clears event flags on a character. Idempotent."""
         with self.pool.connection() as conn:
@@ -195,7 +175,7 @@ class Repository(PartyMixin, WorldMixin):
             raise Forbidden("Not a member of this world")
         with self.pool.connection() as conn:
             rows = conn.execute(
-                "select c.id, c.user_id, c.name, c.class, c.level, c.status, c.retired_at, m.role, "
+                "select c.id, c.user_id, c.name, c.class, c.status, c.retired_at, m.role, "
                 "  (select r.requester_label from world_join_requests r where r.world_id = c.world_id and r.user_id = c.user_id "
                 "     and r.requester_label is not null order by r.created_at desc limit 1) as label, "
                 "  (select p.display_name from profiles p where p.user_id = c.user_id) as display_name "
@@ -205,7 +185,7 @@ class Repository(PartyMixin, WorldMixin):
         for r in rows:
             owner = r["display_name"] or (r["label"].split("@")[0] if r["label"] else
                                           "Host" if r["role"] == "host" else "Player %s" % str(r["user_id"])[:8])
-            out.append({"id": str(r["id"]), "name": r["name"], "class": r["class"], "level": r["level"],
+            out.append({"id": str(r["id"]), "name": r["name"], "class": r["class"],
                         "status": r["status"], "owner": owner, "mine": r["user_id"] == user_id})
         return out
 
@@ -216,7 +196,7 @@ class Repository(PartyMixin, WorldMixin):
             raise NotFound("No active character")
         with self.pool.connection() as conn:
             rows = conn.execute(
-                "select r.created_at, r.outcome as result, r.rounds, p.outcome, p.xp_awarded "
+                "select r.created_at, r.outcome as result, r.rounds, p.outcome "
                 "from combat_result_participants p join combat_results r on r.id = p.result_id "
                 "where p.character_id = %s order by r.created_at desc limit %s", (c["id"], limit)).fetchall()
         return [_row(r) for r in rows]
@@ -225,10 +205,10 @@ class Repository(PartyMixin, WorldMixin):
 
     def commit_combat_result(self, key: str, world_id: uuid.UUID, outcome: str, rounds: int,
                              participants: list[dict]) -> tuple[dict, bool]:
-        """Atomically records a finished encounter and applies XP. Idempotent per key: replaying the same
+        """Atomically records a finished encounter and what it earned (items, flags). Idempotent per key: replaying the same
         payload returns the stored result; reusing a key for a different payload is a conflict."""
         canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds,
-                                "p": sorted((str(p["character_id"]), p["outcome"], p["xp"],
+                                "p": sorted((str(p["character_id"]), p["outcome"],
                                              sorted((p.get("items_used") or {}).items()),
                                              sorted((p.get("items_gained") or {}).items()), sorted(set(p.get("flags_set") or [])))
                                             for p in participants)})
@@ -236,7 +216,6 @@ class Repository(PartyMixin, WorldMixin):
         ids = [p["character_id"] for p in participants]
         if len(set(ids)) != len(ids):
             raise Invalid("Duplicate participant")
-        reset_xp = self.definition(world_id).rules.get("reset_xp_after_battle", False)
         with self.pool.connection() as conn:
             res = conn.execute(
                 "insert into combat_results (idempotency_key, payload_hash, world_id, outcome, rounds) "
@@ -249,8 +228,8 @@ class Repository(PartyMixin, WorldMixin):
                 return _row(existing), True
             for p in participants:
                 ok = conn.execute(
-                    "update characters set xp = xp + %s where id=%s and world_id=%s and status='active' returning id, flags",
-                    (p["xp"], p["character_id"], world_id)).fetchone()
+                    "select id, flags from characters where id=%s and world_id=%s and status='active' for update",
+                    (p["character_id"], world_id)).fetchone()
                 if ok is None:  # rolls the whole transaction back: no partial outcomes
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
                 gained = {k: v for k, v in (p.get("items_gained") or {}).items() if v > 0}
@@ -270,8 +249,6 @@ class Repository(PartyMixin, WorldMixin):
                         raise Invalid("%s used more %s than it carries" % (p["character_id"], item_id))
                     if left["quantity"] == 0:
                         conn.execute("delete from character_items where character_id=%s and item_id=%s", (p["character_id"], item_id))
-                conn.execute("insert into combat_result_participants (result_id, character_id, outcome, xp_awarded, items_used) "
-                             "values (%s,%s,%s,%s,%s)", (res["id"], p["character_id"], p["outcome"], p["xp"], Jsonb(used)))
-                if reset_xp:  # testing aid: the award stays in the history, the character starts the next battle at 0
-                    conn.execute("update characters set xp = 0 where id=%s", (p["character_id"],))
+                conn.execute("insert into combat_result_participants (result_id, character_id, outcome, items_used) "
+                             "values (%s,%s,%s,%s)", (res["id"], p["character_id"], p["outcome"], Jsonb(used)))
         return _row(res), False

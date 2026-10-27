@@ -10,8 +10,8 @@
 script = ExtResource("1_rhuw4")
 id = "mage"
 display_name = "Mage"
-vitality = 10
-might = 1
-dexterity = 10
-agility = 10
+vitality = 3
+might = 3
+dexterity = 6
+agility = 4
 skills = Array[ExtResource("skilldef")]([ExtResource("s_fireball"), ExtResource("s_ice_floor")])

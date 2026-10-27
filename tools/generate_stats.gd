@@ -6,17 +6,17 @@ extends SceneTree
 
 const ROOT := "res://game/content/"
 const CLASSES := [
-	{"id": "warrior", "name": "Warrior", "might": 3, "dex": 8, "agi": 8, "vit": 15,
+	{"id": "warrior", "name": "Warrior", "might": 3, "dex": 4, "agi": 3, "vit": 8,
 		"skills": ["power_strike", "shield_wall"]},
-	{"id": "hunter", "name": "Hunter", "might": 1, "dex": 12, "agi": 12, "vit": 9,
+	{"id": "hunter", "name": "Hunter", "might": 2, "dex": 7, "agi": 6, "vit": 4,
 		"skills": ["aimed_shot", "lob_shot"]},
-	{"id": "mage", "name": "Mage", "might": 1, "dex": 10, "agi": 10, "vit": 10,
+	{"id": "mage", "name": "Mage", "might": 3, "dex": 6, "agi": 4, "vit": 3,
 		"skills": ["fireball", "ice_floor"]},
 ]
 const ENEMIES := [
-	{"id": "ghoul", "name": "Ghoul", "might": 2, "dex": 8, "agi": 8, "vit": 10,
+	{"id": "ghoul", "name": "Ghoul", "might": 2, "dex": 4, "agi": 4, "vit": 5,
 		"skills": ["move", "strike", "power_strike"]},
-	{"id": "cultist", "name": "Cultist", "might": 1, "dex": 10, "agi": 10, "vit": 5,
+	{"id": "cultist", "name": "Cultist", "might": 1, "dex": 6, "agi": 5, "vit": 2,
 		"skills": ["move", "bolt", "strike"]},
 ]
 ## Who stands on E0, E1, E2 (the same enemy can appear several times).

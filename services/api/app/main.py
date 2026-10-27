@@ -74,7 +74,6 @@ class ProfileIn(BaseModel):
 class ParticipantIn(BaseModel):
     character_id: uuid.UUID
     outcome: Literal["survived", "downed", "eliminated", "escaped"]
-    xp: int = Field(ge=0, le=100_000)
     items_used: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)
     items_gained: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)  # from map objects
     flags_set: list[Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]] = Field(default_factory=list, max_length=32)
@@ -86,27 +85,7 @@ class GrantItemIn(BaseModel):
     max_stack: int = Field(default=99, ge=1, le=99)  # the item's own limit, from game/content/items
 
 
-ATTRIBUTES = ("might", "dexterity", "agility", "vitality")
-
-
-class AllocationIn(BaseModel):
-    allocated: dict[str, int]
-
-    @field_validator("allocated")
-    @classmethod
-    def only_attributes(cls, v: dict[str, int]) -> dict[str, int]:
-        if any(k not in ATTRIBUTES for k in v):
-            raise ValueError(f"keys must be among {', '.join(ATTRIBUTES)}")
-        if any(n < 0 or n > 99 for n in v.values()):
-            raise ValueError("points must be between 0 and 99")
-        return {k: n for k, n in v.items() if n > 0}
-
-
 NAME = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
-
-
-class LearnedSkillsIn(BaseModel):
-    learned: list[Annotated[str, NAME]] = Field(max_length=64)
 
 
 class FlagsIn(BaseModel):
@@ -289,16 +268,6 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def grant_items(character_id: uuid.UUID, body: GrantItemIn, r: Repository = Depends(repo)) -> dict:
         """Dev/admin: gives a character copies of an item (see scripts/grant_item.sh). There are no shops or loot yet."""
         return r.grant_items(character_id, body.item_id, body.quantity, body.max_stack)
-
-    @app.put("/internal/characters/{character_id}/allocation", dependencies=[Depends(server_only)])
-    def set_allocation(character_id: uuid.UUID, body: AllocationIn, r: Repository = Depends(repo)) -> dict:
-        """Dev/admin: sets the points a character has put into its attributes. Players cannot allocate yet."""
-        return r.set_allocation(character_id, body.allocated)
-
-    @app.put("/internal/characters/{character_id}/learned-skills", dependencies=[Depends(server_only)])
-    def set_learned_skills(character_id: uuid.UUID, body: LearnedSkillsIn, r: Repository = Depends(repo)) -> dict:
-        """Dev/admin: sets the skills a character picked. Players cannot pick yet."""
-        return r.set_learned_skills(character_id, list(dict.fromkeys(body.learned)))
 
     @app.post("/internal/characters/{character_id}/flags", dependencies=[Depends(server_only)])
     def change_flags(character_id: uuid.UUID, body: FlagsIn, r: Repository = Depends(repo)) -> dict:

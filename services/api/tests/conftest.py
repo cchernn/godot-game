@@ -56,17 +56,6 @@ def client(pool, settings):
     return TestClient(create_app(settings, pool))
 
 
-@pytest.fixture()
-def keep_xp_client(pool, tmp_path):
-    """Like `client`, but the world keeps the XP it awards (the prototype template resets it after every battle)."""
-    import json
-    from app.templates import DEFAULT_DIR
-    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
-    d["rules"]["reset_xp_after_battle"] = False
-    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
-    return TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
-
-
 def token_for(user_id=None, secret=SECRET, **claims) -> tuple[str, str]:
     uid = str(user_id or uuid.uuid4())
     now = int(time.time())

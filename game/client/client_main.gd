@@ -310,8 +310,6 @@ func _on_result(info: Dictionary) -> void:
 	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED"}
 	result_title.text = titles.get(info["outcome"], "BATTLE OVER")
 	var lines: Array[String] = ["Round %d" % info["rounds"]]
-	if info["xp"] > 0:
-		lines.append("+%d XP%s" % [info["xp"], "" if info["saved"] else " (saving…)"])
 	if info["you"] == "escaped":
 		lines.append("You escaped.")
 	elif info["you"] != "survived":

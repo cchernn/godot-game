@@ -10,8 +10,8 @@
 script = ExtResource("1_quv02")
 id = "ghoul"
 display_name = "Ghoul"
-vitality = 10
+vitality = 5
 might = 2
-dexterity = 8
-agility = 8
+dexterity = 4
+agility = 4
 skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_strike"), ExtResource("s_power_strike")])

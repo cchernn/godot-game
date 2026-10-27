@@ -85,51 +85,22 @@ def test_a_result_with_no_items_used_still_works(client):
     assert client.post("/internal/combat-results", json=result_body(w["id"], [char["id"]]), headers=SERVER).status_code == 200
 
 
-def allocate(client, char_id, allocated):
-    return client.put(f"/internal/characters/{char_id}/allocation", json={"allocated": allocated}, headers=SERVER)
-
-
-def test_a_character_starts_with_no_points_and_the_service_key_sets_them(client):
+def test_flags_are_set_with_the_service_key_and_carried(client):
     w, tok, char = one_character(client)
     me = lambda: client.get(f"/worlds/{w['id']}/characters/me", headers=auth(tok)).json()
-    assert me()["allocated"] == {} and me()["level"] == 1
-    r = allocate(client, char["id"], {"might": 2, "agility": 1, "vitality": 0})
-    assert r.status_code == 200 and r.json()["allocated"] == {"might": 2, "agility": 1}, "zeros are dropped"
-    assert me()["allocated"] == {"might": 2, "agility": 1}
-    assert allocate(client, char["id"], {}).json()["allocated"] == {}
-
-
-def test_allocation_is_checked_for_shape_key_and_a_real_character(client):
-    w, tok, char = one_character(client)
-    assert client.put(f"/internal/characters/{char['id']}/allocation", json={"allocated": {"might": 1}}, headers=auth(tok)).status_code == 401
-    assert allocate(client, uuid.uuid4(), {"might": 1}).status_code == 404
-    for bad in ({"luck": 1}, {"might": -1}, {"might": 100}, {"might": "x"}):
-        assert allocate(client, char["id"], bad).status_code == 422, bad
-
-
-
-def test_learned_skills_and_flags_are_set_with_the_service_key_and_carried(client):
-    w, tok, char = one_character(client)
-    me = lambda: client.get(f"/worlds/{w['id']}/characters/me", headers=auth(tok)).json()
-    assert me()["learned_skills"] == [] and me()["flags"] == []
-    put = lambda body: client.put(f"/internal/characters/{char['id']}/learned-skills", json=body, headers=SERVER)
-    assert put({"learned": ["bolt", "bolt", "heal_2"]}).json()["learned_skills"] == ["bolt", "heal_2"], "duplicates dropped"
+    assert me()["flags"] == []
     flag = lambda body: client.post(f"/internal/characters/{char['id']}/flags", json=body, headers=SERVER)
     assert flag({"add": ["met_hermit", "met_hermit"]}).json()["flags"] == ["met_hermit"]
     assert flag({"add": ["slain_ghoul"]}).json()["flags"] == ["met_hermit", "slain_ghoul"]
     assert flag({"remove": ["met_hermit"], "add": ["x"]}).json()["flags"] == ["slain_ghoul", "x"]
-    assert (me()["learned_skills"], me()["flags"]) == (["bolt", "heal_2"], ["slain_ghoul", "x"])
+    assert me()["flags"] == ["slain_ghoul", "x"]
 
 
-def test_learned_skills_and_flags_are_checked(client):
+def test_flags_are_checked(client):
     w, tok, char = one_character(client)
     base = f"/internal/characters/{char['id']}"
-    assert client.put(f"{base}/learned-skills", json={"learned": []}, headers=auth(tok)).status_code == 401
     assert client.post(f"{base}/flags", json={"add": ["a"]}, headers=auth(tok)).status_code == 401
-    assert client.put(f"/internal/characters/{uuid.uuid4()}/learned-skills", json={"learned": []}, headers=SERVER).status_code == 404
     assert client.post(f"/internal/characters/{uuid.uuid4()}/flags", json={"add": ["a"]}, headers=SERVER).status_code == 404
-    for bad in ({"learned": ["Bad Id"]}, {"learned": [""]}, {"learned": "bolt"}):
-        assert client.put(f"{base}/learned-skills", json=bad, headers=SERVER).status_code == 422, bad
     for bad in ({"add": ["Has Space"]}, {"remove": [3]}):
         assert client.post(f"{base}/flags", json=bad, headers=SERVER).status_code == 422, bad
 

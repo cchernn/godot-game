@@ -268,7 +268,7 @@ class WorldMixin:
             inst = conn.execute("select * from activity_instances where id=%s", (instance_id,)).fetchone()
             if inst is None:
                 raise NotFound("Party not found")
-            roster = conn.execute("select c.id, c.user_id, c.name, c.class, c.level, c.allocated, c.learned_skills, c.flags from activity_roster r join characters c on c.id=r.character_id "
+            roster = conn.execute("select c.id, c.user_id, c.name, c.class, c.flags from activity_roster r join characters c on c.id=r.character_id "
                                   "where r.instance_id=%s and (%s::uuid is null or r.character_id in (select character_id from party_members where party_id=%s)) "
                                   "order by r.joined_at", (instance_id, inst["party_id"], inst["party_id"])).fetchall()
             loadouts = self._loadouts(conn, [r["id"] for r in roster])

@@ -29,7 +29,6 @@ def test_one_active_character_per_player_per_world_and_retirement(client):
     assert client.get(f"/worlds/{w['id']}/characters/me", headers=auth(tok)).status_code == 404
     again = make_char(client, w["id"], tok, "Replacement", "hunter")
     assert again.status_code == 201, "replacement allowed after retirement"
-    assert again.json()["xp"] == 0, "no inheritance"
 
 
 def test_authorization_membership_and_ownership(client, pool):
@@ -57,17 +56,12 @@ def test_session_verification_returns_server_derived_identity_and_character(clie
     assert client.post("/internal/auth/session", json={"token": outsider, "world_id": w["id"]}, headers=SERVER).status_code == 403
 
 
-def result_body(world_id, chars, key=None, xp=50, outcome="players_win"):
+def result_body(world_id, chars, key=None, outcome="players_win"):
     return {"idempotency_key": key or str(uuid.uuid4()), "world_id": world_id, "outcome": outcome, "rounds": 5,
-            "participants": [{"character_id": c, "outcome": "survived", "xp": xp} for c in chars]}
+            "participants": [{"character_id": c, "outcome": "survived"} for c in chars]}
 
 
-def xp_of(client, world_id, tok):
-    return client.get(f"/worlds/{world_id}/characters/me", headers=auth(tok)).json()["xp"]
-
-
-def test_combat_result_commit_is_atomic_and_idempotent(keep_xp_client, pool):
-    client = keep_xp_client
+def test_combat_result_commit_is_atomic_and_idempotent(client, pool):
     w, [(a, _), (b, b_id)] = setup_world(client)
     add_member(pool, w["id"], b_id)
     ca = make_char(client, w["id"], a).json()["id"]
@@ -77,7 +71,6 @@ def test_combat_result_commit_is_atomic_and_idempotent(keep_xp_client, pool):
     assert first.status_code == 200 and first.json()["duplicate"] is False
     replay = client.post("/internal/combat-results", json=body, headers=SERVER)
     assert replay.json()["duplicate"] is True and replay.json()["result"]["id"] == first.json()["result"]["id"]
-    assert xp_of(client, w["id"], a) == 50 and xp_of(client, w["id"], b) == 50, "XP applied exactly once"
     changed = dict(body, outcome="draw")
     assert client.post("/internal/combat-results", json=changed, headers=SERVER).status_code == 409
     with pool.connection() as c:
@@ -89,7 +82,6 @@ def test_failed_commit_leaves_no_partial_outcome(client, pool):
     ca = make_char(client, w["id"], a).json()["id"]
     body = result_body(w["id"], [ca, str(uuid.uuid4())], key="battle-bad-1")
     assert client.post("/internal/combat-results", json=body, headers=SERVER).status_code == 422
-    assert xp_of(client, w["id"], a) == 0, "XP of valid participants rolled back"
     with pool.connection() as c:
         assert c.execute("select count(*) n from combat_results").fetchone()["n"] == 0
     good = result_body(w["id"], [ca], key="battle-bad-1")  # the key is free to retry with a corrected payload
@@ -103,15 +95,14 @@ def test_retired_characters_cannot_receive_results(client):
     assert client.post("/internal/combat-results", json=result_body(w["id"], [ca]), headers=SERVER).status_code == 422
 
 
-def test_restart_recovery_data_survives_new_connection_pool(keep_xp_client, pool, pg):
-    client = keep_xp_client
+def test_restart_recovery_data_survives_new_connection_pool(client, pool, pg):
     from app.db import make_pool
     w, [(a, _), _] = setup_world(client)
     ca = make_char(client, w["id"], a).json()["id"]
     client.post("/internal/combat-results", json=result_body(w["id"], [ca], key="battle-restart"), headers=SERVER)
     fresh = make_pool(pg.get_uri())  # simulates a service restart
     with fresh.connection() as c:
-        assert c.execute("select xp from characters where id=%s", (ca,)).fetchone()["xp"] == 50
+        assert c.execute("select count(*) n from combat_result_participants where character_id=%s", (ca,)).fetchone()["n"] == 1
     fresh.close()
 
 

@@ -1,87 +1,36 @@
 class_name CharacterBuild
 extends RefCounted
-## Works out the battle numbers of one character from its class template, level and allocated points. The single place
+## Works out the battle numbers and skills of one character from its class template and the event flags it holds. The single place
 ## that does this: the game server uses it to build a battle and the Character page uses it to show the stats.
-## While config "progression.enabled" is false the level is treated as 1 and allocated points are ignored, so a character
-## fights with exactly its class's attributes. Never trusts its input (the database may hold anything).
+## There are no levels: a character is its class's attributes plus the Attribute Grants whose flags it has earned, kept within the cap in
+## config "stats.attribute_cap". Skills are the class's own plus the Skill Unlocks whose conditions are met. Never trusts its input
+## (the database may hold anything).
 
 
-static func progression_enabled(cfg: GameConfig) -> bool:
-	return cfg.get_value("progression", "enabled") as bool
-
-
-## The level for a total XP, from config "progression.xp_to_level" (1 while progression is disabled).
-static func level_for_xp(cfg: GameConfig, xp: int) -> int:
-	if not progression_enabled(cfg):
-		return 1
-	var level := 1
-	for need: int in cfg.get_value("progression", "xp_to_level"):
-		if xp >= need:
-			level += 1
-	return level
-
-
-## {attributes: {name: int}, stats: {max_hp, power, accuracy, evasion, dexterity, agility}, points_left: int,
-## allocated: {name: int} (what was accepted), skills: Array[String] (ids, in order: starting, granted, picked),
-## picks_left: int, pickable: Array[String] (Pick unlocks whose conditions are met, not yet learned),
-## learned: Array[String] (the picks that were accepted)}.
-## `learned` = skill ids the character picked, `flags` = event flags it has.
-static func compose(tpl: UnitTemplate, level: int, allocated: Dictionary, cfg: GameConfig,
-		learned: Array = [], flags: Array = []) -> Dictionary:
+## {attributes: {name: int}, stats: {max_hp, power, accuracy, evasion, dexterity, agility}, skills: Array[String] (ids, in order:
+## starting, then unlocked)}. `flags` = the event flags the character holds.
+static func compose(tpl: UnitTemplate, cfg: GameConfig, flags: Array = []) -> Dictionary:
+	var held: Array = flags.filter(func(f: Variant) -> bool: return f is String)
 	var attrs := tpl.base_attributes().to_dict()
-	var accepted := {}
-	var points_left := 0
-	if progression_enabled(cfg):
-		level = maxi(1, level)
-		var growth := tpl.growth
-		var value := tpl.point_value
-		var budget := tpl.stat_points_per_level * (level - 1)
-		for a in Attributes.NAMES:
-			if growth != null:
-				attrs[a] += growth.get_attr(a) * (level - 1)
-			var asked := _whole(allocated.get(a, 0))
-			var worth := value.get_attr(a) if value != null else 0
-			if asked <= 0 or worth <= 0:
-				continue
-			if tpl.max_points_per_stat > 0:
-				asked = mini(asked, tpl.max_points_per_stat)
-			asked = mini(asked, budget)
-			if asked > 0:
-				attrs[a] += asked * worth
-				accepted[a] = asked
-				budget -= asked
-		points_left = budget
-	var out := {"attributes": attrs, "stats": battle_stats(attrs, cfg), "points_left": points_left, "allocated": accepted}
-	out.merge(_skills(tpl, level, attrs, learned, flags, cfg))
-	return out
+	for g in tpl.attribute_grants:
+		if g != null and g.bonus != null and g.flag in held:
+			for a in Attributes.NAMES:
+				attrs[a] += maxi(0, g.bonus.get_attr(a))
+	var cap: int = cfg.get_value("stats", "attribute_cap")
+	for a in Attributes.NAMES:
+		attrs[a] = clampi(attrs[a], 0 if a == "might" else 1, cap)
+	return {"attributes": attrs, "stats": battle_stats(attrs, cfg), "skills": _skills(tpl, attrs, held)}
 
 
-static func _skills(tpl: UnitTemplate, level: int, attrs: Dictionary, learned: Array, flags: Array, cfg: GameConfig) -> Dictionary:
+static func _skills(tpl: UnitTemplate, attrs: Dictionary, held: Array) -> Array[String]:
 	var ids: Array[String] = []
 	for sk in tpl.skills:
 		ids.append(sk.id)
-	var pickable: Array[String] = []
-	var taken: Array[String] = []
-	var picks_left := 0
-	if progression_enabled(cfg):
-		var ctx := {"level": maxi(1, level), "attributes": attrs, "flags": flags.filter(func(f: Variant) -> bool: return f is String)}
-		var by_id := {}
-		for u in tpl.unlocks:
-			if u == null or u.skill == null or u.skill.id in ids or not u.is_met(ctx):
-				continue
-			if u.mode == SkillUnlock.Mode.GRANTED:
-				ids.append(u.skill.id)
-			else:
-				by_id[u.skill.id] = true
-				pickable.append(u.skill.id)
-		picks_left = tpl.skill_picks_per_level * (maxi(1, level) - 1)
-		for want: Variant in learned:
-			if picks_left > 0 and want is String and by_id.has(want) and not want in taken:
-				taken.append(want)
-				picks_left -= 1
-		ids.append_array(taken)
-		pickable = pickable.filter(func(s: String) -> bool: return not s in taken)
-	return {"skills": ids, "picks_left": picks_left, "pickable": pickable, "learned": taken}
+	var ctx := {"attributes": attrs, "flags": held}
+	for u in tpl.unlocks:
+		if u != null and u.skill != null and not u.skill.id in ids and u.is_met(ctx):
+			ids.append(u.skill.id)
+	return ids
 
 
 ## The battle numbers for a set of attributes. Armor is not here: it comes from gear (later).
@@ -95,7 +44,3 @@ static func battle_stats(attrs: Dictionary, cfg: GameConfig) -> Dictionary:
 		"dexterity": maxi(1, attrs["dexterity"] as int),
 		"agility": maxi(1, attrs["agility"] as int),
 	}
-
-
-static func _whole(v: Variant) -> int:
-	return int(v) if (v is int or v is float) else 0

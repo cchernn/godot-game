@@ -130,7 +130,7 @@ func is_window_open(key: String) -> bool:
 	return (_toggles[key][1] as Control).visible
 
 
-## "World - Character, level N class" in the corner.
+## "World - Character, class" in the corner.
 func set_header(text: String) -> void:
 	_hud.text = text
 

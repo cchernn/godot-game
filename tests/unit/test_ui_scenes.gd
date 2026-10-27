@@ -115,18 +115,16 @@ func test_the_battle_view_only_exists_during_a_battle() -> void:
 	c.free()
 
 
-func test_result_panel_shows_outcome_xp_and_continue_leaves() -> void:
+func test_result_panel_shows_the_outcome_and_continue_leaves() -> void:
 	var c := _client()
 	c._on_snapshot(_snapshot())
-	c._on_result({"outcome": "players_win", "rounds": 4, "xp": 20, "you": "survived", "saved": false})
+	c._on_result({"outcome": "players_win", "rounds": 4, "you": "survived", "saved": false})
 	var panel := c.get_node("%ResultPanel") as Control
 	assert_true(panel.visible)
 	assert_eq((c.get_node("%ResultTitle") as Label).text, "VICTORY")
 	var detail := (c.get_node("%ResultDetail") as Label).text
-	assert_true(detail.contains("Round 4") and detail.contains("+20 XP") and detail.contains("saving"), detail)
-	c._on_result({"outcome": "players_win", "rounds": 4, "xp": 20, "you": "survived", "saved": true})
-	assert_true(not (c.get_node("%ResultDetail") as Label).text.contains("saving"), "saved update replaces the note")
-	c._on_result({"outcome": "players_lose", "rounds": 7, "xp": 5, "you": "downed", "saved": true})
+	assert_true(detail.contains("Round 4") and not detail.contains("XP"), detail)
+	c._on_result({"outcome": "players_lose", "rounds": 7, "you": "downed", "saved": true})
 	assert_eq((c.get_node("%ResultTitle") as Label).text, "DEFEAT")
 	assert_true((c.get_node("%ResultDetail") as Label).text.contains("downed"))
 	(c.get_node("%ContinueButton") as Button).pressed.emit()
@@ -332,15 +330,14 @@ func test_character_screen_shows_stats_skills_battles_and_everyones_characters()
 	s.retire_requested.connect(func() -> void: got.append("retire"))
 	s.show_checking("Hollow")
 	assert_eq((s.get_node("%WorldLabel") as Label).text, "World: Hollow")
-	s.show_character({"name": "Aldric", "level": 1, "class": "warrior", "xp": 0})
-	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nLevel 1 Warrior")
-	assert_eq((s.get_node("%XpLabel") as Label).text, "0 XP")
+	s.show_character({"name": "Aldric", "class": "warrior", "flags": []})
+	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nWarrior")
 	assert_true((s.get_node("%StatsLabel") as Label).text.begins_with("Might "), "stats come from the class resource")
 	var list := s.get_node("%SkillsList") as ItemList
 	assert_eq(list.item_count, 2, "and so do the skills: only the class skills, not Move, Attack or Defend")
 	assert_true(list.get_item_text(0).begins_with("Power Strike") and list.get_item_text(1).begins_with("Shield Wall"))
-	s.show_battles([{"created_at": "2026-10-25T12:00:00+00:00", "result": "players_win", "outcome": "survived", "xp_awarded": 100}])
-	assert_eq((s.get_node("%BattlesList") as ItemList).get_item_text(0), "2026-10-25  Victory - survived, +100 XP")
+	s.show_battles([{"created_at": "2026-10-25T12:00:00+00:00", "result": "players_win", "outcome": "survived"}])
+	assert_eq((s.get_node("%BattlesList") as ItemList).get_item_text(0), "2026-10-25  Victory - survived")
 	s.show_battles([])
 	assert_eq((s.get_node("%BattlesLabel") as Label).text, "No battles yet.")
 	s.show_world_characters([
@@ -452,8 +449,8 @@ func test_game_view_opens_windows_from_the_dock_and_the_menu_announces_its_doors
 		s.connect(sig, func() -> void: got.append(sig))
 	for key in ["activity", "party", "character", "menu"]:
 		assert_true(not s.is_window_open(key), key + " starts closed")
-	s.set_header("Hollow - Aldric, level 2 warrior")
-	assert_eq((s.get_node("%HudLabel") as Label).text, "Hollow - Aldric, level 2 warrior")
+	s.set_header("Hollow - Aldric, warrior")
+	assert_eq((s.get_node("%HudLabel") as Label).text, "Hollow - Aldric, warrior")
 	(s.get_node("%PartyToggle") as Button).button_pressed = true
 	assert_true(s.is_window_open("party") and not s.is_window_open("activity"), "one window per button")
 	# the windows share one spot: opening another closes the open one and pops its dock button up

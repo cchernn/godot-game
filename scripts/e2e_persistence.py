@@ -1,7 +1,7 @@
 """End-to-end Phase 5 check: embedded Postgres + FastAPI + Godot server + scripted clients.
 
 Verifies that clients authenticate with API-verified tokens, play a battle, and that the finished
-result is committed exactly once (XP applied), and that bad tokens are refused.
+result is committed exactly once, and that bad tokens are refused.
 Run: uv run --project services/api python scripts/e2e_persistence.py
 """
 import os
@@ -109,14 +109,11 @@ try:
     time.sleep(2)  # a duplicate commit would show up by now
     with pool.connection() as c:
         res = c.execute("select * from combat_results").fetchone()
-        xps = {r["name"]: r["xp_awarded"] for r in c.execute(
-            "select ch.name, p.xp_awarded from combat_result_participants p join characters ch on ch.id = p.character_id").fetchall()}
-        kept = c.execute("select count(*) n from characters where xp <> 0").fetchone()["n"]
+        outcomes = {r["name"]: r["outcome"] for r in c.execute(
+            "select ch.name, p.outcome from combat_result_participants p join characters ch on ch.id = p.character_id").fetchall()}
         n_part = c.execute("select count(*) n from combat_result_participants").fetchone()["n"]
-    expected = 20 + (80 if res["outcome"] == "players_win" else 0)
-    # The prototype template resets XP after every battle, so the award lives in the history and the characters sit at 0.
-    if n_part != 3 or set(xps.values()) != {expected} or kept != 0:
-        fail(f"unexpected persistence state: outcome={res['outcome']} participants={n_part} xp={xps}")
+    if n_part != 3:
+        fail(f"unexpected persistence state: outcome={res['outcome']} participants={n_part} outcomes={outcomes}")
     bad_log = (tmp / "bad.log").read_text()
     if "rejected: Sign-in failed" not in bad_log:
         fail("bad token was not rejected:\n" + bad_log)
@@ -133,7 +130,7 @@ try:
     win = res["outcome"] == "players_win"
     if (istate, revision, crypt) != (("finished", 3, 1) if win else ("cancelled", 2, 0)):
         fail(f"unexpected world state after {res['outcome']}: instance={istate} revision={revision} crypt={crypt}")
-    print(f"E2E OK: instance={istate} revision={revision} crypt_revealed={crypt}; outcome={res['outcome']} xp={xps} (one committed result, bad token refused)")
+    print(f"E2E OK: instance={istate} revision={revision} crypt_revealed={crypt}; outcome={res['outcome']} outcomes={outcomes} (one committed result, bad token refused)")
 finally:
     for p in procs:
         p.terminate()

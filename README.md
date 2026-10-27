@@ -32,7 +32,7 @@ character once -> you are **on the map**, the game view that fills the screen. A
 you picked, Start, Travel), **Party** (your party, join requests, other parties here to ask to join), **Character**, and **Menu** (Settings, World management for the host, choose another world, sign out).
 Everyone arrives as a party of one; the party leader travels it along discovered routes and starts activities at the place it stands; players
 standing at the same place can ask a leader to let them in -> the battle server gathers the party -> plan and ready each round (**Escape** leaves a fight) -> result screen
-(victory/defeat/escaped, XP) -> **Continue** back to the map. A closed tab can come back to a battle in
+(victory/defeat/escaped) -> **Continue** back to the map. A closed tab can come back to a battle in
 progress from the Party window (**Return to battle**). Screens: `docs/editor-guide.md`; a real-browser test of this flow: `tests/browser/README.md`.
 One battle server hosts every party in every world, one room per party.
 

@@ -422,7 +422,7 @@ func _enter_game() -> void:
 		status.text = r["error"]
 		return
 	_character = r["data"]
-	_overworld.set_header("%s - %s, level %d %s" % [_world["name"], _character["name"], _character["level"], _character["class"]])
+	_overworld.set_header("%s - %s, %s" % [_world["name"], _character["name"], _character["class"]])
 	_refresh_overworld()
 
 
@@ -733,7 +733,7 @@ func _on_leave_pressed() -> void:
 	_back_to_world()
 
 
-## After a battle: back to the map of the world just played (fresh XP, and the party is idle again).
+## After a battle: back to the map of the world just played (the party is idle again).
 func return_to_menu() -> void:
 	status.text = ""
 	_back_to_world()

@@ -82,7 +82,7 @@ func s_lobby(info: Dictionary) -> void:
 	lobby_received.emit(info)
 
 
-## End of a battle: {outcome: "players_win"|"players_lose"|"draw"|"escaped", rounds, xp, you: "survived"|"downed"|"eliminated"|"escaped", saved: bool}.
+## End of a battle: {outcome: "players_win"|"players_lose"|"draw"|"escaped", rounds, you: "survived"|"downed"|"eliminated"|"escaped", saved: bool}.
 ## Sent when the battle finishes (saved = false) and again once the result is stored (saved = true).
 @rpc("authority", "call_remote", "reliable")
 func s_result(info: Dictionary) -> void:

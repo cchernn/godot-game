@@ -3,7 +3,7 @@
   "id": "prototype",
   "version": 1,
   "start_node": "hollowmere",
-  "rules": {"discovery_scope": "character", "require_location": true, "max_party_size": 4, "reset_xp_after_battle": true},
+  "rules": {"discovery_scope": "character", "require_location": true, "max_party_size": 4},
   "nodes": [
     {"id": "hollowmere", "name": "Kampung Lama", "kind": "settlement", "initially_visible": true},
     {"id": "blackwood", "name": "Hutan Lipur", "kind": "wilderness", "initially_visible": true},

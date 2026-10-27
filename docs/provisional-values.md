@@ -7,12 +7,12 @@ if you add a placeholder anywhere, add it here.
 
 | Value | Now | Meaning |
 |---|---|---|
-| `ap.base_capacity`, `max_capacity`, `dexterity_thresholds` | 3, 5, [10, 16] | Action points per round |
-| `stats.*` (`hp_base` 10, `hp_per_vitality` 2, `power_per_might` 1, `accuracy_baseline` 8 / `_per_dexterity` 0.5, `evasion_baseline` 10 / `_per_agility` 0.5) | see file | How the four attributes become HP, damage, accuracy and evasion |
+| `ap.base_capacity`, `max_capacity`, `dexterity_thresholds` | 3, 5, [6, 10] | Action points per round |
+| `stats.*` (`attribute_cap` 10, `hp_base` 14, `hp_per_vitality` 3, `power_per_might` 1, `accuracy_baseline` 4 / `_per_dexterity` 1, `evasion_baseline` 5 / `_per_agility` 1) | see file | How the four attributes (0-10 for a player: class base plus earned grants; gear and statuses go on top) become HP, damage, accuracy and evasion |
 | Context actions | cost AP like skills; reach 1 (Manhattan); state per battle only; blocking objects block walking but not sight; picked-up items capped by the item's `max_stack` in battle and 99 when saved | Map objects (Phase 6) |
-| `progression.enabled`, `xp_to_level` | false, [100, 250, 450, 700, 1000] | Levels are off; the XP table is a placeholder |
-| Class attributes and the absence of armor | see class `.tres` | Armor is gear-only (gear comes later); warrior and ghoul now have -1 evasion |
-| `movement.*` | 1 tile per AP, bonus at Dexterity 12 / 18, difficult terrain +1 | How far an AP moves a character |
+| Levels and XP | none | There is no experience and there are no levels. Attributes grow slowly and only through Attribute Grants (event flags set by activities, items or story events); skills through Skill Unlocks (an event flag or an attribute value). The database keeps `characters.level`, `xp`, `allocated`, `learned_skills` and `combat_result_participants.xp_awarded` but nothing reads or writes them |
+| Class attributes and the absence of armor | see class `.tres`: warrior 3/4/3/8, hunter 2/7/6/4, mage 3/6/4/3 (might/dex/agi/vit) | Armor is gear-only (gear comes later) |
+| `movement.*` | 1 tile per AP, bonus at Agility 6 / 10, difficult terrain +1 | How far an AP moves a character |
 | `combat.beats_per_round` | 8 | Beats in a round |
 | `combat.planning_timeout_seconds` | 90 | Planning time before the server commits plans |
 | `combat.beat_delay_ms` | 700 | Pause between beats |
@@ -21,7 +21,6 @@ if you add a placeholder anywhere, add it here.
 | `ai.weights` | see file | How enemies choose actions |
 | `instance.disconnect_grace_seconds` | 300 | A battle nobody is connected to is cancelled after this |
 | `lobby.players_required`, `gather_seconds` | 2, 30 | Guest lobby size, and how long a party battle waits for late arrivals |
-| `rewards.xp_participation`, `xp_victory_bonus` | 20, 80 | XP per battle |
 
 Client-side, on the scene root (`client_main.tscn`): `timer_warn_seconds` 30 and `timer_urgent_seconds` 10 (countdown colours), `escape_confirm_seconds` 4.
 Unit stats and skills are `.tres` resources under `game/content/` and are all provisional too.
@@ -33,13 +32,11 @@ Unit stats and skills are `.tres` resources under `game/content/` and are all pr
 | `discovery_scope` | `character` | Each character discovers places for themselves |
 | `require_location` | `true` | A party must be at an activity's place to start it |
 | `max_party_size` | 4 | PROVISIONAL |
-| `reset_xp_after_battle` | `true` | PROVISIONAL testing aid: the award is recorded in the history but the character starts the next battle at 0 XP |
 
 ## Rules written in code, not yet configurable
 
 - **Travel is instant.** `travel_days` on routes is stored but unused until there is a campaign clock.
-- **Escape always succeeds and costs nothing** (`Battle.escape`). It could later get a chance, a cost, or a cooldown. An escaped character gets participation XP but
-  not the victory bonus (`ServerApp._xp_for`). If nobody is left standing and anyone escaped, the outcome is `escaped`, even when the others died.
+- **Escape always succeeds and costs nothing** (`Battle.escape`). It could later get a chance, a cost, or a cooldown. If nobody is left standing and anyone escaped, the outcome is `escaped`, even when the others died.
 - **Presence window:** 30 seconds (`GAME_API_PRESENCE_SECONDS`); the client sends a heartbeat every 10 seconds (`PresenceTimer` in `account_flow.tscn`).
   A player returning after the window leaves an idle party whose other members are offline; idle parties whose members are all offline are disbanded when
   the world's parties are listed. A character with no heartbeat on record counts as online.

@@ -1,8 +1,7 @@
 class_name Attributes
 extends Resource
-## The four primary attributes of a character or enemy. Used for a class's growth per level and for the value of one
-## allocated point (see UnitTemplate); a class's own starting attributes are plain fields on the template.
-## Battle numbers (HP, damage, hit chance, AP, movement) are worked out from them by CharacterBuild using config/balance.json "stats".
+## The four primary attributes of a character or enemy. Used for what an Attribute Grant is worth (see AttributeGrant); a class's own starting attributes are plain fields on the template.
+## Battle numbers (HP, damage, hit chance, AP, movement) are worked out from them by CharacterBuild using config/balance.json "stats". A player's attributes run 0-10 ("stats.attribute_cap").
 
 const NAMES: Array[String] = ["might", "dexterity", "agility", "vitality"]
 

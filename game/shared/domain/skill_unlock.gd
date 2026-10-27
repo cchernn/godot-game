@@ -1,19 +1,11 @@
 class_name SkillUnlock
 extends Resource
 ## A skill a class can gain beyond its starting skills, and what it takes. Add these to a class's Unlocks list.
-## Only used while config "progression.enabled" is true.
-
-enum Mode {
-	## The skill is simply added once every condition is met.
-	GRANTED,
-	## Once every condition is met the skill becomes pickable; each pick costs one of the class's skill picks.
-	PICK,
-}
+## The skill is simply added once every condition is met (an event flag from an activity or item, or an attribute reaching a value).
 
 @export var skill: SkillDef
 ## All of these must be met.
 @export var conditions: Array[UnlockCondition] = []
-@export var mode: Mode = Mode.GRANTED
 
 
 func is_met(ctx: Dictionary) -> bool:

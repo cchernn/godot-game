@@ -116,7 +116,7 @@ try:
     time.sleep(2)  # a duplicate or stray commit would show up by now
     with pool.connection() as c:
         results = c.execute("select id, world_id from combat_results").fetchall()
-        parts = c.execute("select r.world_id, ch.name, ch.world_id as char_world, p.xp_awarded as xp from combat_result_participants p "
+        parts = c.execute("select r.world_id, ch.name, ch.world_id as char_world from combat_result_participants p "
                           "join combat_results r on r.id = p.result_id join characters ch on ch.id = p.character_id").fetchall()
     if len(results) != 2 or {str(r["world_id"]) for r in results} != {A, B}:
         fail(f"expected one result per world, got {[(str(r['world_id'])) for r in results]}")
@@ -127,8 +127,6 @@ try:
         by_world.setdefault(str(p["world_id"]), set()).add(p["name"])
     if by_world != {A: {"Aldric", "Aria"}, B: {"Bran", "Brea"}}:
         fail(f"wrong participants per world: {by_world}")
-    if any(p["xp"] <= 0 for p in parts):
-        fail("xp was not applied")
     if "rejected: Sign-in failed" not in (tmp / "wrong.log").read_text():
         fail("a non-member was admitted to the world:\n" + (tmp / "wrong.log").read_text())
     if "not on this party's roster" not in (tmp / "off.log").read_text():

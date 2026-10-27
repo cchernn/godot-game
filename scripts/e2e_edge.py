@@ -1,7 +1,7 @@
 """End-to-end checks of three awkward battle situations, against a throwaway database, API and battle server:
   A. a party member who never connects: the battle still starts, plays out and is stored with both characters;
   B. the battle server restarting in the middle of a battle: the players reconnect and the party's battle still ends once;
-  D. a player escaping in round 1: they are stored as escaped with participation XP only, and the rest of the party still finishes.
+  D. a player escaping in round 1: they are stored as escaped, and the rest of the party still finishes.
 Run: uv run --project services/api python scripts/e2e_edge.py"""
 import os
 import pathlib
@@ -88,11 +88,11 @@ try:
     def stored(world):
         with pool.connection() as c:
             results = c.execute("select id, outcome from combat_results where world_id=%s", (world,)).fetchall()
-            parts = c.execute("select ch.name, p.outcome, p.xp_awarded from combat_result_participants p "
+            parts = c.execute("select ch.name, p.outcome from combat_result_participants p "
                               "join combat_results r on r.id = p.result_id join characters ch on ch.id = p.character_id "
                               "where r.world_id=%s", (world,)).fetchall()
             run = c.execute("select status from activity_instances where world_id=%s", (world,)).fetchone()["status"]
-        return results, {p["name"]: (p["outcome"], p["xp_awarded"]) for p in parts}, run
+        return results, {p["name"]: p["outcome"] for p in parts}, run
 
     def wait_stored(world, seconds=60):
         end = time.time() + seconds
@@ -116,10 +116,10 @@ try:
     if len(results) != 1 or set(parts) != {"ALead", "AMate"}:
         fail(f"A: expected one result with both characters, got {results} {parts}")
     results, parts, run = wait_stored(D["w"])
-    if len(results) != 1 or parts.get("DMate") != ("escaped", 20):
-        fail(f"D: the escapee should be stored as escaped with participation XP (20), got {parts}")
-    if parts["DLead"][1] < 20:
-        fail(f"D: the leader got no XP: {parts}")
+    if len(results) != 1 or parts.get("DMate") != "escaped":
+        fail(f"D: the escapee should be stored as escaped, got {parts}")
+    if "DLead" not in parts:
+        fail(f"D: the leader was not stored: {parts}")
     d_log = (tmp / "d_lead.log").read_text()
     if "DMate escapes!" not in d_log:
         fail("D: the party did not see the escape in its log")
