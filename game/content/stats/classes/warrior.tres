@@ -3,8 +3,13 @@
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q6e1f"]
 [ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
 
+
 [ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="s_power_strike"]
 [ext_resource type="Resource" path="res://game/content/skills/shield_wall.tres" id="s_shield_wall"]
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="gear_def"]
+[ext_resource type="Resource" path="res://game/content/gear/iron_longsword.tres" id="g_iron_longsword"]
+[ext_resource type="Resource" path="res://game/content/gear/wooden_shield.tres" id="g_wooden_shield"]
+[ext_resource type="Resource" path="res://game/content/gear/iron_chainmail.tres" id="g_iron_chainmail"]
 
 [resource]
 script = ExtResource("1_q6e1f")
@@ -15,3 +20,4 @@ might = 3
 dexterity = 4
 agility = 3
 skills = Array[ExtResource("skilldef")]([ExtResource("s_power_strike"), ExtResource("s_shield_wall")])
+gear = Array[ExtResource("gear_def")]([ExtResource("g_iron_longsword"), ExtResource("g_wooden_shield"), ExtResource("g_iron_chainmail")])

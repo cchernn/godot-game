@@ -337,7 +337,7 @@ func snapshot_for(cid: String) -> Dictionary:
 		var u := {"id": c.id, "name": c.display_name, "visual": c.visual, "team": c.team, "cell": c.cell, "facing": c.facing,
 			"hp": c.hp, "max_hp": c.max_hp, "shield": c.shield + c.beat_shield, "life": c.life_state, "ready": c.ready,
 			"active": c.is_active(state.round_number), "revived": c.revived_this_encounter,
-			"armor": c.stat("armor"), "statuses": _status_view(c), "stunned": c.has_condition("stunned"), "rooted": c.has_condition("rooted")}
+			"armor": c.stat("armor"), "statuses": _status_view(c), "stunned": c.has_condition("stunned"), "rooted": c.has_condition("rooted"), "maimed": c.has_condition("maimed")}
 		if own:
 			u["skills"] = c.skills
 			u["ap_capacity"] = c.ap_capacity

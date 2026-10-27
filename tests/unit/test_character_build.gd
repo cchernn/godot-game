@@ -5,6 +5,7 @@ extends TestCase
 ## The warrior with fixture grants (the shipped classes have none yet).
 func _tpl() -> UnitTemplate:
 	var t := (load("res://game/content/stats/classes/warrior.tres") as UnitTemplate).duplicate() as UnitTemplate
+	t.gear = [] as Array[GearDef]
 	t.attribute_grants = [_grant("trained_might", {"might": 2}), _grant("toughened", {"vitality": 1, "agility": 1})] as Array[AttributeGrant]
 	return t
 
@@ -132,7 +133,7 @@ func test_battle_uses_the_composed_skills() -> void:
 	tpls.append_array(def.classes.slice(1))
 	def.classes = tpls
 	var b := Encounter.build(cfg, SkillDb.load_file(), 2, 1, [], def, [{"flags": ["met_hermit"]}])
-	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "defend", "bolt"] as Array[String])
+	assert_eq(b.state.get_c("pc0").skills, ["move", "defend", "strike", "bolt"] as Array[String])
 	assert_true(b.state.get_c("pc1").skills.size() > 0, "a seat with no build keeps the class's skills")
 
 

@@ -27,6 +27,11 @@ extends Resource
 ## never go past the cap in config "stats.attribute_cap". There are no levels or experience.
 @export var attribute_grants: Array[AttributeGrant] = []
 
+@export_group("Gear")
+## What the unit wears and wields: at most two weapons, one armor and one accessory. Their armor adds up and their granted attacks and
+## skills join the unit's own. (Gear a character changes itself comes later; for now this is the starting loadout.)
+@export var gear: Array[GearDef] = []
+
 @export_group("Skills")
 ## The skills this unit starts with. Pick skill resources from game/content/skills (move, strike, power_strike, bolt,
 ## disrupt, revive, or your own). A skill must also be listed in skills/skill_set.tres.
@@ -49,6 +54,17 @@ func problems(known: SkillDb) -> Array[String]:
 			out.append("%s: an attribute grant slot is empty" % id)
 		else:
 			out.append_array(g.problems(id))
+	var worn := {GearDef.Slot.WEAPON: 0, GearDef.Slot.ARMOR: 0, GearDef.Slot.ACCESSORY: 0}
+	for g in gear:
+		if g == null:
+			out.append("%s: a gear slot is empty" % id)
+			continue
+		out.append_array(g.problems(known))
+		worn[g.slot] += 1
+	for slot: int in [GearDef.Slot.WEAPON, GearDef.Slot.ARMOR, GearDef.Slot.ACCESSORY]:
+		var most := 2 if slot == GearDef.Slot.WEAPON else 1
+		if worn[slot] > most:
+			out.append("%s: wears %d %s items, at most %d" % [id, worn[slot], ["weapon", "armor", "accessory"][slot], most])
 	if skills.is_empty() and known.basic_ids.is_empty():
 		out.append("%s: has no skills" % id)
 	for sk in skills:
@@ -99,6 +115,7 @@ func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i
 	c.power = st["power"]
 	c.accuracy = st["accuracy"]
 	c.evasion = st["evasion"]
+	c.armor = st.get("armor", 0)
 	c.skills.assign(basics)
 	var own: Array = build["skills"] if build.has("skills") else skills.map(func(sk: SkillDef) -> String: return sk.id)
 	for sid: String in own:

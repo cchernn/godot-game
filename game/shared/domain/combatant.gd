@@ -79,7 +79,7 @@ func stat(stat_name: String) -> int:
 	return maxi(1, v) if stat_name == "dexterity" or stat_name == "agility" else v
 
 
-## True when any status carries the condition ("stunned" or "rooted").
+## True when any status carries the condition ("stunned", "rooted" or "maimed").
 func has_condition(condition: String) -> bool:
 	for s in statuses:
 		if s["def"].get(condition, false):

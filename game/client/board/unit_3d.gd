@@ -11,6 +11,9 @@ extends Node3D
 @export var status_label: Label3D
 @export var hp_fill: MeshInstance3D       ## scaled horizontally by health
 @export var animation_player: AnimationPlayer
+## Where the status badges stand (above the head, centred) and the scene each one is made from (content/board/markers/status_icon.tscn).
+@export var status_row: Node3D
+@export var status_icon_scene: PackedScene
 
 @export_group("Look")
 ## Multiplies the Body's own scale: a quick way to make a unit broader, taller or smaller.
@@ -23,6 +26,8 @@ extends Node3D
 @export var hp_player_color: Color = Color(0.35, 0.85, 0.4)
 @export var hp_enemy_color: Color = Color(0.9, 0.35, 0.35)
 @export_range(0.0, 1.0) var inactive_darken: float = 0.4
+## Distance between neighbouring status badges.
+@export var status_icon_spacing: float = 0.34
 
 @export_group("Picking")
 @export var pick_height: float = 0.6
@@ -34,6 +39,8 @@ var _body_material: StandardMaterial3D
 var _fill_material: StandardMaterial3D
 var _last_pos: Vector3
 var _moving_for: float = 0.0
+var _status_sig: int = 0
+var _status_icons: Array[StatusIcon] = []
 
 
 func _ready() -> void:
@@ -79,8 +86,28 @@ func apply(u: Dictionary, is_you: bool) -> void:
 			status_label.text = "ready"
 		else:
 			status_label.text = ""
+	_show_statuses(u.get("statuses", []))
 	if downed:
 		_play("downed")
+
+
+## One badge per status, side by side above the head, rebuilt only when the statuses change.
+func _show_statuses(list: Array) -> void:
+	if status_row == null or status_icon_scene == null:
+		return
+	var sig := hash(list)
+	if sig == _status_sig:
+		return
+	_status_sig = sig
+	while _status_icons.size() < list.size():
+		var icon := status_icon_scene.instantiate() as StatusIcon
+		status_row.add_child(icon)
+		_status_icons.append(icon)
+	for i in _status_icons.size():
+		_status_icons[i].visible = i < list.size()
+		if i < list.size():
+			_status_icons[i].position = Vector3((i - (list.size() - 1) * 0.5) * status_icon_spacing, 0.0, 0.0)
+			_status_icons[i].show_status(list[i])
 
 
 func set_world_position(p: Vector3, delta: float) -> void:

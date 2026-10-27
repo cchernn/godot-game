@@ -59,8 +59,16 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 		var made: Dictionary = {}
 		if i < builds.size() and builds[i] is Dictionary:
 			made = CharacterBuild.compose(tpl, cfg, _list((builds[i] as Dictionary).get("flags", [])))
+		if made.is_empty():
+			made = CharacterBuild.compose(tpl, cfg)
+		var basics := skills.basic_ids.duplicate()
+		var armed := (made["skills"] as Array).any(func(id: String) -> bool:
+			var sk := skills.get_skill(id)
+			return sk != null and sk.slot() == Enums.ActionSlot.ATTACK)
+		if not armed and skills.unarmed_id != "":
+			basics.append(skills.unarmed_id)
 		battle.add_combatant(tpl.make_combatant("pc%d" % i, Enums.Team.PLAYERS, Enums.Facing.EAST,
-			_spawn(map.player_spawns, i, "player seat P%d" % i), cfg, made, skills.basic_ids))
+			_spawn(map.player_spawns, i, "player seat P%d" % i), cfg, made, basics))
 	for i in def.enemies.size():
 		battle.add_combatant(def.enemies[i].make_combatant("e%d" % i, Enums.Team.ENEMIES, Enums.Facing.WEST,
 			_spawn(map.enemy_spawns, i, "enemy spot E%d" % i), cfg))

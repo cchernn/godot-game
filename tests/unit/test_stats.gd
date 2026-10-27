@@ -3,11 +3,11 @@ extends TestCase
 ## The numbers as they were typed into encounter.gd before they became resources.
 ## Attributes and the battle numbers they give with the provisional config (armor is gear-only, so always 0).
 const ORIGINAL := {
-	"warrior": {"name": "Warrior", "might": 3, "dex": 4, "agi": 3, "vit": 8, "hp": 38, "power": 3, "acc": 0, "eva": -2, "skills": ["power_strike", "shield_wall"]},
-	"hunter": {"name": "Hunter", "might": 2, "dex": 7, "agi": 6, "vit": 4, "hp": 26, "power": 2, "acc": 3, "eva": 1, "skills": ["aimed_shot", "lob_shot"]},
-	"mage": {"name": "Mage", "might": 3, "dex": 6, "agi": 4, "vit": 3, "hp": 23, "power": 3, "acc": 2, "eva": -1, "skills": ["fireball", "ice_floor"]},
-	"ghoul": {"name": "Ghoul", "might": 2, "dex": 4, "agi": 4, "vit": 5, "hp": 29, "power": 2, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
-	"cultist": {"name": "Cultist", "might": 1, "dex": 6, "agi": 5, "vit": 2, "hp": 20, "power": 1, "acc": 2, "eva": 0, "skills": ["move", "bolt", "strike"]},
+	"warrior": {"name": "Warrior", "might": 3, "dex": 4, "agi": 3, "vit": 8, "hp": 38, "power": 3, "armor": 4, "acc": 0, "eva": -2, "skills": ["power_strike", "shield_wall"]},
+	"hunter": {"name": "Hunter", "might": 2, "dex": 7, "agi": 6, "vit": 4, "hp": 26, "power": 2, "armor": 1, "acc": 3, "eva": 1, "skills": ["lob_shot", "maim_shot"]},
+	"mage": {"name": "Mage", "might": 3, "dex": 6, "agi": 4, "vit": 3, "hp": 23, "power": 3, "armor": 0, "acc": 2, "eva": -1, "skills": ["fireball", "ice_floor"]},
+	"ghoul": {"name": "Ghoul", "might": 2, "dex": 4, "agi": 4, "vit": 5, "hp": 29, "power": 2, "armor": 0, "acc": 0, "eva": -1, "skills": ["move", "strike", "power_strike"]},
+	"cultist": {"name": "Cultist", "might": 1, "dex": 6, "agi": 5, "vit": 2, "hp": 20, "power": 1, "armor": 0, "acc": 2, "eva": 0, "skills": ["move", "bolt", "strike"]},
 }
 
 
@@ -41,7 +41,7 @@ func test_class_attributes_give_the_expected_battle_numbers() -> void:
 		var c := t.make_combatant("x", Enums.Team.PLAYERS, Enums.Facing.EAST, Vector2i.ZERO, GameConfig.load_file())
 		assert_eq(c.max_hp, want["hp"], "%s hp" % t.id)
 		assert_eq(c.power, want["power"], "%s power" % t.id)
-		assert_eq(c.armor, 0, "%s armor (gear only)" % t.id)
+		assert_eq(c.armor, want["armor"], "%s armor (from its gear)" % t.id)
 		assert_eq(c.accuracy, want["acc"], "%s accuracy" % t.id)
 		assert_eq(c.evasion, want["eva"], "%s evasion" % t.id)
 		assert_eq([c.dexterity, c.agility], [want["dex"], want["agi"]], "%s dex/agi" % t.id)
@@ -115,7 +115,7 @@ func test_editing_a_template_changes_the_battle() -> void:
 	assert_eq(c.max_hp, 41)
 	assert_eq(c.hp, 41)
 	assert_eq(c.power, 7)
-	assert_eq(c.skills, ["move", "strike", "defend"] as Array[String], "the basics are added to the seat's own skills, once")
+	assert_eq(c.skills, ["move", "defend", "strike", "slash"] as Array[String], "the basics are added to the seat's own skills, once")
 	assert_eq(b.state.get_c("pc1").max_hp, 26, "other seats are untouched")
 	var original := Encounter.build(GameConfig.load_file(), SkillDb.load_file(), 1, 1)
 	assert_eq(original.state.get_c("pc0").max_hp, 38, "the shared resource itself was not changed")
@@ -157,12 +157,13 @@ func test_problems_are_reported_with_the_unit_named() -> void:
 
 func test_every_player_seat_gets_the_basic_actions_and_enemies_do_not() -> void:
 	var skills := SkillDb.load_file()
-	assert_eq(skills.basic_ids, ["move", "strike", "defend"] as Array[String])
+	assert_eq(skills.basic_ids, ["move", "defend"] as Array[String])
+	assert_eq(skills.unarmed_id, "strike")
 	var b := Encounter.build(GameConfig.load_file(), skills, 4, 1)
 	for i in 4:
 		var have := b.state.get_c("pc%d" % i).skills
 		for basic in skills.basic_ids:
 			assert_true(basic in have, "pc%d has %s" % [i, basic])
-	assert_eq(b.state.get_c("pc0").skills, ["move", "strike", "defend", "power_strike", "shield_wall"] as Array[String])
+	assert_eq(b.state.get_c("pc0").skills, ["move", "defend", "power_strike", "shield_wall", "slash"] as Array[String], "basics, class skills, then what the gear grants")
 	assert_true(not "defend" in b.state.get_c("e0").skills, "enemies list their own actions")
 	assert_eq(SkillSet.new().problems(), [] as Array[String])

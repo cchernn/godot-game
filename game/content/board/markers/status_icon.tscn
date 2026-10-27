@@ -1,0 +1,51 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/board/status_icon.gd" id="1_icon"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_back"]
+render_priority = 10
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0, 0, 0, 0.7)
+billboard_mode = 1
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="Mesh_back"]
+size = Vector2(0.3, 0.3)
+
+[node name="StatusIcon" type="Node3D" node_paths=PackedStringArray("glyph_label", "turns_label", "picture")]
+script = ExtResource("1_icon")
+glyph_label = NodePath("Glyph")
+turns_label = NodePath("Turns")
+picture = NodePath("Picture")
+
+[node name="Back" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_back")
+mesh = SubResource("Mesh_back")
+
+[node name="Picture" type="Sprite3D" parent="."]
+visible = false
+billboard = 1
+no_depth_test = true
+render_priority = 12
+
+[node name="Glyph" type="Label3D" parent="."]
+pixel_size = 0.006
+billboard = 1
+no_depth_test = true
+render_priority = 12
+outline_render_priority = 11
+text = "*"
+font_size = 48
+outline_size = 10
+
+[node name="Turns" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.11, -0.13, 0)
+pixel_size = 0.004
+billboard = 1
+no_depth_test = true
+render_priority = 13
+outline_render_priority = 12
+text = "1"
+font_size = 40
+outline_size = 8

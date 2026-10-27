@@ -78,6 +78,11 @@ func is_area() -> bool:
 	return area != null and not area.is_single()
 
 
+## True for the attacks and class skills (what a maimed unit cannot use); items and map-object actions never count.
+func is_attack_or_skill() -> bool:
+	return slot() in [Enums.ActionSlot.ATTACK, Enums.ActionSlot.SKILL] and not id.begins_with("item:") and not id.begins_with("ctx:")
+
+
 func slot() -> Enums.ActionSlot:
 	return Enums.ActionSlot.MOVE if kind == Enums.SkillKind.MOVE else action_slot
 

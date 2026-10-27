@@ -13,6 +13,7 @@ project from `project.godot`; the first open imports everything.
 | Units (model, labels, animations) | `game/content/units/unit.tscn` and `warrior.tscn`, `ghoul.tscn`... | the 3D editor, AnimationPlayer |
 | Which scene draws which unit | `game/content/units/unit_visuals.tres` | Inspector |
 | What each skill does (damage, AP, range, speed, stages, hint text) | `game/content/skills/*.tres`, listed in `skills/skill_set.tres` | Inspector |
+| Gear (slot, armor, the attacks it grants) | `game/content/gear/*.tres`; each class lists its gear under **Gear** | Inspector |
 | Class and enemy attributes (might, dexterity, agility, vitality), attribute grants and skills | `game/content/stats/classes/*.tres`, `stats/enemies/*.tres` | Inspector |
 | Which classes and enemies a battle uses | `game/content/encounters/prototype.tres` | Inspector (Max Party seats more players than there are classes) |
 | Camera, light, background | `game/content/board/board_3d.tscn` | Inspector |
@@ -23,6 +24,7 @@ project from `project.godot`; the first open imports everything.
 | One join request in the host's list | `game/content/ui/join_request_row.tscn` | the 2D editor |
 | Victory / defeat panel | `ResultPanel` in `game/client/client_main.tscn` | the 2D editor |
 | Action menu and hover card look | `game/content/ui/action_menu.tscn`, `action_button.tscn`, `hover_card.tscn` | the 2D editor |
+| Status badge over a unit | `game/content/board/markers/status_icon.tscn`; the picture is the **Icon** on each `content/statuses/*.tres` | the 3D editor, Inspector |
 | Target / selected-tile symbols and floating numbers | `game/content/board/markers/*.tscn` (colours and sizes on the `Board3D` node, *Floating text*) | the 3D editor, Inspector |
 | Fonts, colours, panel style (whole UI) | `game/content/ui/theme.tres` | the Theme editor |
 
@@ -173,13 +175,15 @@ Every skill is a `SkillDef` resource in `game/content/skills/` (e.g. `strike.tre
   *kind* of skill or a new *effect type* is new game logic and is code.
 - Edits need `scripts/stack.sh up game web` to reach the running game (the server resolves skills; the web client lists them).
 
+**Gear:** a gear item (`content/gear/*.tres`) has a slot (weapon, armor or accessory), an **armor** number (a flat amount taken off every hit) and **Grants**, the skills it lets its wearer use. A weapon's attack is a skill with the *Attack* action slot, so it shows in the Attack list; every skill a gear item grants must also be in `skills/skill_set.tres`. A class lists its starting gear under **Gear** (at most two weapons, one armor, one accessory). A player with no weapon attack gets the **Unarmed** skill from `skill_set.tres`.
+
 **Action slots:** a skill's **Action slot** decides how it is grouped. **Attack** = a basic attack (for now only the default Attack, whose id is still `strike`; hovering an enemy shows what it would do), **Skills** = class skills (also the Character page's skill list), **Defend** = the Defend entry. In battle they all come from the click menu. Moves always sit on Move. The basic actions every player character has (Move, Attack, Defend) are listed once, in `skill_set.tres` under **Basic**; classes do not list them, so a class's Skills list holds only its own skills. Enemies do not get the basics automatically: list whatever an enemy can do.
 
 ## Statuses (Inspector)
 A status is a timed condition on a unit: a buff, a debuff, bleeding, a stun. Each is a `StatusDef` resource in `game/content/statuses/` (make the folder when you add the
 first one: right-click > New Resource > StatusDef, save as `<id>.tres`). No statuses ship with the framework yet. To use one, add an **Apply Status** effect to a
 skill stage and drag the status into its *Status* slot (no list to register it in). Fields:
-- **Id**, **display name**, **hint** (shown on hover), **glyph** and **color** (what the unit card shows for now; real icons come later), **kind** (buff, debuff, other: used by cleanses).
+- **Id**, **display name**, **hint** (shown on hover), **icon** (a small square texture shown over the unit on the board, FFT-style, with the turns left under it), **glyph** and **color** (the unit card, and the board badge while there is no icon), **kind** (buff, debuff, other: used by cleanses).
 - **Duration turns:** counted in turns (rounds), not beats. A status applied during a turn counts the rest of that turn as its first turn.
 - **Stacking:** *Refresh* restarts the timer; *Stack* adds a stack (up to *max stacks*) and restarts the timer; *Ignore* does nothing if it is already on.
 - **Stat changes (per stack):** armor, power, accuracy, evasion, dexterity, agility. Dexterity also changes AP (from the next turn) and agility changes tiles per AP.

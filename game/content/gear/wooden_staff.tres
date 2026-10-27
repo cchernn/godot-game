@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="1_gear"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="2_skill"]
+[ext_resource type="Resource" path="res://game/content/skills/bash.tres" id="s_bash"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "wooden_staff"
+display_name = "Wooden staff"
+description = "A walking staff. Lets you Bash."
+slot = 0
+armor = 0
+grants = Array[ExtResource("2_skill")]([ExtResource("s_bash")])

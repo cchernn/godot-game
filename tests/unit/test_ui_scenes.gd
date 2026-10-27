@@ -333,6 +333,7 @@ func test_character_screen_shows_stats_skills_battles_and_everyones_characters()
 	s.show_character({"name": "Aldric", "class": "warrior", "flags": []})
 	assert_eq((s.get_node("%CharacterLabel") as Label).text, "Aldric\nWarrior")
 	assert_true((s.get_node("%StatsLabel") as Label).text.begins_with("Might "), "stats come from the class resource")
+	assert_eq((s.get_node("%GearLabel") as Label).text, "Gear: Iron longsword, Wooden shield, Iron chainmail   (armor 4)")
 	var list := s.get_node("%SkillsList") as ItemList
 	assert_eq(list.item_count, 2, "and so do the skills: only the class skills, not Move, Attack or Defend")
 	assert_true(list.get_item_text(0).begins_with("Power Strike") and list.get_item_text(1).begins_with("Shield Wall"))

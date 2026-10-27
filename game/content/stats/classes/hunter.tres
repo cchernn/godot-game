@@ -3,8 +3,13 @@
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_q7u1k"]
 [ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
 
-[ext_resource type="Resource" path="res://game/content/skills/aimed_shot.tres" id="s_aimed_shot"]
+
 [ext_resource type="Resource" path="res://game/content/skills/lob_shot.tres" id="s_lob_shot"]
+[ext_resource type="Resource" path="res://game/content/skills/maim_shot.tres" id="s_maim_shot"]
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="gear_def"]
+[ext_resource type="Resource" path="res://game/content/gear/bow.tres" id="g_bow"]
+[ext_resource type="Resource" path="res://game/content/gear/iron_dagger.tres" id="g_iron_dagger"]
+[ext_resource type="Resource" path="res://game/content/gear/leather_armor.tres" id="g_leather_armor"]
 
 [resource]
 script = ExtResource("1_q7u1k")
@@ -14,4 +19,5 @@ vitality = 4
 might = 2
 dexterity = 7
 agility = 6
-skills = Array[ExtResource("skilldef")]([ExtResource("s_aimed_shot"), ExtResource("s_lob_shot")])
+skills = Array[ExtResource("skilldef")]([ExtResource("s_lob_shot"), ExtResource("s_maim_shot")])
+gear = Array[ExtResource("gear_def")]([ExtResource("g_bow"), ExtResource("g_iron_dagger"), ExtResource("g_leather_armor")])

@@ -154,6 +154,10 @@ Rules:
 
 Tests: `compose` with synthetic states (growth, thresholds, events, picks), unknown skill ids rejected by `problems()`, the disabled path equals today, API payload and flag endpoint.
 
+## Phase 7 (gear)
+
+`GearDef` (slot weapon/armor/accessory, `armor`, `grants`), `UnitTemplate.gear`; `CharacterBuild.compose` adds the gear's armor and granted skills; the Attack list is what weapons grant, with `SkillSet.unarmed` (id `strike`) as the fallback; the basic list is Move and Defend. New: the **Maimed** status and `chance_percent` on Apply Status. Not built: characters owning/changing gear, accessories, attribute bonuses from gear.
+
 ## Phase 5c: no XP, capped attributes, flag-driven growth (implemented)
 
 Replaces the level, XP, free-point and skill-pick design of 5a/5b. Attributes run 0-10 for a player (`stats.attribute_cap`); the rules in `balance.json` were rescaled to that range (HP 14 + 3 per Vitality, AP thresholds at Dexterity 6 and 10, tiles per AP at Agility 6 and 10, accuracy and evasion 1 per point over 4 and 5). Gear and statuses add on top of the cap later.

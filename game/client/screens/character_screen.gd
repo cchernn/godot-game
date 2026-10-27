@@ -14,6 +14,7 @@ const RESULT_TEXT := {"players_win": "Victory", "players_lose": "Defeat", "draw"
 @onready var _world: Label = %WorldLabel
 @onready var _character: Label = %CharacterLabel
 @onready var _stats: Label = %StatsLabel
+@onready var _gear: Label = %GearLabel
 @onready var _skills: ItemList = %SkillsList
 @onready var _confirm: LineEdit = %RetireConfirmEdit
 @onready var _retire: Button = %RetireButton
@@ -38,6 +39,7 @@ func show_checking(world_name: String) -> void:
 	_world.text = "World: %s" % world_name
 	_character.text = "Loading your character…"
 	_stats.text = ""
+	_gear.text = ""
 	_skills.clear()
 	_battles.clear()
 	_roster.clear()
@@ -54,6 +56,7 @@ func show_character(c: Dictionary) -> void:
 	_sync_retire()
 	_skills.clear()
 	_stats.text = ""
+	_gear.text = ""
 	var path := "res://game/content/stats/classes/%s.tres" % c["class"]
 	var t := load(path) as UnitTemplate if ResourceLoader.exists(path) else null
 	if t == null:
@@ -66,6 +69,10 @@ func show_character(c: Dictionary) -> void:
 	_stats.text = "Might %d   Dexterity %d   Agility %d   Vitality %d\nHP %d   Damage +%d   Accuracy %d   Evasion %d   AP %d" \
 		% [at["might"], at["dexterity"], at["agility"], at["vitality"], st["max_hp"], st["power"], st["accuracy"], st["evasion"],
 		cfg.ap_capacity(st["dexterity"])]
+	var worn: Array[String] = []
+	for g in t.gear:
+		worn.append(g.display_name)
+	_gear.text = "Gear: %s   (armor %d)" % [", ".join(worn) if not worn.is_empty() else "nothing", st["armor"]]
 	var db := SkillDb.load_file()
 	for sid: String in build["skills"]:
 		var sk := db.get_skill(sid)

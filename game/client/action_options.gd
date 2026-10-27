@@ -95,6 +95,8 @@ static func _skill_problem(ctx: Dictionary, sk: SkillDef, clicked: Dictionary, o
 		_: # yourself, or nothing to aim
 			if not on_me:
 				return "-"
+	if ctx["me"].get("maimed", false) and sk.is_attack_or_skill():
+		return "maimed: no attacks or skills"
 	if (ctx["planned"] as Array).has(sk.id) and sk.once_per_turn():
 		return "already planned this round"
 	if sk.total_ap() > int(ctx["ap_left"]):

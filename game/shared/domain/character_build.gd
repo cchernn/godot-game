@@ -7,8 +7,8 @@ extends RefCounted
 ## (the database may hold anything).
 
 
-## {attributes: {name: int}, stats: {max_hp, power, accuracy, evasion, dexterity, agility}, skills: Array[String] (ids, in order:
-## starting, then unlocked)}. `flags` = the event flags the character holds.
+## {attributes: {name: int}, stats: {max_hp, power, accuracy, evasion, dexterity, agility, armor (the gear's)}, skills: Array[String] (ids,
+## in order: starting, unlocked, then granted by gear), gear: Array[String] (ids)}. `flags` = the event flags the character holds.
 static func compose(tpl: UnitTemplate, cfg: GameConfig, flags: Array = []) -> Dictionary:
 	var held: Array = flags.filter(func(f: Variant) -> bool: return f is String)
 	var attrs := tpl.base_attributes().to_dict()
@@ -19,7 +19,20 @@ static func compose(tpl: UnitTemplate, cfg: GameConfig, flags: Array = []) -> Di
 	var cap: int = cfg.get_value("stats", "attribute_cap")
 	for a in Attributes.NAMES:
 		attrs[a] = clampi(attrs[a], 0 if a == "might" else 1, cap)
-	return {"attributes": attrs, "stats": battle_stats(attrs, cfg), "skills": _skills(tpl, attrs, held)}
+	var stats := battle_stats(attrs, cfg)
+	var armor := 0
+	var skills := _skills(tpl, attrs, held)
+	var gear: Array[String] = []
+	for g in tpl.gear:
+		if g == null:
+			continue
+		gear.append(g.id)
+		armor += g.armor
+		for sk in g.grants:
+			if not sk.id in skills:
+				skills.append(sk.id)
+	stats["armor"] = armor
+	return {"attributes": attrs, "stats": stats, "skills": skills, "gear": gear}
 
 
 static func _skills(tpl: UnitTemplate, attrs: Dictionary, held: Array) -> Array[String]:

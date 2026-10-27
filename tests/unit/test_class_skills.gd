@@ -1,7 +1,7 @@
 extends TestCase
 ## The skills of the three classes (all numbers provisional): shields by length, lobbing without sight, the fireball star and the ice line.
 
-const SKILLS := ["move", "strike", "defend", "shield_wall", "aimed_shot", "lob_shot", "fireball", "ice_floor"]
+const SKILLS := ["move", "strike", "defend", "shield_wall", "shoot", "maim_shot", "lob_shot", "slash", "fireball", "ice_floor"]
 const BIG: Array = [".........", ".........", ".........", ".........", ".........", ".........", "........."]
 
 
@@ -40,14 +40,14 @@ func test_shield_wall_lasts_the_round() -> void:
 	assert_eq(b.state.get_c("a").shield, 0, "ends with the round")
 
 
-func test_aimed_shot_draws_then_shoots_at_range() -> void:
+func test_shoot_draws_then_shoots_at_range() -> void:
 	var b := Fx.battle(Fx.OPEN, [_p("a", V(0, 1)), Fx.enemy("e", V(4, 1))])
-	Fx.plan(b, "a", [Fx.act("aimed_shot", "e")])
+	Fx.plan(b, "a", [Fx.act("shoot", "e")])
 	b.begin_resolution()
 	Fx.run_beats(b, 1)
 	assert_eq(b.state.get_c("e").hp, 20, "the first beat only draws")
 	Fx.run_beats(b, 1)
-	assert_eq(b.state.get_c("e").hp, 11)
+	assert_eq(b.state.get_c("e").hp, 12)
 
 
 func test_lob_shot_reaches_a_tile_behind_a_wall() -> void:
@@ -59,10 +59,10 @@ func test_lob_shot_reaches_a_tile_behind_a_wall() -> void:
 	Fx.run_beats(b, 2)
 	assert_eq(b.state.get_c("e").hp, 12, "no line of sight needed")
 	var bolt := Fx.battle(rows, [_p("a", V(1, 1)), Fx.enemy("e", V(7, 1))])
-	Fx.plan(bolt, "a", [{"skill": "aimed_shot", "target": "e"}])
+	Fx.plan(bolt, "a", [{"skill": "shoot", "target": "e"}])
 	bolt.begin_resolution()
 	Fx.run_beats(bolt, 2)
-	assert_eq(bolt.state.get_c("e").hp, 20, "an aimed shot does")
+	assert_eq(bolt.state.get_c("e").hp, 20, "a shot at a character does")
 
 
 func test_fireball_burns_a_star_after_two_beats_of_charging() -> void:
@@ -87,3 +87,52 @@ func test_ice_floor_freezes_a_line_of_three() -> void:
 	assert_true(b.state.get_c("one").has_condition("rooted"))
 	assert_true(b.state.get_c("three").has_condition("rooted"))
 	assert_true(not b.state.get_c("four").has_condition("rooted"), "the fourth tile is out of the line")
+
+
+func _maim_always(b: Battle) -> void:
+	var sk := b.skills.get_skill("maim_shot")
+	for st in sk.stage_defs:
+		for e in st.effects:
+			if e is ApplyStatusEffect:
+				(e as ApplyStatusEffect).chance_percent = 100
+	sk.stage_defs = sk.stage_defs # marks the cached stage view as stale
+
+
+func test_maim_shot_hurts_a_little_interrupts_hard_and_maims() -> void:
+	var b := Fx.battle(Fx.OPEN, [_p("a", V(0, 1)), Fx.enemy("e", V(3, 1))])
+	_maim_always(b)
+	Fx.plan(b, "a", [Fx.act("maim_shot", "e")])
+	Fx.plan(b, "e", [Fx.act("power_strike", "a")])
+	b.begin_resolution()
+	Fx.run_beats(b, 2)
+	var e := b.state.get_c("e")
+	assert_eq(e.hp, 16, "4 damage")
+	assert_true(e.has_condition("maimed"))
+	assert_eq(b.skills.get_skill("maim_shot").stages[1]["interrupt"], 3, "high interrupt")
+
+
+func test_a_maimed_unit_cannot_attack_or_use_skills_but_can_defend() -> void:
+	var b := Fx.battle(Fx.OPEN, [_p("a", V(0, 1)), Fx.enemy("e", V(3, 1), {"skills": SKILLS})])
+	_maim_always(b)
+	Fx.plan(b, "a", [Fx.act("maim_shot", "e")])
+	b.begin_resolution()
+	Fx.run_round(b)
+	Fx.plan(b, "e", [Fx.act("strike", "a"), {"skill": "defend"}])
+	Fx.plan(b, "a", [{"skill": "defend"}])
+	b.begin_resolution()
+	Fx.run_beats(b, 3)
+	assert_eq(b.state.get_c("a").hp, 20, "the strike never happened")
+	assert_true("maimed" in " ".join(Fx.texts(b)))
+	assert_true(b.state.get_c("e").beat_shield >= 0 and Fx.has_event(b, "shield"), "defend still works")
+
+
+func test_a_status_with_a_chance_may_be_shrugged_off() -> void:
+	var landed := 0
+	for seed in range(1, 41):
+		var b := Fx.battle(Fx.OPEN, [_p("a", V(0, 1)), Fx.enemy("e", V(3, 1))], seed)
+		Fx.plan(b, "a", [Fx.act("maim_shot", "e")])
+		b.begin_resolution()
+		Fx.run_beats(b, 2)
+		if b.state.get_c("e").has_condition("maimed"):
+			landed += 1
+	assert_true(landed > 8 and landed < 32, "about half of 40 land (got %d)" % landed)

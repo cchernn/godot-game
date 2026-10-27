@@ -3,8 +3,12 @@
 [ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_rhuw4"]
 [ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
 
+
 [ext_resource type="Resource" path="res://game/content/skills/fireball.tres" id="s_fireball"]
 [ext_resource type="Resource" path="res://game/content/skills/ice_floor.tres" id="s_ice_floor"]
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="gear_def"]
+[ext_resource type="Resource" path="res://game/content/gear/wooden_staff.tres" id="g_wooden_staff"]
+[ext_resource type="Resource" path="res://game/content/gear/garb.tres" id="g_garb"]
 
 [resource]
 script = ExtResource("1_rhuw4")
@@ -15,3 +19,4 @@ might = 3
 dexterity = 6
 agility = 4
 skills = Array[ExtResource("skilldef")]([ExtResource("s_fireball"), ExtResource("s_ice_floor")])
+gear = Array[ExtResource("gear_def")]([ExtResource("g_wooden_staff"), ExtResource("g_garb")])

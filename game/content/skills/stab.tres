@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/interrupt_effect.gd" id="5_def"]
+
+[sub_resource type="Resource" id="Damage_hit"]
+script = ExtResource("4_def")
+base = 5
+
+[sub_resource type="Resource" id="Interrupt_hit"]
+script = ExtResource("5_def")
+points = 1
+
+[sub_resource type="Resource" id="Stage_hit"]
+script = ExtResource("2_def")
+stage_name = "stab"
+effects = Array[ExtResource("3_def")]([SubResource("Damage_hit"), SubResource("Interrupt_hit")])
+
+[resource]
+script = ExtResource("1_def")
+id = "stab"
+display_name = "Stab"
+hint = "Click a character"
+description = "A quick thrust at a character next to you, with a dagger."
+targeting = 1
+speed = 6
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_hit")])

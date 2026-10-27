@@ -12,7 +12,7 @@ stage_name = "draw"
 
 [sub_resource type="Resource" id="Damage_shoot"]
 script = ExtResource("4_def")
-base = 9
+base = 8
 
 [sub_resource type="Resource" id="Interrupt_shoot"]
 script = ExtResource("5_def")
@@ -25,11 +25,10 @@ effects = Array[ExtResource("3_def")]([SubResource("Damage_shoot"), SubResource(
 
 [resource]
 script = ExtResource("1_def")
-id = "aimed_shot"
-display_name = "Aimed Shot"
+id = "shoot"
+display_name = "Shoot"
 hint = "Click a character (2 stages)"
-description = "Draw your bow, then loose a shot at a character you can see."
-action_slot = 3
+description = "Draw the bow, then loose an arrow at a character you can see."
 targeting = 1
 attack_range = 5
 speed = 5

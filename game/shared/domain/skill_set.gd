@@ -7,6 +7,8 @@ extends Resource
 ## The basic actions every player character has automatically (Move, Attack, Defend), so classes do not list them. Each must also be in
 ## the list above. Enemies do not get them: an enemy lists whatever it can do.
 @export var basic: Array[SkillDef] = []
+## The attack a player character falls back on when no gear gives it one (bare hands). Must also be in the list above.
+@export var unarmed: SkillDef
 
 
 func problems() -> Array[String]:
@@ -23,4 +25,6 @@ func problems() -> Array[String]:
 	for b in basic:
 		if b == null or not seen.has(b.id):
 			out.append("a basic skill is not in the skill list")
+	if unarmed != null and not seen.has(unarmed.id):
+		out.append("the unarmed attack is not in the skill list")
 	return out

@@ -32,6 +32,11 @@ unique_name_in_owner = true
 layout_mode = 2
 autowrap_mode = 3
 
+[node name="GearLabel" type="Label" parent="CharacterTabs/Overview"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
 [node name="SkillsTitle" type="Label" parent="CharacterTabs/Overview"]
 layout_mode = 2
 text = "Skills"

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/status_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = "maimed"
+display_name = "Maimed"
+hint = "Cannot attack or use skills (it can still move, defend and use items)."
+glyph = "M"
+color = Color(1, 0.6, 0.3, 1)
+kind = 1
+duration_turns = 2
+maimed = true

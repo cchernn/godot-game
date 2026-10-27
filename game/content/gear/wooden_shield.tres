@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="1_gear"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="2_skill"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "wooden_shield"
+display_name = "Wooden shield"
+description = "A round shield of planks: a little armor."
+slot = 0
+armor = 1

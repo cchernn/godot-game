@@ -253,3 +253,23 @@ func test_battle_events_carry_their_numbers_to_the_client() -> void:
 	assert_eq(hit["target"], "e")
 	var snapshot := b.snapshot_for("a")
 	assert_true(snapshot["units"][0].has("armor") and snapshot["units"][0].has("power"), "stats the damage preview needs")
+
+
+func test_statuses_show_as_badges_over_the_unit_with_their_turns() -> void:
+	var u := (load("res://game/content/units/warrior.tscn") as PackedScene).instantiate() as Unit3D
+	(Engine.get_main_loop() as SceneTree).root.add_child(u)
+	var b := Fx.battle(Fx.OPEN, [Fx.player("pc0", V(1, 1))])
+	var unit: Dictionary = b.snapshot_for("pc0")["units"][0]
+	unit["statuses"] = [{"id": "maimed", "name": "Maimed", "glyph": "M", "color": "ff9a4d", "turns": 2, "stacks": 1},
+		{"id": "made_up", "name": "Odd", "glyph": "?", "color": "ffffff", "turns": 1, "stacks": 3}]
+	u.apply(unit, true)
+	var icons := u.status_row.get_children().filter(func(n: Node) -> bool: return n is StatusIcon and (n as Node3D).visible)
+	assert_eq(icons.size(), 2)
+	assert_eq((icons[0] as StatusIcon).glyph_label.text, "M")
+	assert_eq((icons[0] as StatusIcon).turns_label.text, "2")
+	assert_eq((icons[1] as StatusIcon).turns_label.text, "1×3", "stacks are shown")
+	assert_true((icons[0] as Node3D).position.x < (icons[1] as Node3D).position.x, "side by side")
+	unit["statuses"] = []
+	u.apply(unit, true)
+	assert_eq(u.status_row.get_children().filter(func(n: Node) -> bool: return (n as Node3D).visible).size(), 0, "gone with the status")
+	u.free()

@@ -12,7 +12,9 @@ enum Stacking { REFRESH, STACK, IGNORE }
 @export var id: String = ""
 @export var display_name: String = ""
 @export_multiline var hint: String = ""
-## What the unit card shows: a short glyph (1-2 characters) in this colour. Real icons come later.
+## The icon shown over the unit on the board. Drop a texture here (a small square image) when there is one; until then the glyph below is shown.
+@export var icon: Texture2D
+## What the unit card shows, and what the board shows while there is no icon: a short glyph (1-2 characters) in this colour.
 @export var glyph: String = "*"
 @export var color: Color = Color(1, 1, 1)
 ## Buff, debuff or other. Cleanse effects can remove "all debuffs" or "all buffs".
@@ -41,6 +43,8 @@ enum Stacking { REFRESH, STACK, IGNORE }
 @export var stunned: bool = false
 ## The bearer cannot move.
 @export var rooted: bool = false
+## The bearer cannot use attacks or skills (it can still move, defend and use items).
+@export var maimed: bool = false
 
 
 ## The plain view the battle rules read (also what the client shows).
@@ -53,7 +57,7 @@ func to_dict() -> Dictionary:
 		"color": color.to_html(false), "kind": kind, "duration": duration_turns, "stacking": stacking,
 		"max_stacks": max_stacks,
 		"mods": {"armor": armor, "power": power, "accuracy": accuracy, "evasion": evasion, "dexterity": dexterity, "agility": agility},
-		"ticks": ticks, "stunned": stunned, "rooted": rooted}
+		"ticks": ticks, "stunned": stunned, "rooted": rooted, "maimed": maimed}
 
 
 func problems() -> Array[String]:

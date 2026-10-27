@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="1_gear"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="2_skill"]
+[ext_resource type="Resource" path="res://game/content/skills/slash.tres" id="s_slash"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "iron_longsword"
+display_name = "Iron longsword"
+description = "A plain iron blade. Lets you Slash."
+slot = 0
+armor = 0
+grants = Array[ExtResource("2_skill")]([ExtResource("s_slash")])

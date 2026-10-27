@@ -102,6 +102,8 @@ func _can_begin(c: Combatant, a: PlannedAction, sk: SkillDef) -> String:
 			return "no item left"
 	elif sk == null or not c.skills.has(a.skill_id):
 		return "unknown skill"
+	if c.has_condition("maimed") and sk.is_attack_or_skill():
+		return "maimed"
 	if sk.once_per_turn() and c.skills_used.has(sk.id):
 		return "already used this round"
 	if sk.kind == Enums.SkillKind.MOVE:
@@ -324,7 +326,7 @@ func _apply_effect(c: Combatant, sk: SkillDef, e: Dictionary, who: Combatant, co
 			if connected and who.life_state == Enums.LifeState.ALIVE:
 				_add_interrupt(who, e["points"] as int)
 		"apply_status":
-			if connected and who.life_state == Enums.LifeState.ALIVE:
+			if connected and who.life_state == Enums.LifeState.ALIVE and _status_lands(e, c, who):
 				_apply_status(c, e, who)
 		"remove_status":
 			_remove_status(c, e, who)
@@ -520,6 +522,15 @@ func run_turn_end() -> void:
 				c.statuses.erase(s)
 				if c.is_present():
 					b.emit("status_end", "%s fades from {t}." % s["def"]["name"], "", c.id, _status_data(s["def"]))
+
+
+## Whether a status with a chance below 100% lands (rolled on the battle's seeded numbers; a sure thing rolls nothing).
+func _status_lands(e: Dictionary, c: Combatant, who: Combatant) -> bool:
+	var chance: int = e.get("chance", 100)
+	if chance >= 100 or b.rng.randf() * 100.0 < chance:
+		return true
+	b.emit("no_effect", "{t} shrugs off %s." % (e["status"] as Dictionary).get("name", "it"), c.id, who.id)
+	return false
 
 
 func _apply_status(c: Combatant, e: Dictionary, who: Combatant) -> void:

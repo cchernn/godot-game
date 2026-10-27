@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="1_gear"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="2_skill"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "leather_armor"
+display_name = "Leather armor"
+description = "Boiled leather: a little armor."
+slot = 1
+armor = 1

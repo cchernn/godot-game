@@ -9,7 +9,7 @@ const CLASSES := [
 	{"id": "warrior", "name": "Warrior", "might": 3, "dex": 4, "agi": 3, "vit": 8,
 		"skills": ["power_strike", "shield_wall"]},
 	{"id": "hunter", "name": "Hunter", "might": 2, "dex": 7, "agi": 6, "vit": 4,
-		"skills": ["aimed_shot", "lob_shot"]},
+		"skills": ["lob_shot", "maim_shot"]},
 	{"id": "mage", "name": "Mage", "might": 3, "dex": 6, "agi": 4, "vit": 3,
 		"skills": ["fireball", "ice_floor"]},
 ]
