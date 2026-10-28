@@ -259,6 +259,8 @@ class PartyMixin:
                 act = d.activities.get(activity_id)
                 if act is None:
                     raise NotFound("Unknown activity")
+                if act["type"] == "shop":
+                    raise Conflict("A shop is entered alone, not as a party")
                 if self._live_run(conn, party_id):
                     raise Conflict("The party is already playing an activity")
                 if d.rules.get("require_location", True) and p["node_id"] != act["node"]:

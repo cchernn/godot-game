@@ -889,3 +889,56 @@ def test_a_loss_pays_nothing_and_a_result_cannot_name_a_foreign_run(client, pool
     assert lost["rewards"][c1["id"]]["gold"] == 0
     assert client.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()["gold"] == 0
     assert run_result(client, w["id"], str(uuid.uuid4()), [(c1["id"], "survived", 1)]).status_code == 422
+
+
+def test_shop_and_event_activities_are_validated():
+    base = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
+    shop = {"id": "smith", "node": "hollowmere", "name": "The smith", "class": "job", "type": "shop",
+            "stock": [{"item": "potion", "price": 10}]}
+    event = {"id": "haunting", "node": "blackwood", "name": "The haunting", "class": "quest", "type": "event", "max_players": 4,
+             "steps": [{"id": "warning", "type": "story", "story": "the_warning",
+                        "choices": [{"id": "fight", "next": "ghouls"}, {"id": "bargain", "next": "dawn", "flags": ["bargained"]}]},
+                       {"id": "ghouls", "type": "battle", "encounter": "prototype", "on_lose": "dawn"},
+                       {"id": "dawn", "type": "story", "story": "the_dawn"}],
+             "rewards": {"flags": ["laid_to_rest"]}}
+    ok = json.loads(json.dumps(base))
+    ok["activities"] += [shop, event]
+    parsed = parse(ok)
+    assert parsed.activities["smith"]["type"] == "shop" and len(parsed.activities["haunting"]["steps"]) == 3
+    from app.templates import step_edges
+    assert step_edges(parsed.activities["haunting"]["steps"]) == {"warning": ["ghouls", "dawn"], "ghouls": ["dawn", "dawn"], "dawn": ["end"]}
+    for mutate in (lambda d: act(d, "smith").update({"class": "campaign"}),
+                   lambda d: act(d, "smith").pop("stock"),
+                   lambda d: act(d, "smith").update({"stock": [{"item": "potion", "price": 0}]}),
+                   lambda d: act(d, "haunting").update({"steps": [{"id": "a", "type": "story", "story": "x"}]}),  # one step is not a chain
+                   lambda d: act(d, "haunting")["steps"].append({"id": "s", "type": "shop", "story": "x"}),
+                   lambda d: act(d, "haunting")["steps"][1].pop("encounter"),
+                   lambda d: act(d, "haunting")["steps"][1].update({"id": "dawn"}),  # duplicate id
+                   lambda d: act(d, "haunting")["steps"][1].update({"id": "end"}),
+                   lambda d: act(d, "haunting")["steps"][1].update({"on_win": "nowhere"}),
+                   lambda d: act(d, "haunting")["steps"][1].update({"on_win": "warning"}),  # loops back
+                   lambda d: act(d, "haunting")["steps"][2].update({"on_win": "end"}),  # a story uses next
+                   lambda d: act(d, "haunting")["steps"][0]["choices"].pop(),  # one choice is no choice
+                   lambda d: act(d, "haunting")["steps"][0]["choices"][0].pop("next"),
+                   lambda d: act(d, "haunting")["steps"][0]["choices"][1].update({"flags": ["Bad Flag"]}),
+                   lambda d: [act(d, "haunting")["steps"][0].update({"choices": [{"id": "a", "next": "fail"}, {"id": "b", "next": "fail"}]}),
+                              act(d, "haunting")["steps"][1].update({"on_win": "fail"}),
+                              act(d, "haunting")["steps"][2].update({"next": "fail"})],  # nothing ends well
+                   lambda d: act(d, "haunting").pop("max_players")):
+        d = json.loads(json.dumps(ok))
+        mutate(d)
+        with pytest.raises(TemplateError):
+            parse(d)
+
+
+def test_a_shop_is_not_started_as_a_party_run(pool, tmp_path):
+    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
+    d["activities"].append({"id": "smith", "node": "hollowmere", "name": "The smith", "class": "job", "type": "shop",
+                            "stock": [{"item": "potion", "price": 10}]})
+    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
+    c = TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
+    w, [t1, _], _ = party(c, pool)
+    shop = next(a for a in overview(c, w["id"], t1)["activities"] if a["id"] == "smith")
+    assert shop["type"] == "shop" and shop["stock"] == [{"item": "potion", "price": 10}] and shop["max_players"] is None
+    r = start(c, my_party(c, w["id"], t1)["id"], t1, "smith")
+    assert r.status_code == 409 and "alone" in r.json()["detail"]

@@ -208,9 +208,14 @@ world template (that is game data); they live in `game/content/overworld/map_lay
 spread around a ring, so a new template node always shows up. Why a button is disabled is written under it (`OverworldScreen.travel_problem` / `start_problem`).
 
 ## Activity classes and types
-Each world-template activity has a **type** (what is played: `battle` with an `encounter` id, or `story` with a `story` id; only battles run today) and a **class** (its role in the world):
+Each world-template activity has a **type** (what is played: `battle` with an `encounter` id, `story` with a `story` id, `shop` with a `stock` of `{item, price}`, or `event` with `steps`; only battles run today) and a **class** (its role in the world):
 - `campaign`: moves the world forward; once per world (first completion wins). Replaces the old "major"/"one_time".
 - `quest`: once per character (a separate `activity_completions` record); an optional `audience` names the one class that may take it.
 - `job`: repeatable; the practice and gear-grind runs.
 
 `rewards` is authored per activity: `flags` (event flags), `items` (`{id, count}`) and `reveal` (map nodes/routes). `reveal` is applied when the run completes. `flags`, `items` and the encounter's `gold` are applied when the battle result is committed (`POST /internal/combat-results`, now with the run's `instance_id`): on a win, each participant who did not escape is paid, gets the activity's completion record (`activity_completions`), and the response returns each character's `rewards`, which the game server shows on the result screen. A replay returns the stored payout and pays nothing twice. Gold is `characters.gold`.
+
+Types in the template format:
+- `battle` / `story`: played by a party. A story plays once for the whole party.
+- `shop`: entered by one character alone, any time, no party run; always class `job`. Starting it as a party run is refused.
+- `event`: a graph of at least two inline `steps`, each a `battle` or a `story` with a unique `id` (no shop or nested event); the first step starts it. A battle leads on with `on_win` and `on_lose`; a story with `next`, or with `choices` (two or more `{id, next, flags}`; a choice's flags are set when it is picked). Targets are step ids or an ending: `end` pays the event's own `rewards`, `fail` pays nothing. Left out, `on_win`/`next` go to the following step in the list (the last to `end`) and `on_lose` is `fail`. The template is rejected if a target is unknown, steps loop back, a step cannot be reached from the first, or no path reaches `end`. The runtime for story, shop and event is still to build.
