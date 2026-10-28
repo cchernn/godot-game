@@ -47,6 +47,21 @@ STEP_TYPES = ("battle", "story")  # what an event chains; an event cannot contai
 _ID = r"[a-z0-9_]+"
 
 
+def _check_rewards(name: str, rewards: dict, nodes: dict, routes: dict) -> None:
+    gold = rewards.get("gold", 0)
+    if not isinstance(gold, int) or isinstance(gold, bool) or gold < 0:
+        raise TemplateError(f"{name} has a bad reward gold {gold!r}")
+    for flag in rewards.get("flags", []):
+        if not re.fullmatch(_ID, str(flag)):
+            raise TemplateError(f"{name} has a bad reward flag {flag!r}")
+    for it in rewards.get("items", []):
+        if not re.fullmatch(_ID, str(it.get("id", ""))) or not isinstance(it.get("count"), int) or it["count"] < 1:
+            raise TemplateError(f"{name} has a bad reward item {it!r}")
+    for rv in rewards.get("reveal", []):
+        if rv["id"] not in {"node": nodes, "route": routes}.get(rv["kind"], {}):
+            raise TemplateError(f"{name} reveals unknown {rv}")
+
+
 def _check_content(name: str, part: dict, allowed: tuple) -> None:
     kind = part.get("type")
     if kind not in allowed:
@@ -74,7 +89,7 @@ def step_edges(steps: list[dict]) -> dict[str, list[str]]:
     return out
 
 
-def _check_steps(name: str, steps: list[dict]) -> None:
+def _check_steps(name: str, steps: list[dict], nodes: dict, routes: dict) -> None:
     ids: set[str] = set()
     for i, step in enumerate(steps):
         where = f"{name} step {i + 1}"
@@ -83,6 +98,7 @@ def _check_steps(name: str, steps: list[dict]) -> None:
         if not re.fullmatch(_ID, sid) or sid in ENDINGS or sid in ids:
             raise TemplateError(f"{where} needs a unique id (not {' or '.join(ENDINGS)})")
         ids.add(sid)
+        _check_rewards(where, step.get("rewards", {}), nodes, routes)
         if step["type"] == "battle" and ("next" in step or "choices" in step):
             raise TemplateError(f"{where}: a battle leads on with on_win and on_lose")
         if step["type"] == "story" and ("on_win" in step or "on_lose" in step):
@@ -149,23 +165,16 @@ def _check_activity(a: dict, nodes: dict, routes: dict) -> None:
         steps = a.get("steps")
         if not isinstance(steps, list) or len(steps) < 2:
             raise TemplateError(f"{name} needs at least two steps")
-        _check_steps(name, steps)
+        _check_steps(name, steps, nodes, routes)
+        if a.get("on_fail", "restart") not in ("restart", "end"):
+            raise TemplateError(f"{name}: on_fail is restart or end")
     else:
         _check_content(name, a, ("battle", "story"))
     if kind != "shop" and (not isinstance(a.get("max_players"), int) or a["max_players"] < 1):
         raise TemplateError(f"{name} needs max_players")
     if "audience" in a and (a["class"] != "quest" or not re.fullmatch(_ID, str(a["audience"]))):
         raise TemplateError(f"{name}: only a quest can name an audience (a class id)")
-    rewards = a.get("rewards", {})
-    for flag in rewards.get("flags", []):
-        if not re.fullmatch(_ID, str(flag)):
-            raise TemplateError(f"{name} has a bad reward flag {flag!r}")
-    for it in rewards.get("items", []):
-        if not re.fullmatch(_ID, str(it.get("id", ""))) or not isinstance(it.get("count"), int) or it["count"] < 1:
-            raise TemplateError(f"{name} has a bad reward item {it!r}")
-    for rv in rewards.get("reveal", []):
-        if rv["id"] not in {"node": nodes, "route": routes}.get(rv["kind"], {}):
-            raise TemplateError(f"{name} reveals unknown {rv}")
+    _check_rewards(name, a.get("rewards", {}), nodes, routes)
 
 
 def parse(raw: dict) -> WorldDefinition:

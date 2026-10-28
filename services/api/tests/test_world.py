@@ -898,9 +898,10 @@ def test_shop_and_event_activities_are_validated():
     event = {"id": "haunting", "node": "blackwood", "name": "The haunting", "class": "quest", "type": "event", "max_players": 4,
              "steps": [{"id": "warning", "type": "story", "story": "the_warning",
                         "choices": [{"id": "fight", "next": "ghouls"}, {"id": "bargain", "next": "dawn", "flags": ["bargained"]}]},
-                       {"id": "ghouls", "type": "battle", "encounter": "prototype", "on_lose": "dawn"},
+                       {"id": "ghouls", "type": "battle", "encounter": "prototype", "on_lose": "dawn",
+                        "rewards": {"gold": 5, "items": [{"id": "potion", "count": 1}]}},
                        {"id": "dawn", "type": "story", "story": "the_dawn"}],
-             "rewards": {"flags": ["laid_to_rest"]}}
+             "on_fail": "end", "rewards": {"flags": ["laid_to_rest"], "gold": 30}}
     ok = json.loads(json.dumps(base))
     ok["activities"] += [shop, event]
     parsed = parse(ok)
@@ -913,6 +914,9 @@ def test_shop_and_event_activities_are_validated():
                    lambda d: act(d, "haunting").update({"steps": [{"id": "a", "type": "story", "story": "x"}]}),  # one step is not a chain
                    lambda d: act(d, "haunting")["steps"].append({"id": "s", "type": "shop", "story": "x"}),
                    lambda d: act(d, "haunting")["steps"][1].pop("encounter"),
+                   lambda d: act(d, "haunting")["steps"][1].update({"rewards": {"gold": -1}}),
+                   lambda d: act(d, "haunting")["steps"][0].update({"rewards": {"flags": ["Bad Flag"]}}),
+                   lambda d: act(d, "haunting").update({"on_fail": "never"}),
                    lambda d: act(d, "haunting")["steps"][1].update({"id": "dawn"}),  # duplicate id
                    lambda d: act(d, "haunting")["steps"][1].update({"id": "end"}),
                    lambda d: act(d, "haunting")["steps"][1].update({"on_win": "nowhere"}),
