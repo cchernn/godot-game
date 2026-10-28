@@ -42,10 +42,13 @@ func verify_session(token: String, world_id: String, instance_id: String = "") -
 	return {"ok": true, "user_id": b["user_id"], "character": b["character"], "instance": b.get("instance", {})}
 
 
-func commit_result(world_id: String, key: String, outcome: String, rounds: int, participants: Array) -> Dictionary:
-	var r := await _post("/internal/combat-results", {"idempotency_key": key, "world_id": world_id,
-		"outcome": outcome, "rounds": rounds, "participants": participants})
-	return {"ok": r["ok"], "duplicate": (r["body"] as Dictionary).get("duplicate", false), "error": r["error"]}
+func commit_result(world_id: String, key: String, outcome: String, rounds: int, participants: Array, instance_id: String = "") -> Dictionary:
+	var body := {"idempotency_key": key, "world_id": world_id, "outcome": outcome, "rounds": rounds, "participants": participants}
+	if instance_id != "":
+		body["instance_id"] = instance_id
+	var r := await _post("/internal/combat-results", body)
+	var b: Dictionary = r["body"]
+	return {"ok": r["ok"], "duplicate": b.get("duplicate", false), "rewards": b.get("rewards", {}), "error": r["error"]}
 
 
 func get_instance(instance_id: String) -> Dictionary:

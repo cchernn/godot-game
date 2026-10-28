@@ -67,7 +67,7 @@ class Repository(PartyMixin, WorldMixin):
                 conn.execute("insert into world_discoveries (world_id, kind, target_id, scope) values (%s,%s,%s,'world')",
                              (w["id"], kind, target))
             for a in d.activities.values():
-                if a.get("one_time"):
+                if a["class"] == "campaign":
                     conn.execute("insert into world_activities (world_id, activity_id) values (%s,%s)", (w["id"], a["id"]))
         return _row(w)
 
@@ -204,35 +204,59 @@ class Repository(PartyMixin, WorldMixin):
     # ---- combat results ----
 
     def commit_combat_result(self, key: str, world_id: uuid.UUID, outcome: str, rounds: int,
-                             participants: list[dict]) -> tuple[dict, bool]:
-        """Atomically records a finished encounter and what it earned (items, flags). Idempotent per key: replaying the same
+                             participants: list[dict], instance_id: uuid.UUID | None = None) -> tuple[dict, bool]:
+        """Atomically records a finished encounter and what it earned (gold, items, flags).
+        On a win, every participant who did not escape is paid the gold the game server computed (equal for all), and, when the result
+        belongs to an activity run, that activity's authored rewards (flags, items) and its completion record. Idempotent per key: replaying the same
         payload returns the stored result; reusing a key for a different payload is a conflict."""
-        canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds,
+        canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds, "i": str(instance_id or ""),
                                 "p": sorted((str(p["character_id"]), p["outcome"],
                                              sorted((p.get("items_used") or {}).items()),
-                                             sorted((p.get("items_gained") or {}).items()), sorted(set(p.get("flags_set") or [])))
+                                             sorted((p.get("items_gained") or {}).items()), sorted(set(p.get("flags_set") or [])),
+                                             int(p.get("gold") or 0))
                                             for p in participants)})
         digest = hashlib.sha256(canonical.encode()).hexdigest()
         ids = [p["character_id"] for p in participants]
         if len(set(ids)) != len(ids):
             raise Invalid("Duplicate participant")
         with self.pool.connection() as conn:
+            activity: dict | None = None
+            if instance_id is not None:
+                inst = conn.execute("select * from activity_instances where id=%s", (instance_id,)).fetchone()
+                if inst is None or inst["world_id"] != world_id or inst["status"] not in ("active", "finished"):
+                    raise Invalid("Unknown or closed activity run")
+                activity = self.definition(world_id).activities[inst["activity_id"]]
             res = conn.execute(
-                "insert into combat_results (idempotency_key, payload_hash, world_id, outcome, rounds) "
-                "values (%s,%s,%s,%s,%s) on conflict (idempotency_key) do nothing returning *",
-                (key, digest, world_id, outcome, rounds)).fetchone()
+                "insert into combat_results (idempotency_key, payload_hash, world_id, outcome, rounds, instance_id) "
+                "values (%s,%s,%s,%s,%s,%s) on conflict (idempotency_key) do nothing returning *",
+                (key, digest, world_id, outcome, rounds, instance_id)).fetchone()
             if res is None:
                 existing = conn.execute("select * from combat_results where idempotency_key=%s", (key,)).fetchone()
                 if existing["payload_hash"] != digest:
                     raise Conflict("Idempotency key was already used with a different result")
-                return _row(existing), True
+                return {**_row(existing), "rewards": self._stored_rewards(conn, existing["id"])}, True
+            rewards: dict[str, dict] = {}
             for p in participants:
                 ok = conn.execute(
                     "select id, flags from characters where id=%s and world_id=%s and status='active' for update",
                     (p["character_id"], world_id)).fetchone()
                 if ok is None:  # rolls the whole transaction back: no partial outcomes
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
+                paid = outcome == "players_win" and p["outcome"] != "escaped"
+                reward = {"gold": int(p.get("gold") or 0) if paid else 0, "items": {}, "flags": []}
+                if paid and activity is not None:
+                    for it in activity.get("rewards", {}).get("items", []):
+                        reward["items"][it["id"]] = reward["items"].get(it["id"], 0) + it["count"]
+                    reward["flags"] = list(activity.get("rewards", {}).get("flags", []))
+                    conn.execute("insert into activity_completions (world_id, activity_id, character_id, instance_id) values (%s,%s,%s,%s) "
+                                 "on conflict do nothing", (world_id, activity["id"], p["character_id"], instance_id))
+                if reward["gold"]:
+                    conn.execute("update characters set gold = gold + %s where id=%s", (reward["gold"], p["character_id"]))
                 gained = {k: v for k, v in (p.get("items_gained") or {}).items() if v > 0}
+                for k, v in reward["items"].items():
+                    gained[k] = gained.get(k, 0) + v
+                p = {**p, "flags_set": list(p.get("flags_set") or []) + reward["flags"]}
+                rewards[str(p["character_id"])] = reward
                 for item_id, n in gained.items():  # picked up in the battle: added before the used ones are taken off
                     conn.execute("insert into character_items (character_id, item_id, quantity) values (%s,%s,%s) "
                                  "on conflict (character_id, item_id) do update set quantity = least(99, character_items.quantity + excluded.quantity)",
@@ -249,6 +273,11 @@ class Repository(PartyMixin, WorldMixin):
                         raise Invalid("%s used more %s than it carries" % (p["character_id"], item_id))
                     if left["quantity"] == 0:
                         conn.execute("delete from character_items where character_id=%s and item_id=%s", (p["character_id"], item_id))
-                conn.execute("insert into combat_result_participants (result_id, character_id, outcome, items_used) "
-                             "values (%s,%s,%s,%s)", (res["id"], p["character_id"], p["outcome"], Jsonb(used)))
-        return _row(res), False
+                conn.execute("insert into combat_result_participants (result_id, character_id, outcome, items_used, rewards) "
+                             "values (%s,%s,%s,%s,%s)", (res["id"], p["character_id"], p["outcome"], Jsonb(used), Jsonb(reward)))
+        return {**_row(res), "rewards": rewards}, False
+
+    @staticmethod
+    def _stored_rewards(conn, result_id) -> dict[str, dict]:
+        return {str(r["character_id"]): r["rewards"] for r in conn.execute(
+            "select character_id, rewards from combat_result_participants where result_id=%s", (result_id,)).fetchall()}

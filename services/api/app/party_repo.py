@@ -271,9 +271,16 @@ class PartyMixin:
                 if conn.execute("select 1 from world_activities where world_id=%s and activity_id=%s and status='completed'",
                                 (p["world_id"], activity_id)).fetchone():
                     raise Conflict("This activity is no longer available")
+                if act["class"] == "quest":
+                    ids = [m["id"] for m in members]
+                    if act.get("audience") and any(m["class"] != act["audience"] for m in members):
+                        raise Forbidden(f"This quest is for the {act['audience']} class")
+                    if conn.execute("select 1 from activity_completions where world_id=%s and activity_id=%s and character_id = any(%s)",
+                                    (p["world_id"], activity_id, ids)).fetchone():
+                        raise Conflict("A member of the party has already completed this quest")
                 inst = conn.execute("insert into activity_instances (world_id, activity_id, kind, leader_character_id, party_id, status) "
                                     "values (%s,%s,%s,%s,%s,'active') returning *",
-                                    (p["world_id"], activity_id, act["kind"], p["leader_character_id"], party_id)).fetchone()
+                                    (p["world_id"], activity_id, "major" if act["class"] == "campaign" else "minor", p["leader_character_id"], party_id)).fetchone()
                 for m in members:
                     conn.execute("insert into activity_roster (instance_id, character_id) values (%s,%s)", (inst["id"], m["id"]))
                 conn.execute("update party_join_requests set status='cancelled', decided_at=now() where party_id=%s and status='pending'", (party_id,))

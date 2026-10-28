@@ -82,16 +82,26 @@ def test_invalid_templates_are_rejected():
     for mutate in (lambda d: d["routes"][0].update({"to": "nowhere"}),
                    lambda d: d.update({"start_node": "nowhere"}),
                    lambda d: d["nodes"].append(dict(d["nodes"][0])),
-                   lambda d: act(d, "cellar_rats").update({"one_time": True}),  # minor + one_time
+                   lambda d: act(d, "cellar_rats").update({"class": "hunt"}),
+                   lambda d: act(d, "cellar_rats").update({"type": "puzzle"}),
+                   lambda d: act(d, "cellar_rats").update({"audience": "mage"}),  # only a quest has an audience
+                   lambda d: act(d, "cellar_rats").update({"type": "story"}),  # a story needs a story id
+                   lambda d: act(d, "cellar_rats").update({"rewards": {"flags": ["Bad Flag"]}}),
+                   lambda d: act(d, "cellar_rats").update({"rewards": {"items": [{"id": "potion", "count": 0}]}}),
                    lambda d: act(d, "cellar_rats").pop("encounter"),
                    lambda d: act(d, "cellar_rats").update({"encounter": "../etc"}),
                    lambda d: act(d, "cellar_rats").update({"max_players": 0}),
-                   lambda d: act(d, "ashen_keep_siege")["on_complete"]["reveal"].append({"kind": "node", "id": "ghost"})):
+                   lambda d: act(d, "ashen_keep_siege")["rewards"]["reveal"].append({"kind": "node", "id": "ghost"})):
         d = json.loads(json.dumps(base))
         mutate(d)
         with pytest.raises(TemplateError):
             parse(d)
     assert parse(base).start_node == "hollowmere"
+    story = json.loads(json.dumps(base))
+    act(story, "cellar_rats").pop("encounter")
+    act(story, "cellar_rats").update({"type": "story", "story": "cellar_tale", "class": "quest", "audience": "mage",
+                                      "rewards": {"flags": ["heard_the_tale"], "items": [{"id": "potion", "count": 2}]}})
+    assert parse(story).activities["cellar_rats"]["type"] == "story"
 
 
 def test_multiple_routes_between_the_same_nodes_are_allowed():
@@ -815,3 +825,67 @@ def test_display_names_are_validated_and_belong_to_the_caller(client):
     other, _ = new_user()
     assert client.get("/me/profile", headers=auth(other)).json() == {"display_name": None}
     assert client.get("/me/profile").status_code == 401
+
+
+def test_a_quest_is_done_once_per_character_and_can_be_limited_to_a_class(pool, tmp_path):
+    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
+    act(d, "cellar_rats").update({"class": "quest", "audience": "mage"})
+    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
+    c = TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
+    w, [t1, t2], [c1, c2] = party(c, pool)
+
+    def quest(tok):
+        return next(a for a in overview(c, w["id"], tok)["activities"] if a["id"] == "cellar_rats")
+    assert quest(t1)["class"] == "quest" and quest(t1)["available"] and not quest(t1)["completed"]
+    with pool.connection() as conn:
+        conn.execute("update characters set class='warrior' where id=%s", (c1["id"],))
+        conn.execute("update characters set class='mage' where id=%s", (c2["id"],))
+    r = start(c, my_party(c, w["id"], t1)["id"], t1, "cellar_rats")
+    assert r.status_code == 403 and "mage" in r.json()["detail"]
+    iid = new_party(c, w["id"], t2)
+    c.post(f"/internal/instances/{iid}/complete", headers=SERVER)
+    assert not quest(t2)["completed"], "finishing the run records nothing until the battle result arrives"
+    assert run_result(c, w["id"], iid, [(c2["id"], "survived", 10)]).status_code == 200
+    assert quest(t2)["completed"] and not quest(t2)["available"], "done for the character who finished it"
+    assert quest(t1)["available"], "the other character has not done it"
+    r = start(c, my_party(c, w["id"], t2)["id"], t2, "cellar_rats")
+    assert r.status_code == 409 and "already completed" in r.json()["detail"]
+    with pool.connection() as conn:
+        assert conn.execute("select count(*) as n from activity_completions where world_id=%s", (w["id"],)).fetchone()["n"] == 1
+
+
+def run_result(client, wid, instance_id, who, key=None, outcome="players_win"):
+    return client.post("/internal/combat-results", headers=SERVER, json={
+        "idempotency_key": key or str(uuid.uuid4()), "world_id": wid, "outcome": outcome, "rounds": 3, "instance_id": instance_id,
+        "participants": [{"character_id": cid, "outcome": o, "gold": g} for cid, o, g in who]})
+
+
+def test_a_win_pays_gold_and_the_authored_rewards_to_everyone_who_did_not_escape(pool, tmp_path):
+    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
+    act(d, "cellar_rats").update({"rewards": {"flags": ["cellar_cleared"], "items": [{"id": "potion", "count": 2}]}})
+    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
+    c = TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
+    w, [t1, t2], [c1, c2] = party(c, pool)
+    pid = my_party(c, w["id"], t1)["id"]
+    join_party(c, pid, t1, t2)
+    iid = new_party(c, w["id"], t1)
+    res = run_result(c, w["id"], iid, [(c1["id"], "survived", 25), (c2["id"], "escaped", 25)], key="battle-reward-1")
+    assert res.status_code == 200, res.text
+    paid, unpaid = res.json()["rewards"][c1["id"]], res.json()["rewards"][c2["id"]]
+    assert paid == {"gold": 25, "items": {"potion": 2}, "flags": ["cellar_cleared"]}
+    assert unpaid == {"gold": 0, "items": {}, "flags": []}, "an escaped character earns nothing"
+    me = c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()
+    assert me["gold"] == 25 and me["flags"] == ["cellar_cleared"] and {"item_id": "potion", "quantity": 2} in me["items"]
+    assert c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t2)).json()["gold"] == 0
+    replay = run_result(c, w["id"], iid, [(c1["id"], "survived", 25), (c2["id"], "escaped", 25)], key="battle-reward-1")
+    assert replay.json()["duplicate"] and replay.json()["rewards"][c1["id"]]["gold"] == 25, "a replay returns the same payout"
+    assert c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()["gold"] == 25, "and pays nothing twice"
+
+
+def test_a_loss_pays_nothing_and_a_result_cannot_name_a_foreign_run(client, pool):
+    w, [t1, _], [c1, _] = party(client, pool)
+    iid = new_party(client, w["id"], t1)
+    lost = run_result(client, w["id"], iid, [(c1["id"], "downed", 25)], outcome="players_lose").json()
+    assert lost["rewards"][c1["id"]]["gold"] == 0
+    assert client.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()["gold"] == 0
+    assert run_result(client, w["id"], str(uuid.uuid4()), [(c1["id"], "survived", 1)]).status_code == 422

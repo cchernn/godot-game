@@ -11,9 +11,11 @@ func verify_session(_token: String, _world_id: String, _instance_id: String = ""
 	return {"ok": false, "error": "Persistence is not configured"}
 
 
-## participants: [{character_id, outcome, items_used: {item id: copies}, items_gained: {item id: copies}, flags_set: [flag]}]. Idempotent per key. Returns {ok, duplicate, error}.
-func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: int, _participants: Array) -> Dictionary:
-	return {"ok": true, "duplicate": false}
+## participants: [{character_id, outcome, gold, items_used: {item id: copies}, items_gained: {item id: copies}, flags_set: [flag]}].
+## `instance_id` is the activity run this battle was ("" for none): its authored rewards are applied on a win.
+## Idempotent per key. Returns {ok, duplicate, rewards: {character id: {gold, items: {item id: copies}, flags}}, error}.
+func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: int, _participants: Array, _instance_id: String = "") -> Dictionary:
+	return {"ok": true, "duplicate": false, "rewards": {}}
 
 
 ## Returns {ok, instance: {status, encounter, max_players, roster: [{id, user_id, name, class}]}, error}.

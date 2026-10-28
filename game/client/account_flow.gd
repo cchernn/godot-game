@@ -422,7 +422,7 @@ func _enter_game() -> void:
 		status.text = r["error"]
 		return
 	_character = r["data"]
-	_overworld.set_header("%s - %s, %s" % [_world["name"], _character["name"], _character["class"]])
+	_overworld.set_header("%s - %s, %s - %d gold" % [_world["name"], _character["name"], _character["class"], int(_character.get("gold", 0))])
 	_refresh_overworld()
 
 

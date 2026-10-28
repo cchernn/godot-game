@@ -77,6 +77,7 @@ class ParticipantIn(BaseModel):
     items_used: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)
     items_gained: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)  # from map objects
     flags_set: list[Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]] = Field(default_factory=list, max_length=32)
+    gold: int = Field(default=0, ge=0, le=100_000)  # what the game server decided this character earns (paid on a win, unless escaped)
 
 
 class GrantItemIn(BaseModel):
@@ -98,6 +99,7 @@ class CombatResultIn(BaseModel):
     world_id: uuid.UUID
     outcome: Literal["players_win", "players_lose", "draw", "escaped"]
     rounds: int = Field(ge=1, le=10_000)
+    instance_id: uuid.UUID | None = None  # the activity run this battle was; its authored rewards apply on a win
     participants: list[ParticipantIn] = Field(max_length=16)
 
 
@@ -261,8 +263,8 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def combat_result(body: CombatResultIn, r: Repository = Depends(repo)) -> dict:
         res, dup = r.commit_combat_result(
             body.idempotency_key, body.world_id, body.outcome, body.rounds,
-            [p.model_dump() for p in body.participants])
-        return {"result": res, "duplicate": dup}
+            [p.model_dump() for p in body.participants], body.instance_id)
+        return {"result": res, "duplicate": dup, "rewards": res.get("rewards", {})}
 
     @app.post("/internal/characters/{character_id}/items", dependencies=[Depends(server_only)])
     def grant_items(character_id: uuid.UUID, body: GrantItemIn, r: Repository = Depends(repo)) -> dict:

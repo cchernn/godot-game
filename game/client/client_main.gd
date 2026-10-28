@@ -321,8 +321,21 @@ func _on_result(info: Dictionary) -> void:
 		lines.append("You escaped.")
 	elif info["you"] != "survived":
 		lines.append("You were %s." % info["you"])
+	lines.append_array(reward_lines(info.get("rewards", {}), skills))
 	result_detail.text = "\n".join(lines)
 	result_panel.show()
+
+
+## What the battle paid this player, one line each: gold, then items by name. (Event flags are not shown; they unlock things quietly.)
+static func reward_lines(rewards: Dictionary, db: SkillDb) -> Array[String]:
+	var out: Array[String] = []
+	if int(rewards.get("gold", 0)) > 0:
+		out.append("+%d gold" % int(rewards["gold"]))
+	var items: Dictionary = rewards.get("items", {})
+	for id: String in items:
+		var def: ItemDef = db.items.get(id) if db != null else null
+		out.append("+%d %s" % [int(items[id]), def.display_name if def != null else id.replace("_", " ")])
+	return out
 
 
 ## Leaves the finished battle and returns to the menu (the character screen when signed in).

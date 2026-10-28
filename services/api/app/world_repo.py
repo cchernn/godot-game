@@ -235,13 +235,16 @@ class WorldMixin:
             w = conn.execute("select * from worlds where id=%s", (world_id,)).fetchone()
             vis = self._visible(conn, world_id, char["id"] if char else None)
             state = {r["activity_id"]: r["status"] for r in conn.execute("select * from world_activities where world_id=%s", (world_id,)).fetchall()}
+            done = {r["activity_id"] for r in conn.execute("select distinct activity_id from activity_completions where world_id=%s and character_id=%s",
+                                                           (world_id, char["id"])).fetchall()} if char else set()
             live = {r["activity_id"]: _row(r) for r in conn.execute(
                 "select * from activity_instances where world_id=%s and status in ('forming','active')", (world_id,)).fetchall()}
         nodes = [{"id": n["id"], "name": n["name"], "kind": n["kind"]} for n in d.nodes.values() if ("node", n["id"]) in vis]
         routes = [{k: r[k] for k in ("id", "from", "to", "travel_days")} for r in d.routes.values() if ("route", r["id"]) in vis]
         visible_nodes = {n["id"] for n in nodes}
-        board = [{"id": a["id"], "node": a["node"], "name": a["name"], "kind": a["kind"], "one_time": a.get("one_time", False),
-                  "available": state.get(a["id"], "available") == "available", "max_players": a["max_players"], "instance": live.get(a["id"])}
+        board = [{"id": a["id"], "node": a["node"], "name": a["name"], "class": a["class"], "type": a["type"], "audience": a.get("audience"),
+                  "available": state.get(a["id"], "available") == "available" and not (a["class"] == "quest" and a["id"] in done),
+                  "completed": a["id"] in done, "max_players": a["max_players"], "instance": live.get(a["id"])}
                  for a in d.activities.values() if a["node"] in visible_nodes]
         return {"world": {"id": str(w["id"]), "name": w["name"], "template": f"{w['template_id']}@{w['definition_version']}",
                           "state_revision": w["state_revision"]},
@@ -274,7 +277,7 @@ class WorldMixin:
             loadouts = self._loadouts(conn, [r["id"] for r in roster])
         act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
         roster = [{**_row(r), "items": loadouts.get(str(r["id"]), [])} for r in roster]
-        return {**_row(inst), "roster": roster, "encounter": act["encounter"],
+        return {**_row(inst), "roster": roster, "activity_type": act["type"], "encounter": act.get("encounter"), "story": act.get("story"),
                 "activity_name": act["name"], "max_players": act["max_players"]}
 
     def party_seat(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
@@ -301,14 +304,14 @@ class WorldMixin:
                 raise Conflict("Only an active instance can be completed")
             act = self.definition(wid).activities[inst["activity_id"]]
             changed = False
-            if act.get("one_time"):
+            if act["class"] == "campaign":
                 won = conn.execute("update world_activities set status='completed', completed_by_instance=%s, completed_at=now() "
                                    "where world_id=%s and activity_id=%s and status='available' returning activity_id",
                                    (instance_id, wid, inst["activity_id"])).fetchone()
                 if won is None:
                     raise Conflict("This activity was already completed")
                 changed = True
-            for rv in act.get("on_complete", {}).get("reveal", []):
+            for rv in act.get("rewards", {}).get("reveal", []):
                 new = conn.execute("insert into world_discoveries (world_id, kind, target_id, scope) values (%s,%s,%s,'world') "
                                    "on conflict (world_id, kind, target_id) where scope='world' do nothing returning id",
                                    (wid, rv["kind"], rv["id"])).fetchone()

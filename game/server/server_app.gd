@@ -601,6 +601,8 @@ func _result_for(room: Room, rec: PlayerRec) -> Dictionary:
 	var info := room.result_info.duplicate()
 	var c := room.battle.state.get_c(rec.combatant_id)
 	info["you"] = _fate(c)
+	var all: Dictionary = info.get("rewards", {})
+	info["rewards"] = all.get(str(rec.character.get("id", "")), {})
 	return info
 
 
@@ -621,20 +623,28 @@ func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	if room.instance_id != "":
 		_finish_instance(room.instance_id, battle.outcome == Enums.Outcome.PLAYERS_WIN)
 	var participants: Array = []
+	var win := battle.outcome == Enums.Outcome.PLAYERS_WIN
 	for rec in _members(room):
 		var c := battle.state.get_c(rec.combatant_id)
+		# every encounter pays the same gold to everyone still in the fight when it is won
 		participants.append({"character_id": rec.character["id"], "outcome": _fate(c),
+			"gold": _encounter_of(room).gold if win and c.life_state != Enums.LifeState.ESCAPED else 0,
 			"items_used": c.items_used.duplicate(), "items_gained": c.items_gained.duplicate(), "flags_set": c.flags_gained.duplicate()})
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String
 	for attempt in 5:
-		var r := await persistence.commit_result(room.world_id, key, outcome_name, battle.state.round_number, participants)
+		var r := await persistence.commit_result(room.world_id, key, outcome_name, battle.state.round_number, participants, room.instance_id)
 		if r["ok"]:
+			room.result_info["rewards"] = r.get("rewards", {})
 			print("[server] result committed (%s%s)" % [key, ", duplicate" if r["duplicate"] else ""])
 			return
 		push_warning("[server] result commit failed (%s); retrying" % r["error"])
 		await get_tree().create_timer(1.0 * (attempt + 1)).timeout
 	push_error("[server] could not persist result %s" % key)
+
+
+func _encounter_of(room: Room) -> EncounterDef:
+	return room.def if room.def != null else Encounter.definition()
 
 
 func _finish_instance(instance_id: String, success: bool) -> void:

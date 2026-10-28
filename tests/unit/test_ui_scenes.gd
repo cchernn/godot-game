@@ -574,8 +574,8 @@ func _overview() -> Dictionary:
 	return {"nodes": [{"id": "hollowmere", "name": "Hollowmere", "kind": "settlement"}, {"id": "blackwood", "name": "The Blackwood", "kind": "wilderness"},
 			{"id": "ashen_keep", "name": "Ashen Keep", "kind": "dungeon"}],
 		"routes": [{"id": "road", "from": "hollowmere", "to": "blackwood", "travel_days": 2}],
-		"activities": [{"id": "cellar_rats", "node": "hollowmere", "name": "Clear the cellar", "kind": "minor", "available": true, "max_players": 4},
-			{"id": "wolf_hunt", "node": "blackwood", "name": "Thin the wolf pack", "kind": "minor", "available": true, "max_players": 4}]}
+		"activities": [{"id": "cellar_rats", "node": "hollowmere", "name": "Clear the cellar", "class": "job", "type": "battle", "available": true, "max_players": 4},
+			{"id": "wolf_hunt", "node": "blackwood", "name": "Thin the wolf pack", "class": "job", "type": "battle", "available": true, "max_players": 4}]}
 
 
 func test_overworld_rules_say_why_travel_and_start_are_not_possible() -> void:

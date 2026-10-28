@@ -376,3 +376,13 @@ func test_hovering_a_unit_highlights_the_unit_and_a_tile_gets_a_border() -> void
 	assert_true(not enemy.hover_ring.visible)
 	assert_eq(board._overlays["hover"].filter(func(m: MeshInstance3D) -> bool: return m.visible).size(), 1, "a tile gets its border")
 	c.free()
+
+
+func test_the_result_lists_the_gold_and_items_the_battle_paid() -> void:
+	var db := SkillDb.load_file()
+	var script := load("res://game/client/client_main.gd")
+	var lines: Array[String] = script.reward_lines({"gold": 25, "items": {"potion": 2}, "flags": ["quiet"]}, db)
+	assert_eq(lines[0], "+25 gold")
+	assert_eq(lines.size(), 2, "flags are not shown")
+	assert_true(script.reward_lines({}, db).is_empty() and script.reward_lines({"gold": 0}, db).is_empty(), "nothing earned, nothing listed")
+	assert_true(Encounter.definition().gold > 0, "the prototype encounter pays gold")

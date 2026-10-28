@@ -13,5 +13,6 @@
 script = ExtResource("9_ofuep")
 map = ExtResource("8_o6c02")
 max_party = 4
+gold = 25
 classes = Array[ExtResource("1_a64oc")]([ExtResource("2_l7fi6"), ExtResource("3_7l5xe"), ExtResource("4_ukqwb")])
 enemies = Array[ExtResource("1_a64oc")]([ExtResource("6_ciasf"), ExtResource("6_ciasf"), ExtResource("7_wsoml")])

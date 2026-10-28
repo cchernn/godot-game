@@ -11,6 +11,8 @@ extends Resource
 ## The most players the battle seats. 0 = one seat per class. Seats beyond the class list start as the classes again, in order
 ## (a seat's class is replaced by the character's own anyway).
 @export_range(0, 8) var max_party: int = 0
+## Gold each player who is still in the fight at the end of a win receives (the same for everyone). PROVISIONAL; 0 = none.
+@export_range(0, 100000) var gold: int = 0
 ## Enemies in order: the first stands on spawn marker E0, the second on E1, and so on.
 @export var enemies: Array[UnitTemplate] = []
 

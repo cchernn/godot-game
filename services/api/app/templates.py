@@ -41,6 +41,41 @@ def _unique(items: list[dict], what: str) -> dict:
     return out
 
 
+ACTIVITY_CLASSES = ("campaign", "quest", "job")
+ACTIVITY_TYPES = ("battle", "story")
+_ID = r"[a-z0-9_]+"
+
+
+def _check_activity(a: dict, nodes: dict, routes: dict) -> None:
+    """An activity has a type (what is played: battle, story) and a class (its role in the world: campaign = once per world,
+    quest = once per character, optionally only for one class, job = repeatable). `rewards` is authored per activity."""
+    name = f"activity {a['id']}"
+    if a["node"] not in nodes:
+        raise TemplateError(f"{name} is invalid")
+    if a.get("class") not in ACTIVITY_CLASSES:
+        raise TemplateError(f"{name} needs a class: {', '.join(ACTIVITY_CLASSES)}")
+    kind = a.get("type")
+    if kind not in ACTIVITY_TYPES:
+        raise TemplateError(f"{name} needs a type: {', '.join(ACTIVITY_TYPES)}")
+    content = "encounter" if kind == "battle" else "story"
+    if not re.fullmatch(_ID, str(a.get(content, ""))):
+        raise TemplateError(f"{name} needs a {content} id")
+    if not isinstance(a.get("max_players"), int) or a["max_players"] < 1:
+        raise TemplateError(f"{name} needs max_players")
+    if "audience" in a and (a["class"] != "quest" or not re.fullmatch(_ID, str(a["audience"]))):
+        raise TemplateError(f"{name}: only a quest can name an audience (a class id)")
+    rewards = a.get("rewards", {})
+    for flag in rewards.get("flags", []):
+        if not re.fullmatch(_ID, str(flag)):
+            raise TemplateError(f"{name} has a bad reward flag {flag!r}")
+    for it in rewards.get("items", []):
+        if not re.fullmatch(_ID, str(it.get("id", ""))) or not isinstance(it.get("count"), int) or it["count"] < 1:
+            raise TemplateError(f"{name} has a bad reward item {it!r}")
+    for rv in rewards.get("reveal", []):
+        if rv["id"] not in {"node": nodes, "route": routes}.get(rv["kind"], {}):
+            raise TemplateError(f"{name} reveals unknown {rv}")
+
+
 def parse(raw: dict) -> WorldDefinition:
     try:
         nodes = _unique(raw["nodes"], "node")
@@ -52,17 +87,7 @@ def parse(raw: dict) -> WorldDefinition:
             if r["from"] not in nodes or r["to"] not in nodes or r["travel_days"] <= 0:
                 raise TemplateError(f"route {r['id']} is invalid")
         for a in activities.values():
-            if a["node"] not in nodes or a["kind"] not in ("minor", "major"):
-                raise TemplateError(f"activity {a['id']} is invalid")
-            if not re.fullmatch(r"[a-z0-9_]+", str(a.get("encounter", ""))):
-                raise TemplateError(f"activity {a['id']} needs an encounter id")
-            if not isinstance(a.get("max_players"), int) or a["max_players"] < 1:
-                raise TemplateError(f"activity {a['id']} needs max_players")
-            if a.get("one_time") and a["kind"] != "major":
-                raise TemplateError("only major activities can be one-time")
-            for rv in a.get("on_complete", {}).get("reveal", []):
-                if rv["id"] not in {"node": nodes, "route": routes}.get(rv["kind"], {}):
-                    raise TemplateError(f"activity {a['id']} reveals unknown {rv}")
+            _check_activity(a, nodes, routes)
         return WorldDefinition(raw["id"], int(raw["version"]), raw["start_node"], raw.get("rules", {}), nodes, routes, activities)
     except KeyError as e:
         raise TemplateError(f"missing field {e}") from e
