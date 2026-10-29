@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="StoryDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/story_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/story_slide.gd" id="2_slide"]
+[ext_resource type="Script" path="res://game/shared/domain/story_choice.gd" id="3_choice"]
+[ext_resource type="Resource" path="res://game/content/stories/actors/scout.tres" id="a_scout"]
+
+[sub_resource type="Resource" id="S0"]
+script = ExtResource("2_slide")
+text = "Where the lich fell, the ground slopes away into a great round hollow, tier on tier of weathered stone like an old theatre."
+backdrop_color = Color(0.1, 0.1, 0.13, 1)
+
+[sub_resource type="Resource" id="S1"]
+script = ExtResource("2_slide")
+text = "In the middle, a pedestal rises from a black pond, linked to the rim by four narrow bridges. Carved wolves ring the seats, each with its muzzle lifted."
+
+[sub_resource type="Resource" id="S2"]
+script = ExtResource("2_slide")
+actor = ExtResource("a_scout")
+side = 1
+text = "I have seen this shape in the elder's old drawings. The serpent was sealed below this place."
+
+[sub_resource type="Resource" id="S3"]
+script = ExtResource("2_slide")
+actor = ExtResource("a_scout")
+side = 1
+text = "Walk softly. Those statues are watching us."
+
+[sub_resource type="Resource" id="S4"]
+script = ExtResource("2_slide")
+text = "Somewhere under the water, something shifts. The stone wolves open their eyes."
+clear_stage = true
+
+[resource]
+script = ExtResource("1_def")
+title = "The Sunken Theatre"
+slides = Array[ExtResource("2_slide")]([SubResource("S0"), SubResource("S1"), SubResource("S2"), SubResource("S3"), SubResource("S4")])

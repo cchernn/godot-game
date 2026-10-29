@@ -81,3 +81,28 @@ func test_a_character_who_was_downed_stands_up_at_the_revive_fraction() -> void:
 	assert_eq(EventRun.hp_after(33, 40, 25), 33, "a healthy character keeps their hit points")
 	assert_eq(EventRun.hp_after(99, 40, 25), 40, "and never goes above the maximum")
 	assert_eq(EventRun.hp_after(0, 1, 0), 1, "at least 1")
+
+
+## An event routes on the id of the choice the party made in a story, so each step choice must exist in its story and the other way round.
+func test_event_story_choices_match_the_stories_they_route_on() -> void:
+	var raw: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://services/api/templates/prototype@1.json"))
+	for a: Dictionary in (raw as Dictionary)["activities"]:
+		if a["type"] != "event":
+			continue
+		for step: Dictionary in a["steps"]:
+			if step["type"] != "story":
+				continue
+			var story := StoryDef.load_story(str(step["story"]))
+			assert_true(story != null, "%s: story %s exists" % [a["id"], step["story"]])
+			if story == null:
+				continue
+			var in_story: Array[String] = []
+			for slide in story.slides:
+				for c in slide.choices:
+					in_story.append(c.id)
+			in_story.sort()
+			var in_step: Array[String] = []
+			for c: Dictionary in step.get("choices", []):
+				in_step.append(str(c["id"]))
+			in_step.sort()
+			assert_eq(in_story, in_step, "%s step %s: choices agree with the story" % [a["id"], step["id"]])

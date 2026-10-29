@@ -1032,3 +1032,22 @@ def test_a_lost_battle_step_pays_its_lose_rewards_and_a_failed_event_pays_no_end
     me = c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()
     assert me["gold"] == 1 and me["flags"] == []
     assert not next(a for a in overview(c, w["id"], t1)["activities"] if a["id"] == "haunting")["completed"]
+
+
+def test_the_emerald_serpent_opens_after_the_hub_story_and_needs_the_party_in_the_woods(client, pool):
+    w, [t1, _], [c1, _c2] = party(client, pool)
+    pid = my_party(client, w["id"], t1)["id"]
+    nodes = lambda: {n["id"] for n in overview(client, w["id"], t1)["nodes"]}
+    assert "lost_woods" not in nodes()
+    assert start(client, pid, t1, "emerald_serpent").status_code == 403, "an undiscovered place cannot be played"
+    story = new_party(client, w["id"], t1, "elder_rumor")
+    assert client.post(f"/internal/instances/{story}/complete", json={"participants": [c1["id"]]}, headers=SERVER).status_code == 200
+    assert "lost_woods" in nodes()
+    event = next(a for a in overview(client, w["id"], t1)["activities"] if a["id"] == "emerald_serpent")
+    assert event["type"] == "event" and event["class"] == "quest" and event["available"]
+    r = start(client, pid, t1, "emerald_serpent")
+    assert r.status_code == 403 and "location" in r.json()["detail"], "the party must be at the woods first"
+    assert client.post(f"/parties/{pid}/travel", json={"node_id": "lost_woods"}, headers=auth(t1)).status_code == 200
+    iid = start(client, pid, t1, "emerald_serpent").json()["id"]
+    inst = client.get(f"/internal/instances/{iid}", headers=SERVER).json()
+    assert [s["id"] for s in inst["steps"]] == ["arrival", "trolls", "lich_intro", "lich", "theatre_intro", "statues", "pit_intro", "dragon", "epilogue"]

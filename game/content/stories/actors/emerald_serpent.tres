@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="StoryActor" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/story_actor.gd" id="1_actor"]
+
+[resource]
+script = ExtResource("1_actor")
+id = "emerald_serpent"
+display_name = "The Emerald Serpent"
+color = Color(0.2, 0.7, 0.45, 1)
