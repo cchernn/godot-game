@@ -916,6 +916,8 @@ def test_shop_and_event_activities_are_validated():
                    lambda d: act(d, "haunting")["steps"][1].pop("encounter"),
                    lambda d: act(d, "haunting")["steps"][1].update({"rewards": {"gold": -1}}),
                    lambda d: act(d, "haunting")["steps"][0].update({"rewards": {"flags": ["Bad Flag"]}}),
+                   lambda d: act(d, "haunting")["steps"][0].update({"lose_rewards": {"gold": 1}}),  # a story cannot be lost
+                   lambda d: act(d, "haunting")["steps"][1].update({"lose_rewards": {"gold": -1}}),
                    lambda d: act(d, "haunting").update({"on_fail": "never"}),
                    lambda d: act(d, "haunting")["steps"][1].update({"id": "dawn"}),  # duplicate id
                    lambda d: act(d, "haunting")["steps"][1].update({"id": "end"}),

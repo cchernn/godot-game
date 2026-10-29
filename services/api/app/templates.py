@@ -99,6 +99,9 @@ def _check_steps(name: str, steps: list[dict], nodes: dict, routes: dict) -> Non
             raise TemplateError(f"{where} needs a unique id (not {' or '.join(ENDINGS)})")
         ids.add(sid)
         _check_rewards(where, step.get("rewards", {}), nodes, routes)
+        if "lose_rewards" in step and step["type"] != "battle":
+            raise TemplateError(f"{where}: only a battle can be lost")
+        _check_rewards(where + " (lost)", step.get("lose_rewards", {}), nodes, routes)
         if step["type"] == "battle" and ("next" in step or "choices" in step):
             raise TemplateError(f"{where}: a battle leads on with on_win and on_lose")
         if step["type"] == "story" and ("on_win" in step or "on_lose" in step):
