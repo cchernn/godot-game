@@ -1051,3 +1051,15 @@ def test_the_emerald_serpent_opens_after_the_hub_story_and_needs_the_party_in_th
     iid = start(client, pid, t1, "emerald_serpent").json()["id"]
     inst = client.get(f"/internal/instances/{iid}", headers=SERVER).json()
     assert [s["id"] for s in inst["steps"]] == ["arrival", "trolls", "lich_intro", "lich", "theatre_intro", "statues", "pit_intro", "dragon", "epilogue"]
+
+
+def test_a_campaign_activity_added_after_the_world_was_made_can_still_be_completed(pool, client):
+    w, [t1, _], [c1, _c2] = party(client, pool)
+    with pool.connection() as conn:  # a world created before the template had this campaign activity
+        conn.execute("delete from world_activities where world_id=%s and activity_id='elder_rumor'", (w["id"],))
+    iid = new_party(client, w["id"], t1, "elder_rumor")
+    done = client.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER)
+    assert done.status_code == 200, done.text
+    assert "lost_woods" in {n["id"] for n in overview(client, w["id"], t1)["nodes"]}
+    again = client.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER)
+    assert again.json()["duplicate"]

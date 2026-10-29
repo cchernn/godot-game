@@ -15,6 +15,12 @@ var _welcomes: int = 0
 var _finished: bool = false
 var _escape_round: int = -1
 var _escaped: bool = false
+## --event: play a story or a chain of steps (stories and battles) to the end instead of stopping after one battle.
+var _multi: bool = false
+var _timeout: float = 150.0
+var _pick: int = 0 # --story-choice=n: which option to take at a story choice
+var _name: String = "Bot"
+var _last_slide: String = ""
 
 
 func _ready() -> void:
@@ -39,8 +45,15 @@ func _ready() -> void:
 			_drop_plan_round = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--escape-at-round="):
 			_escape_round = int(arg.get_slice("=", 1))
+		elif arg == "--event":
+			_multi = true
+		elif arg.begins_with("--timeout="):
+			_timeout = float(arg.get_slice("=", 1))
+		elif arg.begins_with("--story-choice="):
+			_pick = int(arg.get_slice("=", 1))
 		elif arg.begins_with("--drop-at-round="):
 			_drop_round = int(arg.get_slice("=", 1))
+	_name = nm
 	net = NetClient.new()
 	net.persist_token = false
 	net.access_token = access
@@ -49,10 +62,15 @@ func _ready() -> void:
 	add_child(net)
 	net.welcomed.connect(func(i: Dictionary) -> void:
 		_welcomes += 1
+		_planned_round = -1 # a new step may start at round 1 again
 		print("[%s] welcomed #%d as %s" % [nm, _welcomes, i["combatant_id"]]))
 	net.notice.connect(func(t: String) -> void: print("[%s] notice: %s" % [nm, t]))
 	net.lobby.connect(func(i: Dictionary) -> void: print("[%s] lobby: %s (need %d)" % [nm, str(i["players"]), i["needed"]]))
-	net.result.connect(func(i: Dictionary) -> void: print("[bot] RESULT %s you=%s saved=%s" % [i["outcome"], i["you"], str(i["saved"])]))
+	net.result.connect(func(i: Dictionary) -> void:
+		print("[bot] RESULT %s you=%s saved=%s rewards=%s" % [i["outcome"], i["you"], str(i["saved"]), str(i.get("rewards", {}))])
+		if _multi and i["saved"] and ["story_complete", "event_complete", "event_failed"].has(i["outcome"]):
+			get_tree().create_timer(0.5).timeout.connect(func() -> void: get_tree().quit(0)))
+	net.story.connect(_on_story)
 	net.rejected.connect(func(t: String) -> void:
 		print("[%s] rejected: %s" % [nm, t])
 		if t.begins_with("Sign-in failed") or t.begins_with("Create a character") or t.begins_with("Guest access") \
@@ -67,7 +85,7 @@ func _ready() -> void:
 	net.snapshot.connect(_on_snapshot)
 	net.start(url, nm)
 	# Safety net so a stuck run never hangs CI.
-	get_tree().create_timer(150.0).timeout.connect(func() -> void:
+	get_tree().create_timer(_timeout).timeout.connect(func() -> void:
 		print("[%s] TIMEOUT" % nm)
 		get_tree().quit(2))
 
@@ -93,6 +111,8 @@ func _on_snapshot(s: Dictionary) -> void:
 		return
 	if _escaped and not s.get("escaped", false) and s["phase"] != Enums.RoundPhase.FINISHED:
 		print("[%s] ERROR still in the fight after escaping" % name)
+	if s["phase"] == Enums.RoundPhase.FINISHED and _multi:
+		return # one step of a longer run is over; the next one (or the final result) follows
 	if s["phase"] == Enums.RoundPhase.FINISHED and not _finished:
 		_finished = true
 		print("[bot] FINISHED outcome=%d round=%d me=%s" % [s["outcome"], s["round"], str(me.get("hp", "-"))])
@@ -148,3 +168,22 @@ func _make_plan(s: Dictionary, me: Dictionary) -> Array:
 	if not target.is_empty():
 		plan.append({"skill": "strike", "target": target["id"]})
 	return plan
+
+
+## Reads each slide the server shows and presses Continue, or picks an option when the slide offers choices and this bot is the leader.
+func _on_story(state: Dictionary) -> void:
+	if state["finished"]:
+		return
+	var story := StoryDef.load_story(str(state["story"]))
+	if story == null:
+		print("[%s] ERROR unknown story %s" % [_name, state["story"]])
+		return
+	var slide := story.slides[(state["path"] as Array).back() as int]
+	if _last_slide != "%s/%s" % [state["story"], str((state["path"] as Array).size())]:
+		_last_slide = "%s/%s" % [state["story"], str((state["path"] as Array).size())]
+		print("[%s] STORY %s: %s" % [_name, slide.actor.display_name if slide.actor != null else "-", slide.text.left(60)])
+	if not slide.choices.is_empty():
+		if state["can_choose"]:
+			net.send_story_choice(slide.choices[mini(_pick, slide.choices.size() - 1)].id)
+	elif not state["you_continued"]:
+		net.send_story_continue()

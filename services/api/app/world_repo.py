@@ -384,6 +384,8 @@ class WorldMixin:
             act = self.definition(wid).activities[inst["activity_id"]]
             changed = False
             if act["class"] == "campaign":
+                # a world made before this campaign activity was added to the template has no row for it yet
+                conn.execute("insert into world_activities (world_id, activity_id) values (%s,%s) on conflict do nothing", (wid, inst["activity_id"]))
                 won = conn.execute("update world_activities set status='completed', completed_by_instance=%s, completed_at=now() "
                                    "where world_id=%s and activity_id=%s and status='available' returning activity_id",
                                    (instance_id, wid, inst["activity_id"])).fetchone()
