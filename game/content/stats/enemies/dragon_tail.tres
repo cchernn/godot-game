@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_unit"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/tail_lash.tres" id="s_tail_lash"]
+
+[resource]
+script = ExtResource("1_unit")
+id = "dragon_tail"
+display_name = "Dragon's Tail"
+vitality = 8
+might = 3
+dexterity = 5
+agility = 1
+immobile = true
+skills = Array[ExtResource("skilldef")]([ExtResource("s_tail_lash")])

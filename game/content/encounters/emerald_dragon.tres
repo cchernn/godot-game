@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="EncounterDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_unit"]
+[ext_resource type="Script" path="res://game/shared/domain/encounter_def.gd" id="2_enc"]
+[ext_resource type="Script" path="res://game/shared/domain/encounter_trigger.gd" id="3_trg"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/warrior.tres" id="c_warrior"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/hunter.tres" id="c_hunter"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/mage.tres" id="c_mage"]
+[ext_resource type="PackedScene" path="res://game/content/maps/dragon_pit.tscn" id="map"]
+[ext_resource type="Resource" path="res://game/content/stats/enemies/dragon_tail.tres" id="e_dragon_tail"]
+[ext_resource type="Resource" path="res://game/content/stats/enemies/half_dragon.tres" id="e_half_dragon"]
+[ext_resource type="Resource" path="res://game/content/stats/enemies/leshen.tres" id="e_leshen"]
+
+[sub_resource type="Resource" id="Trigger_0"]
+script = ExtResource("3_trg")
+when = 1
+enemy = 0
+effect = 1
+targets = PackedInt32Array(2)
+message = "The ground splits and a leshen strides out of the roots."
+
+[sub_resource type="Resource" id="Trigger_1"]
+script = ExtResource("3_trg")
+when = 1
+enemy = 0
+effect = 2
+targets = PackedInt32Array(1)
+message = ""
+
+[resource]
+script = ExtResource("2_enc")
+map = ExtResource("map")
+max_party = 4
+gold = 10
+classes = Array[ExtResource("1_unit")]([ExtResource("c_warrior"), ExtResource("c_hunter"), ExtResource("c_mage")])
+enemies = Array[ExtResource("1_unit")]([ExtResource("e_half_dragon"), ExtResource("e_dragon_tail"), ExtResource("e_leshen")])
+triggers = Array[ExtResource("3_trg")]([SubResource("Trigger_0"), SubResource("Trigger_1")])

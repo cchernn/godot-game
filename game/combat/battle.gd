@@ -65,7 +65,59 @@ func start() -> void:
 	_begin_planning()
 
 
+# ---------- Encounter triggers ----------
+
+## Fires every trigger whose moment has come: wakes, brings in or removes the enemies it names. Runs when a round begins and after each beat.
+func _run_triggers() -> void:
+	for t: Dictionary in triggers:
+		if t["done"]:
+			continue
+		var fire := false
+		if t["when"] == EncounterTrigger.When.ROUND_REACHED:
+			fire = state.round_number >= int(t["round"])
+		else:
+			var watched := state.get_c(t["watch"])
+			fire = watched != null and (watched.life_state == Enums.LifeState.ELIMINATED or watched.life_state == Enums.LifeState.ESCAPED)
+		if not fire:
+			continue
+		t["done"] = true
+		if str(t["message"]) != "":
+			emit("trigger", str(t["message"]), "", "", {}, true)
+		for id: String in t["targets"]:
+			var c := state.get_c(id)
+			if c == null or c.life_state != Enums.LifeState.ALIVE:
+				continue
+			match t["effect"]:
+				EncounterTrigger.Effect.WAKE:
+					c.dormant = false
+					emit("wake", "{a} stirs!", c.id, "", {}, true)
+				EncounterTrigger.Effect.APPEAR:
+					c.in_reserve = false
+					c.cell = _free_cell_near(c.cell)
+					emit("appear", "{a} appears!", c.id, "", {}, true)
+				EncounterTrigger.Effect.REMOVE:
+					c.life_state = Enums.LifeState.ELIMINATED
+					emit("removed", "{a} falls still.", c.id, "", {}, true)
+
+
+## `cell` if nobody stands there, else the nearest walkable tile that is empty.
+func _free_cell_near(cell: Vector2i) -> Vector2i:
+	for radius in range(0, 8):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if absi(dx) + absi(dy) != radius:
+					continue
+				var c := cell + Vector2i(dx, dy)
+				if bf.in_bounds(c) and not bf.is_blocked(c) and state.at_cell(c) == null and not bf.object_blocks.has(c):
+					return c
+	return cell
+
+
 # ---------- Planning ----------
+
+## The encounter's triggers (see EncounterDef.triggers): {when, round, watch, effect, targets, message, done}.
+var triggers: Array[Dictionary] = []
+
 
 func _begin_planning() -> void:
 	state.phase = Enums.RoundPhase.PLANNING
@@ -87,6 +139,7 @@ func _begin_planning() -> void:
 		c.shield = 0 # a shield lasts until the end of the round (PROVISIONAL)
 		c.beat_shield = 0
 	emit("round_start", "Round %d begins. Planning." % state.round_number)
+	_run_triggers()
 	# AI plans simultaneously with the players, under the same rules; hidden until execution.
 	for c: Combatant in state.team_members(Enums.Team.ENEMIES):
 		if ai_enabled and c.is_active(state.round_number):
@@ -194,6 +247,7 @@ func resolve_next_beat() -> void:
 		return
 	beat += 1
 	_resolver.run_beat()
+	_run_triggers() # before the verdict: a boss's fall may bring the next one in
 	if not _conclude() and beat >= beats_per_round:
 		_end_round()
 
@@ -336,7 +390,7 @@ func snapshot_for(cid: String) -> Dictionary:
 			continue
 		var u := {"id": c.id, "name": c.display_name, "visual": c.visual, "team": c.team, "cell": c.cell, "facing": c.facing,
 			"hp": c.hp, "max_hp": c.max_hp, "shield": c.shield + c.beat_shield, "life": c.life_state, "ready": c.ready,
-			"active": c.is_active(state.round_number), "revived": c.revived_this_encounter,
+			"active": c.is_active(state.round_number), "dormant": c.dormant, "revived": c.revived_this_encounter,
 			"armor": c.stat("armor"), "statuses": _status_view(c), "stunned": c.has_condition("stunned"), "rooted": c.has_condition("rooted"), "maimed": c.has_condition("maimed")}
 		if own:
 			u["skills"] = c.skills

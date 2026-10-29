@@ -46,7 +46,7 @@ look (the rig then drives the camera size).
    - **The block's name decides the tile kind** (looked at on the top block of each column):
      names starting with `wall` = blocked, `rough` = difficult terrain (costs more AP), anything else = normal.
    - A column with no blocks is blocked (a hole). The prototype's walls are 4 blocks tall for looks; any height works.
-3. **Spawns:** the `Spawns` node holds `Marker3D`s. `P0`..`P3` are the player seats, `E0`..`E2` the enemy spots. Drag them
+3. **Spawns:** the `Spawns` node holds `Marker3D`s. `P0`..`P3` are the player seats, `E0`.. the enemy spots (the first enemy in the encounter stands on `E0`, the next on `E1`, and so on). Drag them
    (they snap to whichever tile column they sit above). Names must start with `P` or `E`.
 4. Keep the GridMap's **Cell Size** at 1 x 0.5 x 1 and cell centering on, unless you also change the tile meshes.
 
@@ -54,7 +54,7 @@ look (the rig then drives the camera size).
 If they disagree, the client logs a warning and draws the server's layout, and the game follows the server's.
 
 ## Changing tile blocks
-- Colours and textures: edit `tiles/materials/ground.tres`, `rough.tres`, `wall.tres` directly; the blocks update at once.
+- Colours and textures: edit the files in `tiles/materials/` directly (`ground`, `rough`, `wall`, and the Lost Woods blocks `ground_grass`, `ground_stone`, `ground_earth`, `rough_roots`, `wall_tree`, `wall_gate`, `wall_water`, `wall_rubble`); the blocks update at once.
 - Shapes or new block types: open `tiles/tiles_source.tscn`. Each `MeshInstance3D` child is one block, and its **node name
   is the block name** (so a new `wall_stone` child is a blocked block). Then **Scene > Export As > MeshLibrary...** and save over
   `tiles/tiles.tres`. Add new blocks at the end: maps remember blocks by their position in the library.
@@ -71,6 +71,11 @@ If they disagree, the client logs a warning and draws the server's layout, and t
   `unit_visuals.tres` and add an entry under **Scenes**. The key is the **lower-case template name** (`warrior`, `hunter`, `mage`,
   `ghoul`, `cultist`); anything without an entry uses the default scene.
 - Colours, health-bar size and pick size are exported on the root (`Look` and `Picking` groups).
+
+## Triggers, dormant and immobile enemies (Inspector)
+- An encounter's **Triggers** list (`EncounterTrigger`) makes things happen mid-fight. **When:** a round beginning (`Round Reached` + `At Round`) or one of the enemies being defeated (`Enemy Defeated` + `Enemy`, its place in the Enemies list, 0 = first). **Effect** on the enemies listed in **Targets** (also places in the Enemies list): `Wake` (they start dormant: on the map, dimmed, inert, and can be attacked, until the trigger wakes them), `Appear` (they start off the map and arrive on their spawn marker, or the nearest free tile, when it fires) or `Remove` (they fall still and leave the fight). **Message** goes in the combat log. A dormant or not-yet-arrived enemy still counts as an enemy left to beat.
+- A unit template's **Behaviour > Immobile** keeps a unit rooted: it cannot walk and its AI only attacks what is already within reach (the half dragon and its buried tail).
+- `emerald_dragon.tres` is the worked example: the leshen starts off the map and arrives when the half dragon falls, and the tail is removed at the same moment.
 
 ## Highlights and look
 - `board/materials/fog.tres` (unseen tiles), `move.tres` (planned path), `target.tres` (planned attack), `hover.tres` (cursor), `path.tres` (the walk to the hovered tile).

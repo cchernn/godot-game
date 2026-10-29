@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EncounterDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_unit"]
+[ext_resource type="Script" path="res://game/shared/domain/encounter_def.gd" id="2_enc"]
+[ext_resource type="Script" path="res://game/shared/domain/encounter_trigger.gd" id="3_trg"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/warrior.tres" id="c_warrior"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/hunter.tres" id="c_hunter"]
+[ext_resource type="Resource" path="res://game/content/stats/classes/mage.tres" id="c_mage"]
+[ext_resource type="PackedScene" path="res://game/content/maps/theatre.tscn" id="map"]
+[ext_resource type="Resource" path="res://game/content/stats/enemies/wolf_statue.tres" id="e_wolf_statue"]
+
+[sub_resource type="Resource" id="Trigger_0"]
+script = ExtResource("3_trg")
+when = 0
+at_round = 2
+effect = 0
+targets = PackedInt32Array(0, 1, 2, 3, 4, 5)
+message = "The stone wolves shudder and open their eyes."
+
+[resource]
+script = ExtResource("2_enc")
+map = ExtResource("map")
+max_party = 4
+gold = 10
+classes = Array[ExtResource("1_unit")]([ExtResource("c_warrior"), ExtResource("c_hunter"), ExtResource("c_mage")])
+enemies = Array[ExtResource("1_unit")]([ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue")])
+triggers = Array[ExtResource("3_trg")]([SubResource("Trigger_0")])

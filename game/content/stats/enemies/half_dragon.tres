@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_unit"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/fire_breath.tres" id="s_fire_breath"]
+[ext_resource type="Resource" path="res://game/content/skills/power_strike.tres" id="s_power_strike"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
+
+[resource]
+script = ExtResource("1_unit")
+id = "half_dragon"
+display_name = "Half Dragon"
+vitality = 14
+might = 4
+dexterity = 6
+agility = 1
+immobile = true
+skills = Array[ExtResource("skilldef")]([ExtResource("s_fire_breath"), ExtResource("s_power_strike"), ExtResource("s_strike")])

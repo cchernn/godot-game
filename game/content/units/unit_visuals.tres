@@ -6,6 +6,18 @@
 [ext_resource type="PackedScene" path="res://game/content/units/mage.tscn" id="4_o0im5"]
 [ext_resource type="PackedScene" path="res://game/content/units/ghoul.tscn" id="6_1xsx5"]
 [ext_resource type="PackedScene" path="res://game/content/units/cultist.tscn" id="7_33620"]
+[ext_resource type="PackedScene" path="res://game/content/units/troll.tscn" id="v_troll"]
+[ext_resource type="PackedScene" path="res://game/content/units/lich.tscn" id="v_lich"]
+[ext_resource type="PackedScene" path="res://game/content/units/wolf_statue.tscn" id="v_wolf_statue"]
+[ext_resource type="PackedScene" path="res://game/content/units/half_dragon.tscn" id="v_half_dragon"]
+[ext_resource type="PackedScene" path="res://game/content/units/dragon_tail.tscn" id="v_dragon_tail"]
+[ext_resource type="PackedScene" path="res://game/content/units/leshen.tscn" id="v_leshen"]
+[ext_resource type="PackedScene" path="res://game/content/units/troll.tscn" id="v_troll"]
+[ext_resource type="PackedScene" path="res://game/content/units/lich.tscn" id="v_lich"]
+[ext_resource type="PackedScene" path="res://game/content/units/wolf_statue.tscn" id="v_wolf_statue"]
+[ext_resource type="PackedScene" path="res://game/content/units/half_dragon.tscn" id="v_half_dragon"]
+[ext_resource type="PackedScene" path="res://game/content/units/dragon_tail.tscn" id="v_dragon_tail"]
+[ext_resource type="PackedScene" path="res://game/content/units/leshen.tscn" id="v_leshen"]
 [ext_resource type="Script" path="res://game/client/board/unit_visuals.gd" id="8_ekr3v"]
 
 [resource]
@@ -16,5 +28,17 @@ scenes = Dictionary[String, PackedScene]({
 "cultist": ExtResource("7_33620"),
 "ghoul": ExtResource("6_1xsx5"),
 "hunter": ExtResource("3_i463w"),
-"warrior": ExtResource("2_mdx8e")
+"warrior": ExtResource("2_mdx8e"),
+"troll": ExtResource("v_troll"),
+"lich": ExtResource("v_lich"),
+"wolf_statue": ExtResource("v_wolf_statue"),
+"half_dragon": ExtResource("v_half_dragon"),
+"dragon_tail": ExtResource("v_dragon_tail"),
+"leshen": ExtResource("v_leshen"),
+"troll": ExtResource("v_troll"),
+"lich": ExtResource("v_lich"),
+"wolf_statue": ExtResource("v_wolf_statue"),
+"half_dragon": ExtResource("v_half_dragon"),
+"dragon_tail": ExtResource("v_dragon_tail"),
+"leshen": ExtResource("v_leshen")
 })

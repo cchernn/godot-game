@@ -25,6 +25,8 @@ func plan_for(battle: Battle, c: Combatant) -> Array[PlannedAction]:
 			blocked[o.cell] = true
 	var search := Pathfinder.search(bf, c.cell, blocked, max_step)
 	var cells: Array = (search["cost"] as Dictionary).keys()
+	if c.immobile:
+		cells = [c.cell] # it can only stand where it is
 	cells.sort_custom(func(p: Vector2i, q: Vector2i) -> bool:
 		var cp: int = search["cost"][p]
 		var cq: int = search["cost"][q]
@@ -124,7 +126,7 @@ func _build(c: Combatant, sk: SkillDef, t: Combatant, path: Array[Vector2i]) -> 
 func _approach(battle: Battle, c: Combatant, targets: Array[Combatant], search: Dictionary,
 		cells: Array, tpa: int, sur: int) -> Array[PlannedAction]:
 	var out: Array[PlannedAction] = []
-	if targets.is_empty() or not c.skills.has("move"):
+	if targets.is_empty() or not c.skills.has("move") or c.immobile:
 		return out
 	var best_cell := c.cell
 	var best_dist := 9999

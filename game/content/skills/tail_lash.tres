@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/interrupt_effect.gd" id="5_def"]
+[ext_resource type="Script" path="res://game/shared/domain/area_shape.gd" id="6_def"]
+
+[sub_resource type="Resource" id="Damage_lash"]
+script = ExtResource("4_def")
+base = 6
+
+[sub_resource type="Resource" id="Interrupt_lash"]
+script = ExtResource("5_def")
+points = 1
+
+[sub_resource type="Resource" id="Stage_lash"]
+script = ExtResource("2_def")
+stage_name = "lash"
+effects = Array[ExtResource("3_def")]([SubResource("Damage_lash"), SubResource("Interrupt_lash")])
+
+[sub_resource type="Resource" id="Area_lash"]
+script = ExtResource("6_def")
+shape = 1
+size = 1
+
+[resource]
+script = ExtResource("1_def")
+id = "tail_lash"
+display_name = "Tail Lash"
+hint = "Click a character (lashes them and the tiles beside them)"
+description = "Whip the tail across a character within two tiles; whoever stands next to them is struck too, friend or foe."
+targeting = 1
+attack_range = 2
+speed = 5
+stability = 2
+area = SubResource("Area_lash")
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_lash")])

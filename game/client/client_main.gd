@@ -274,6 +274,8 @@ func _on_events(list: Array) -> void:
 			"status_end": col = "#9a9a9a"
 			"round_start", "resolution_start": col = "#7fb2ff"
 			"victory": col = "#ffffff"
+			"trigger", "wake", "appear": col = "#ffcf5a"
+			"removed": col = "#9a9a9a"
 		if "unseen" in String(e["text"]):
 			col = "#b69af0" # something happened out of sight
 		log_view.append_text("[color=%s]%s[/color]\n" % [col, e["text"]])

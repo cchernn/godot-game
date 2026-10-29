@@ -41,6 +41,8 @@ static func validate(battle: Battle, c: Combatant, actions: Array[PlannedAction]
 		var cost := 0
 		match sk.kind:
 			Enums.SkillKind.MOVE:
+				if c.immobile:
+					return _fail("%s cannot move" % c.display_name)
 				if a.path.is_empty() or a.path.size() > 24:
 					return _fail("Invalid path")
 				var cur := pos

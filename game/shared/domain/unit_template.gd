@@ -22,6 +22,10 @@ extends Resource
 ## Sets tiles moved per AP (config "movement") and subtracts from the enemy's chance to hit.
 @export_range(1, 99) var agility: int = 8
 
+@export_group("Behaviour")
+## The unit never moves: it cannot plan a walk and its AI only attacks what is already within reach (a boss rooted to the ground, a buried tail).
+@export var immobile: bool = false
+
 @export_group("Growth")
 ## Permanent attribute gains the character earns by holding an event flag (set by an activity, an item or a story event). The attributes
 ## never go past the cap in config "stats.attribute_cap". There are no levels or experience.
@@ -116,6 +120,7 @@ func make_combatant(combatant_id: String, team: int, facing: int, cell: Vector2i
 	c.accuracy = st["accuracy"]
 	c.evasion = st["evasion"]
 	c.armor = st.get("armor", 0)
+	c.immobile = immobile
 	c.skills.assign(basics)
 	var own: Array = build["skills"] if build.has("skills") else skills.map(func(sk: SkillDef) -> String: return sk.id)
 	for sid: String in own:

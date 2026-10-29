@@ -72,6 +72,20 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 	for i in def.enemies.size():
 		battle.add_combatant(def.enemies[i].make_combatant("e%d" % i, Enums.Team.ENEMIES, Enums.Facing.WEST,
 			_spawn(map.enemy_spawns, i, "enemy spot E%d" % i), cfg))
+	for tr in def.triggers: # who starts asleep or off the map, then what sets them going
+		var ids: Array[String] = []
+		for i in tr.targets:
+			var who := battle.state.get_c("e%d" % i)
+			ids.append("e%d" % i)
+			if who == null:
+				continue
+			if tr.effect == EncounterTrigger.Effect.WAKE and not who.in_reserve:
+				who.dormant = true
+			elif tr.effect == EncounterTrigger.Effect.APPEAR:
+				who.in_reserve = true
+				who.dormant = false
+		battle.triggers.append({"when": tr.when, "round": tr.at_round, "watch": "e%d" % tr.enemy, "effect": tr.effect, "targets": ids,
+			"message": tr.message, "done": false})
 	battle.start()
 	return battle
 

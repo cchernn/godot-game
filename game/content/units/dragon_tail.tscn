@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1"]
+
+[node name="DragonsTail" instance=ExtResource("1")]
+body_scale = Vector3(0.6, 2.2, 0.6)
+enemy_color = Color(0.6, 0.25, 0.2, 1.0)

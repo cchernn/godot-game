@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="UnitTemplate" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/unit_template.gd" id="1_unit"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skilldef"]
+[ext_resource type="Resource" path="res://game/content/skills/move.tres" id="s_move"]
+[ext_resource type="Resource" path="res://game/content/skills/bolt.tres" id="s_bolt"]
+[ext_resource type="Resource" path="res://game/content/skills/fireball.tres" id="s_fireball"]
+[ext_resource type="Resource" path="res://game/content/skills/strike.tres" id="s_strike"]
+
+[resource]
+script = ExtResource("1_unit")
+id = "lich"
+display_name = "Lich"
+vitality = 8
+might = 3
+dexterity = 7
+agility = 4
+skills = Array[ExtResource("skilldef")]([ExtResource("s_move"), ExtResource("s_bolt"), ExtResource("s_fireball"), ExtResource("s_strike")])

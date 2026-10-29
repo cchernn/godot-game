@@ -15,6 +15,8 @@ extends Resource
 @export_range(0, 100000) var gold: int = 0
 ## Enemies in order: the first stands on spawn marker E0, the second on E1, and so on.
 @export var enemies: Array[UnitTemplate] = []
+## Things that happen during the fight: enemies waking up, arriving or falling away (see EncounterTrigger).
+@export var triggers: Array[EncounterTrigger] = []
 
 
 func map_id() -> String:
@@ -55,4 +57,9 @@ func problems(known: SkillDb) -> Array[String]:
 			out.append("an enemy slot is empty")
 			continue
 		out.append_array(t.problems(known))
+	for tr in triggers:
+		if tr == null:
+			out.append("a trigger slot is empty")
+		else:
+			out.append_array(tr.problems(enemies.size()))
 	return out

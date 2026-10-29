@@ -88,6 +88,8 @@ func apply(u: Dictionary, is_you: bool) -> void:
 	if status_label != null:
 		if u.get("online", true) == false:
 			status_label.text = "offline"
+		elif u.get("dormant", false):
+			status_label.text = "dormant"
 		elif not enemy and u["ready"]:
 			status_label.text = "ready"
 		else:

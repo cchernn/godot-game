@@ -3,6 +3,14 @@
 [ext_resource type="Material" path="res://game/content/tiles/materials/ground.tres" id="1_h528b"]
 [ext_resource type="Material" path="res://game/content/tiles/materials/rough.tres" id="2_kce25"]
 [ext_resource type="Material" path="res://game/content/tiles/materials/wall.tres" id="3_an7n5"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/ground_grass.tres" id="m_ground_grass"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/ground_stone.tres" id="m_ground_stone"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/ground_earth.tres" id="m_ground_earth"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/rough_roots.tres" id="m_rough_roots"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/wall_tree.tres" id="m_wall_tree"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/wall_gate.tres" id="m_wall_gate"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/wall_water.tres" id="m_wall_water"]
+[ext_resource type="Material" path="res://game/content/tiles/materials/wall_rubble.tres" id="m_wall_rubble"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_4ppq8"]
 material = ExtResource("1_h528b")
@@ -14,6 +22,38 @@ size = Vector3(1, 0.5, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_lydda"]
 material = ExtResource("3_an7n5")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_ground_grass"]
+material = ExtResource("m_ground_grass")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_ground_stone"]
+material = ExtResource("m_ground_stone")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_ground_earth"]
+material = ExtResource("m_ground_earth")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_rough_roots"]
+material = ExtResource("m_rough_roots")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_wall_tree"]
+material = ExtResource("m_wall_tree")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_wall_gate"]
+material = ExtResource("m_wall_gate")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_wall_water"]
+material = ExtResource("m_wall_water")
+size = Vector3(1, 0.5, 1)
+
+[sub_resource type="BoxMesh" id="Box_wall_rubble"]
+material = ExtResource("m_wall_rubble")
 size = Vector3(1, 0.5, 1)
 
 [node name="TilesSource" type="Node3D" unique_id=1475895668]
@@ -28,3 +68,35 @@ mesh = SubResource("BoxMesh_tw8af")
 [node name="wall" type="MeshInstance3D" parent="." unique_id=943254]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0)
 mesh = SubResource("BoxMesh_lydda")
+
+[node name="ground_grass" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0, 0)
+mesh = SubResource("Box_ground_grass")
+
+[node name="ground_stone" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.0, 0, 0)
+mesh = SubResource("Box_ground_stone")
+
+[node name="ground_earth" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0, 0)
+mesh = SubResource("Box_ground_earth")
+
+[node name="rough_roots" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.0, 0, 0)
+mesh = SubResource("Box_rough_roots")
+
+[node name="wall_tree" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 0, 0)
+mesh = SubResource("Box_wall_tree")
+
+[node name="wall_gate" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.0, 0, 0)
+mesh = SubResource("Box_wall_gate")
+
+[node name="wall_water" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.5, 0, 0)
+mesh = SubResource("Box_wall_water")
+
+[node name="wall_rubble" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.0, 0, 0)
+mesh = SubResource("Box_wall_rubble")

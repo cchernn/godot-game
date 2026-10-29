@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1"]
+
+[node name="Lich" instance=ExtResource("1")]
+body_scale = Vector3(0.9, 1.35, 0.9)
+enemy_color = Color(0.75, 0.75, 0.9, 1.0)

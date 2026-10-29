@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="SkillDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="2_def"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="3_def"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="4_def"]
+[ext_resource type="Script" path="res://game/shared/domain/interrupt_effect.gd" id="5_def"]
+[ext_resource type="Script" path="res://game/shared/domain/area_shape.gd" id="6_def"]
+
+[sub_resource type="Resource" id="Stage_draw"]
+script = ExtResource("2_def")
+stage_name = "draw breath"
+
+[sub_resource type="Resource" id="Damage_breath"]
+script = ExtResource("4_def")
+base = 9
+
+[sub_resource type="Resource" id="Stage_breath"]
+script = ExtResource("2_def")
+stage_name = "breathe fire"
+effects = Array[ExtResource("3_def")]([SubResource("Damage_breath")])
+
+[sub_resource type="Resource" id="Area_cone"]
+script = ExtResource("6_def")
+shape = 3
+size = 3
+
+[resource]
+script = ExtResource("1_def")
+id = "fire_breath"
+display_name = "Fire Breath"
+hint = "Click a tile (2 stages, burns a cone 3 tiles deep)"
+description = "Draw a breath, then breathe fire in a cone toward a tile. Everything in the cone burns, friend or foe."
+action_slot = 3
+targeting = 2
+attack_range = 3
+speed = 4
+stability = 3
+area = SubResource("Area_cone")
+stage_defs = Array[ExtResource("2_def")]([SubResource("Stage_draw"), SubResource("Stage_breath")])

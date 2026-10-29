@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1"]
+
+[node name="Leshen" instance=ExtResource("1")]
+body_scale = Vector3(1.5, 2.1, 1.5)
+enemy_color = Color(0.3, 0.45, 0.2, 1.0)

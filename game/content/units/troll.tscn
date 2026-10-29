@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://game/content/units/unit.tscn" id="1"]
+
+[node name="Troll" instance=ExtResource("1")]
+body_scale = Vector3(1.6, 1.5, 1.6)
+enemy_color = Color(0.35, 0.5, 0.3, 1.0)

@@ -39,6 +39,12 @@ var life_state: int = Enums.LifeState.ALIVE
 var revived_this_encounter: bool = false
 ## Revived characters cannot act or react until this round.
 var inactive_until_round: int = 0
+## On the field but inert (a statue, a sleeper) until an encounter trigger wakes it.
+var dormant: bool = false
+## Not on the field at all (it has not arrived yet) until an encounter trigger brings it in. It still counts as an enemy left to beat.
+var in_reserve: bool = false
+## Never moves (a boss rooted to the ground); it still attacks what comes within reach.
+var immobile: bool = false
 
 # AP: capacity refreshes each round; reserved (committed, unspent), spent, and forfeited are tracked separately.
 var ap_capacity: int = 0
@@ -64,11 +70,11 @@ var controller: String = ""
 
 
 func is_active(round_number: int) -> bool:
-	return life_state == Enums.LifeState.ALIVE and round_number >= inactive_until_round
+	return life_state == Enums.LifeState.ALIVE and round_number >= inactive_until_round and not dormant and not in_reserve
 
 
 func is_present() -> bool:
-	return life_state != Enums.LifeState.ELIMINATED and life_state != Enums.LifeState.ESCAPED
+	return life_state != Enums.LifeState.ELIMINATED and life_state != Enums.LifeState.ESCAPED and not in_reserve
 
 
 ## Armor, power, accuracy, evasion, dexterity or agility including the changes from statuses (always use this in the rules, not the raw field).
