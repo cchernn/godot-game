@@ -14,7 +14,7 @@ script = ExtResource("3_trg")
 when = 0
 at_round = 2
 effect = 0
-targets = PackedInt32Array(0, 1, 2, 3, 4, 5)
+targets = PackedInt32Array(0, 1, 2, 3)
 message = "The stone wolves shudder and open their eyes."
 
 [resource]
@@ -23,5 +23,5 @@ map = ExtResource("map")
 max_party = 4
 gold = 10
 classes = Array[ExtResource("1_unit")]([ExtResource("c_warrior"), ExtResource("c_hunter"), ExtResource("c_mage")])
-enemies = Array[ExtResource("1_unit")]([ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue")])
+enemies = Array[ExtResource("1_unit")]([ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue")])
 triggers = Array[ExtResource("3_trg")]([SubResource("Trigger_0")])

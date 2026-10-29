@@ -3,7 +3,8 @@
 A party of four plays the hub story ("The Elder's request", which reveals Lost Woods), travels to the woods and plays
 "The Emerald Serpent" (five stories and four battles, with hit points carried over). Checks what the API recorded.
 The bots are simple (walk up and strike), so the party may lose a battle; the event then restarts, which this run also covers.
-Run: uv run --project services/api python scripts/e2e_event.py [--minutes=15]
+Run: uv run --project services/api python scripts/e2e_event.py [--minutes=15] [--hp-base=N]
+(--hp-base raises every unit's base HP for the run, so the scripted bots can survive to the later battles)
 """
 import os
 import pathlib
@@ -21,6 +22,8 @@ from app.db import make_pool, migrate  # noqa: E402
 
 API_PORT, GAME_PORT = 8767, 9185
 SERVER_KEY, SECRET = "e2e-service-key", "e2e-secret-e2e-secret-e2e-secret-1"
+SEED = next((a for a in sys.argv[1:] if a.startswith("--seed=")), "")  # unset: every battle gets its own seed, so a retry is not the same fight
+HP_BASE = next((a.split("=")[1] for a in sys.argv[1:] if a.startswith("--hp-base=")), "")
 MINUTES = next((int(a.split("=")[1]) for a in sys.argv[1:] if a.startswith("--minutes=")), 15)
 tmp = pathlib.Path(tempfile.mkdtemp())
 procs: list[subprocess.Popen] = []
@@ -92,8 +95,8 @@ try:
         rid = httpx.post(f"{api}/parties/{pid}/requests", headers=h(u)).json()["id"]
         assert httpx.post(f"{api}/parties/{pid}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
 
-    start(["scripts/run_server.sh", f"--port={GAME_PORT}", "--seed=3", f"--api-url={api}", "--set=combat.beat_delay_ms=30",
-           "--set=combat.planning_timeout_seconds=20", "--set=event.step_pause_ms=400"], env={"GAME_API_SERVER_KEY": SERVER_KEY}, log="server")
+    start(["scripts/run_server.sh", f"--port={GAME_PORT}", f"--api-url={api}"] + ([SEED] if SEED else []) + ["--set=combat.beat_delay_ms=30",
+           "--set=combat.planning_timeout_seconds=20", "--set=event.step_pause_ms=400"] + ([f"--set=stats.hp_base={HP_BASE}"] if HP_BASE else []), env={"GAME_API_SERVER_KEY": SERVER_KEY}, log="server")
     time.sleep(4)
 
     # 1. the hub story
@@ -118,7 +121,7 @@ try:
         pays = c.execute("select step_key, count(*) n from event_step_pays where instance_id=%s group by step_key order by step_key", (iid,)).fetchall()
         done = c.execute("select count(*) n from activity_completions where activity_id='emerald_serpent'").fetchone()["n"]
         folks = c.execute("select name, gold, flags from characters order by name").fetchall()
-    restarts = srv.count("starts over") + srv.count("event failed")
+    restarts = srv.count("finished: outcome 2")  # battles the party lost on the way
     print("server events:", [l for l in srv.splitlines() if "event" in l][-12:])
     print("instance:", inst, "| step payouts:", [(p["step_key"], p["n"]) for p in pays], "| completions:", done)
     print("characters:", [(f["name"], f["gold"], f["flags"]) for f in folks])

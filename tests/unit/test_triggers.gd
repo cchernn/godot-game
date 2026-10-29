@@ -119,7 +119,7 @@ func test_the_emerald_serpent_battles_are_sound_and_start_as_designed() -> void:
 	assert_eq(trolls.state.team_members(Enums.Team.ENEMIES).size(), 4)
 	var statues := Encounter.build(cfg, skills, 4, 3, [], Encounter.load_definition("emerald_statues"))
 	for c in statues.state.team_members(Enums.Team.ENEMIES):
-		assert_true(c.dormant, "all six wolves are stone to begin with")
+		assert_true(c.dormant, "all the wolves are stone to begin with")
 	Fx.run_round(statues)
 	for c in statues.state.team_members(Enums.Team.ENEMIES):
 		assert_true(not c.dormant, "and awake in round two")

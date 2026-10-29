@@ -165,8 +165,14 @@ func _make_plan(s: Dictionary, me: Dictionary) -> Array:
 			best = c
 	if best != cell:
 		plan.append({"skill": "move", "path": Pathfinder.path_to(res, cell, best)})
-	if not target.is_empty():
-		plan.append({"skill": "strike", "target": target["id"]})
+	var attack := ""
+	for id: String in me.get("skills", []):
+		var sk := skills.get_skill(id)
+		if sk != null and sk.slot() == Enums.ActionSlot.ATTACK:
+			attack = id
+			break
+	if not target.is_empty() and attack != "":
+		plan.append({"skill": attack, "target": target["id"]})
 	return plan
 
 
