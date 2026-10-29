@@ -1,0 +1,141 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://game/client/screens/story_player.gd" id="1_player"]
+[ext_resource type="PackedScene" path="res://game/client/screens/story_portrait.tscn" id="2_portrait"]
+
+[sub_resource type="StyleBoxFlat" id="Box_text"]
+bg_color = Color(0.05, 0.06, 0.09, 0.88)
+border_width_top = 2
+border_color = Color(0.75, 0.62, 0.3, 1)
+content_margin_left = 28.0
+content_margin_top = 18.0
+content_margin_right = 28.0
+content_margin_bottom = 16.0
+
+[node name="StoryPlayer" type="Control" node_paths=PackedStringArray("backdrop_color", "backdrop_picture", "left_portrait", "right_portrait", "speaker_label", "text_label", "choices_box", "waiting_label", "continue_hint", "text_box")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_player")
+backdrop_color = NodePath("BackdropColor")
+backdrop_picture = NodePath("BackdropPicture")
+left_portrait = NodePath("Stage/LeftPortrait")
+right_portrait = NodePath("Stage/RightPortrait")
+speaker_label = NodePath("TextBox/Layout/Speaker")
+text_label = NodePath("TextBox/Layout/Text")
+choices_box = NodePath("Choices")
+waiting_label = NodePath("TextBox/Layout/Footer/Waiting")
+continue_hint = NodePath("TextBox/Layout/Footer/ContinueHint")
+text_box = NodePath("TextBox")
+
+[node name="BackdropColor" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.06, 0.07, 0.1, 1)
+
+[node name="BackdropPicture" type="TextureRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Stage" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="LeftPortrait" parent="Stage" instance=ExtResource("2_portrait")]
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = -640.0
+offset_right = 380.0
+offset_bottom = -180.0
+grow_vertical = 0
+
+[node name="RightPortrait" parent="Stage" instance=ExtResource("2_portrait")]
+visible = false
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -380.0
+offset_top = -640.0
+offset_right = -80.0
+offset_bottom = -180.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="Choices" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -400.0
+offset_right = 260.0
+offset_bottom = -200.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 2
+
+[node name="TextBox" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 60.0
+offset_top = -190.0
+offset_right = -60.0
+offset_bottom = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("Box_text")
+
+[node name="Layout" type="VBoxContainer" parent="TextBox"]
+layout_mode = 2
+
+[node name="Speaker" type="Label" parent="TextBox/Layout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="Text" type="RichTextLabel" parent="TextBox/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 20
+text = ""
+
+[node name="Footer" type="HBoxContainer" parent="TextBox/Layout"]
+layout_mode = 2
+
+[node name="Waiting" type="Label" parent="TextBox/Layout/Footer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 0.7, 0.75, 1)
+
+[node name="ContinueHint" type="Label" parent="TextBox/Layout/Footer"]
+layout_mode = 2
+text = "▼"

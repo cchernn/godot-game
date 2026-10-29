@@ -3,6 +3,7 @@ Static definitions come from templates; everything mutable lives in Postgres."""
 import uuid
 
 import psycopg.errors
+from psycopg.types.json import Jsonb
 
 from .errors import Conflict, Forbidden, Invalid, NotFound
 from .templates import TemplateError, WorldDefinition
@@ -14,6 +15,30 @@ def _s(v):
 
 def _row(r):
     return None if r is None else {k: _s(v) for k, v in r.items()}
+
+
+def pay_character(conn, character_id, reward: dict) -> None:
+    """Gives a character what an activity paid: gold, item copies (never above 99) and event flags (kept once)."""
+    if reward.get("gold"):
+        conn.execute("update characters set gold = gold + %s where id=%s", (reward["gold"], character_id))
+    for item_id, n in (reward.get("items") or {}).items():
+        conn.execute("insert into character_items (character_id, item_id, quantity) values (%s,%s,%s) "
+                     "on conflict (character_id, item_id) do update set quantity = least(99, character_items.quantity + excluded.quantity)",
+                     (character_id, item_id, n))
+    flags = reward.get("flags") or []
+    if flags:
+        have = conn.execute("select flags from characters where id=%s for update", (character_id,)).fetchone()["flags"]
+        new = [f for f in dict.fromkeys(flags) if f not in have]
+        if new:
+            conn.execute("update characters set flags=%s where id=%s", (Jsonb(list(have) + new), character_id))
+
+
+def authored_reward(act: dict) -> dict:
+    r = act.get("rewards", {})
+    items: dict[str, int] = {}
+    for it in r.get("items", []):
+        items[it["id"]] = items.get(it["id"], 0) + it["count"]
+    return {"gold": int(r.get("gold", 0)), "items": items, "flags": list(r.get("flags", []))}
 
 
 class WorldMixin:
@@ -289,7 +314,7 @@ class WorldMixin:
             raise Forbidden("You are not on this party's roster")
         return inst
 
-    def complete_instance(self, instance_id: uuid.UUID) -> tuple[dict, bool]:
+    def complete_instance(self, instance_id: uuid.UUID, participants: list[uuid.UUID] | None = None) -> tuple[dict, bool]:
         """Atomically finishes an active instance and applies its world changes. First completion of a
         one-time activity wins; replays are harmless. Returns (result, duplicate)."""
         with self.pool.connection() as conn:
@@ -299,7 +324,7 @@ class WorldMixin:
             wid = inst["world_id"]
             revision = conn.execute("select state_revision from worlds where id=%s", (wid,)).fetchone()["state_revision"]
             if inst["status"] == "finished":
-                return {"instance": _row(inst), "world_changed": False, "state_revision": revision}, True
+                return {"instance": _row(inst), "world_changed": False, "state_revision": revision, "rewards": {}}, True
             if inst["status"] != "active":
                 raise Conflict("Only an active instance can be completed")
             act = self.definition(wid).activities[inst["activity_id"]]
@@ -316,7 +341,18 @@ class WorldMixin:
                                    "on conflict (world_id, kind, target_id) where scope='world' do nothing returning id",
                                    (wid, rv["kind"], rv["id"])).fetchone()
                 changed = changed or new is not None
+            rewards: dict[str, dict] = {}
+            if act["type"] == "story":  # a story has no battle result, so its authored rewards are paid here
+                roster = {str(r["character_id"]) for r in conn.execute(
+                    "select character_id from activity_roster where instance_id=%s", (instance_id,)).fetchall()}
+                chosen = {str(p) for p in participants} & roster if participants is not None else roster
+                for cid in sorted(chosen):
+                    pay = authored_reward(act)
+                    pay_character(conn, cid, pay)
+                    conn.execute("insert into activity_completions (world_id, activity_id, character_id, instance_id) values (%s,%s,%s,%s) "
+                                 "on conflict do nothing", (wid, inst["activity_id"], cid, instance_id))
+                    rewards[cid] = pay
             inst = conn.execute("update activity_instances set status='finished', ended_at=now() where id=%s returning *", (instance_id,)).fetchone()
             if changed:
                 revision = self._bump(conn, wid)
-        return {"instance": _row(inst), "world_changed": changed, "state_revision": revision}, False
+        return {"instance": _row(inst), "world_changed": changed, "state_revision": revision, "rewards": rewards}, False

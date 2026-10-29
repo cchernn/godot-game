@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="StoryActor" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/story_actor.gd" id="1_actor"]
+
+[resource]
+script = ExtResource("1_actor")
+id = "scout"
+display_name = "Scout"
+color = Color(0.4, 0.62, 0.5, 1)

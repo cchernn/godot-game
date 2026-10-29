@@ -9,16 +9,21 @@
     {"id": "blackwood", "name": "Hutan Lipur", "kind": "wilderness", "initially_visible": true},
     {"id": "ashen_keep", "name": "Ashen Keep", "kind": "dungeon", "initially_visible": false},
     {"id": "old_shrine", "name": "Old Shrine", "kind": "landmark", "initially_visible": false},
-    {"id": "sunken_crypt", "name": "Sunken Crypt", "kind": "dungeon", "initially_visible": false}
+    {"id": "sunken_crypt", "name": "Sunken Crypt", "kind": "dungeon", "initially_visible": false},
+    {"id": "lost_woods", "name": "Lost Woods", "kind": "wilderness", "initially_visible": false}
   ],
   "routes": [
     {"id": "road_hm_bw", "from": "hollowmere", "to": "blackwood", "travel_days": 2, "initially_visible": true},
     {"id": "river_hm_bw", "from": "hollowmere", "to": "blackwood", "travel_days": 3, "initially_visible": false},
     {"id": "trail_bw_ak", "from": "blackwood", "to": "ashen_keep", "travel_days": 3, "initially_visible": false},
     {"id": "path_bw_shrine", "from": "blackwood", "to": "old_shrine", "travel_days": 1, "initially_visible": false},
-    {"id": "tunnel_ak_crypt", "from": "ashen_keep", "to": "sunken_crypt", "travel_days": 2, "initially_visible": false}
+    {"id": "tunnel_ak_crypt", "from": "ashen_keep", "to": "sunken_crypt", "travel_days": 2, "initially_visible": false},
+    {"id": "path_hm_lw", "from": "hollowmere", "to": "lost_woods", "travel_days": 2, "initially_visible": false}
   ],
   "activities": [
+    {"id": "elder_rumor", "node": "hollowmere", "name": "The Elder's request", "class": "campaign", "type": "story",
+     "max_players": 4, "story": "elder_rumor",
+     "rewards": {"reveal": [{"kind": "node", "id": "lost_woods"}, {"kind": "route", "id": "path_hm_lw"}]}},
     {"id": "training_skirmish", "node": "hollowmere", "name": "Training skirmish", "class": "job", "type": "battle",
      "max_players": 4, "encounter": "prototype"},
     {"id": "cellar_rats", "node": "hollowmere", "name": "Clear the cellar", "class": "job", "type": "battle",

@@ -78,15 +78,21 @@ func test_encounters_are_looked_up_by_a_plain_id_only() -> void:
 
 
 ## The API caps a party by the activity's max_players and the battle seats players by the encounter's classes;
-## the two must agree, or a party could be larger than its battle.
-func test_every_activity_names_a_real_encounter_with_enough_seats() -> void:
+## the two must agree, or a party could be larger than its battle. A story must exist as a file and be sound.
+func test_every_activity_names_real_content_with_enough_seats() -> void:
 	var raw: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://services/api/templates/prototype@1.json"))
 	assert_true(raw is Dictionary, "template readable")
 	for a: Dictionary in (raw as Dictionary)["activities"]:
-		var def := Encounter.load_definition(str(a.get("encounter", "")))
-		assert_true(def != null, "%s: encounter '%s' exists" % [a["id"], a.get("encounter", "")])
-		if def != null:
-			assert_true(int(a["max_players"]) <= def.max_players(), "%s: max_players fits the encounter" % a["id"])
+		var parts: Array = a["steps"] if a["type"] == "event" else [a]
+		for part: Dictionary in parts:
+			if part["type"] == "battle":
+				var def := Encounter.load_definition(str(part.get("encounter", "")))
+				assert_true(def != null, "%s: encounter '%s' exists" % [a["id"], part.get("encounter", "")])
+				if def != null and a.has("max_players"):
+					assert_true(int(a["max_players"]) <= def.max_players(), "%s: max_players fits the encounter" % a["id"])
+			elif part["type"] == "story":
+				var story := StoryDef.load_story(str(part.get("story", "")))
+				assert_true(story != null, "%s: story '%s' exists" % [a["id"], part.get("story", "")])
 
 
 func test_class_ids_match_the_account_screen_and_every_unit_has_a_look() -> void:

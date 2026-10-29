@@ -24,6 +24,7 @@ func get_instance(_instance_id: String) -> Dictionary:
 
 
 ## Win completes the instance (applying its world changes atomically); anything else cancels it.
-## Idempotent. Returns {ok, world_changed, error}.
-func finish_instance(_instance_id: String, _success: bool) -> Dictionary:
-	return {"ok": true, "world_changed": false}
+## `participants` (character ids who reached the end) are paid a story's rewards; empty = the whole roster.
+## Idempotent. Returns {ok, world_changed, rewards: {character id: {gold, items, flags}}, error}.
+func finish_instance(_instance_id: String, _success: bool, _participants: Array = []) -> Dictionary:
+	return {"ok": true, "world_changed": false, "rewards": {}}

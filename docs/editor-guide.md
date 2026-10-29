@@ -224,3 +224,11 @@ The one-time scaffold that created these files. It never overwrites existing fil
 
 The Character page lists the stats and skills of the character's class from the `.tres` files in `game/content/stats/classes`; change them in the Inspector and the page follows.
 Settings (`settings_screen.tscn`) holds the account block only (email, change password, sign out); add other options there when the features exist.
+
+## Stories (visual-novel scenes)
+A story is a `StoryDef` resource in `game/content/stories/` (the file name is the id a world-template activity's `"story"` uses, e.g. `elder_rumor.tres`). Open it in the Inspector:
+- **Slides** play in order. Each **StorySlide** is one line: **Actor** (who speaks; empty = narration), **Side** (left or right), **Text**, an optional **Background** picture or **Backdrop Color** (empty keeps the previous one), **Clear Stage** (everyone leaves first), **Choices** (two or more; the party leader picks) and **Next** (a slide **Id** to jump to, or `end`). A choice's own **Next** works the same way. Stories only move forward.
+- **Actors** are `StoryActor` resources in `stories/actors/`: a name, a colour and a **Portrait** picture. Until you paint a portrait, the screen draws a silhouette in the actor's colour. Portraits stay on stage from slide to slide; the speaker is lit and the other side dimmed.
+- **Who continues:** every player present presses Continue (click the text box, or Space/Enter) before the story moves on; a player who leaves never holds it up. A choice's **Id** is what an event routes on (the event step's `choices[].id`).
+- **The screen** is `game/client/screens/story_player.tscn` (and `story_portrait.tscn` for one standing character): restyle the text box, fonts, positions and the choice button (**Choice Button Scene**) freely; **Characters Per Second** sets the typing speed (0 = at once).
+- **Checked by:** a test loads every story and reports empty text, a duplicate or unknown slide id, a one-option choice and a jump backwards.

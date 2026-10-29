@@ -71,6 +71,7 @@ var _preview_sig: int = 0
 @onready var unit_strip: Control = %UnitStrip
 @onready var party_cards: HBoxContainer = %PartyCards
 @onready var enemy_cards: HBoxContainer = %EnemyCards
+@onready var story_player: StoryPlayer = %StoryPlayer
 @onready var result_panel: Control = %ResultPanel
 @onready var result_title: Label = %ResultTitle
 @onready var result_detail: Label = %ResultDetail
@@ -94,6 +95,9 @@ func _ready() -> void:
 	net.notice.connect(func(t: String) -> void: connect_status.text = t)
 	net.lobby.connect(_on_lobby)
 	net.result.connect(_on_result)
+	net.story.connect(_on_story)
+	story_player.continue_pressed.connect(func() -> void: net.send_story_continue())
+	story_player.choice_chosen.connect(func(id: String) -> void: net.send_story_choice(id))
 	net.rejected.connect(func(t: String) -> void:
 		_set_state("menu")
 		_set_battle_view(false)
@@ -291,6 +295,8 @@ func _set_battle_view(on: bool) -> void:
 	unit_strip.visible = on
 	if not on:
 		result_panel.hide()
+	if on:
+		story_player.hide()
 
 
 ## Publishes the screen the player is on ("menu", "lobby", "battle", "result") as window.unnamedState in the
@@ -312,11 +318,23 @@ func _on_lobby(info: Dictionary) -> void:
 			", ".join(PackedStringArray(info["players"]))]
 
 
+## The party's story: the visual-novel screen takes over until the story ends (then the result panel shows what it paid).
+func _on_story(state: Dictionary) -> void:
+	if _state != "result":
+		_set_state("story")
+	connect_panel.hide()
+	menu_background.set_playing(false)
+	story_player.show()
+	story_player.show_state(state)
+
+
 func _on_result(info: Dictionary) -> void:
 	_set_state("result")
-	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED"}
+	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED", "story_complete": "STORY COMPLETE"}
 	result_title.text = titles.get(info["outcome"], "BATTLE OVER")
-	var lines: Array[String] = ["Round %d" % info["rounds"]]
+	var lines: Array[String] = []
+	if info["outcome"] != "story_complete":
+		lines.append("Round %d" % info["rounds"])
 	if info["you"] == "escaped":
 		lines.append("You escaped.")
 	elif info["you"] != "survived":
@@ -341,6 +359,8 @@ static func reward_lines(rewards: Dictionary, db: SkillDb) -> Array[String]:
 ## Leaves the finished battle and returns to the menu (the character screen when signed in).
 func _on_continue_pressed() -> void:
 	_set_state("menu")
+	story_player.hide()
+	story_player.story_id = ""
 	net.stop()
 	snap = {}
 	me = {}

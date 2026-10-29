@@ -66,6 +66,8 @@ func get_instance(instance_id: String) -> Dictionary:
 	return {"ok": true, "instance": parsed}
 
 
-func finish_instance(instance_id: String, success: bool) -> Dictionary:
-	var r := await _post("/internal/instances/%s/%s" % [instance_id, "complete" if success else "cancel"], {})
-	return {"ok": r["ok"], "world_changed": (r["body"] as Dictionary).get("world_changed", false), "error": r["error"]}
+func finish_instance(instance_id: String, success: bool, participants: Array = []) -> Dictionary:
+	var body := {"participants": participants} if success and not participants.is_empty() else {}
+	var r := await _post("/internal/instances/%s/%s" % [instance_id, "complete" if success else "cancel"], body)
+	var b: Dictionary = r["body"]
+	return {"ok": r["ok"], "world_changed": b.get("world_changed", false), "rewards": b.get("rewards", {}), "error": r["error"]}

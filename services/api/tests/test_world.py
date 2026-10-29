@@ -948,3 +948,26 @@ def test_a_shop_is_not_started_as_a_party_run(pool, tmp_path):
     assert shop["type"] == "shop" and shop["stock"] == [{"item": "potion", "price": 10}] and shop["max_players"] is None
     r = start(c, my_party(c, w["id"], t1)["id"], t1, "smith")
     assert r.status_code == 409 and "alone" in r.json()["detail"]
+
+
+def test_a_story_pays_its_rewards_to_the_players_who_reached_the_end(pool, tmp_path):
+    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
+    act(d, "elder_rumor").update({"class": "quest"})
+    act(d, "elder_rumor")["rewards"].update({"flags": ["heard_the_elder"], "gold": 7, "items": [{"id": "potion", "count": 1}]})
+    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
+    c = TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
+    w, [t1, t2], [c1, c2] = party(c, pool)
+    join_party(c, my_party(c, w["id"], t1)["id"], t1, t2)
+    iid = new_party(c, w["id"], t1, "elder_rumor")
+    inst = c.get(f"/internal/instances/{iid}", headers=SERVER).json()
+    assert inst["activity_type"] == "story" and inst["story"] == "elder_rumor" and inst["encounter"] is None
+    done = c.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER).json()
+    assert done["rewards"] == {c1["id"]: {"gold": 7, "items": {"potion": 1}, "flags": ["heard_the_elder"]}}
+    me, other = (c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t)).json() for t in (t1, t2))
+    assert me["gold"] == 7 and me["flags"] == ["heard_the_elder"] and other["gold"] == 0 and other["flags"] == []
+    ov = overview(c, w["id"], t1)
+    assert {"lost_woods"} <= {n["id"] for n in ov["nodes"]}, "the story's reveal reaches the map"
+    assert next(a for a in ov["activities"] if a["id"] == "elder_rumor")["completed"]
+    again = c.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER).json()
+    assert again["duplicate"] and again["rewards"] == {}
+    assert c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()["gold"] == 7, "a replay pays nothing twice"

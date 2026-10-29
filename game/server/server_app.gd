@@ -39,6 +39,10 @@ class Room:
 	var paused_since: int = 0
 	var grace_deadline: int = 0
 	var reset_at: int = 0
+	var story_def: StoryDef = null # set when the party's activity is a story
+	var story_id: String = ""
+	var story_run: StoryRun = null
+	var leader_user: String = "" # the user id of the party leader (picks story choices)
 	var result_info: Dictionary = {} # last battle's result, resent to a player who reconnects to the result screen
 
 var cfg: GameConfig
@@ -89,6 +93,8 @@ func _ready() -> void:
 	Gateway.plan_received.connect(_on_plan)
 	Gateway.ready_received.connect(_on_ready)
 	Gateway.escape_received.connect(_on_escape)
+	Gateway.story_continue_received.connect(_on_story_continue)
+	Gateway.story_choice_received.connect(_on_story_choice)
 	print("[server] listening on %s port %d (env=%s, guests=%s, persistence=%s, players_required=%d, worlds=%s)" % [
 		"wss" if tls else "ws", port, env, allow_guests, "api" if persistence else "off", players_required,
 		_world_filter if _world_filter != "" else "any"])
@@ -150,7 +156,7 @@ func _members(room: Room) -> Array[PlayerRec]:
 
 ## Forgets a room nobody is in and no battle is running.
 func _drop_if_idle(room: Room) -> void:
-	if room.battle == null and _members(room).is_empty():
+	if room.battle == null and room.story_run == null and _members(room).is_empty():
 		_rooms.erase(room.key)
 
 
@@ -173,11 +179,13 @@ func _process(_delta: float) -> void:
 	for room: Room in _rooms.values():
 		if room.battle != null:
 			_tick_battle(room, now)
+		elif room.story_run != null:
+			_tick_story(room, now)
 		elif room.gather_deadline != 0 and now >= room.gather_deadline:
 			room.gather_deadline = 0
 			if not _members(room).is_empty():
 				print("[server] gather time is up; starting party %s with whoever is here" % room.key)
-				_start_battle(room)
+				_start_activity(room)
 
 
 func _drop(peer_id: int, why: String) -> void:
@@ -201,6 +209,9 @@ func _on_peer_disconnected(peer_id: int) -> void:
 	print("[server] %s disconnected" % rec.display_name)
 	var room := _rooms.get(rec.room_key) as Room
 	if room == null:
+		return
+	if room.story_run != null:
+		_story_member_left(room, rec, token)
 		return
 	if room.battle == null:
 		_players.erase(token) # lobby: free the seat
@@ -295,6 +306,9 @@ func _on_hello(peer_id: int, display_name: String, token: String, world_id: Stri
 			var finished := room.battle.state.phase == Enums.RoundPhase.FINISHED
 			_drop(peer_id, "The previous battle is wrapping up. Try again in a moment." if finished else "A battle is already in progress")
 			return
+		if room.story_run != null:
+			_drop(peer_id, "A battle is already in progress" if not room.story_run.finished else "The previous battle is wrapping up. Try again in a moment.")
+			return
 		if _members(room).size() >= _seats(room):
 			_drop(peer_id, "The party is full")
 			return
@@ -322,10 +336,16 @@ func _on_hello(peer_id: int, display_name: String, token: String, world_id: Stri
 		room.paused_since = 0
 	room.grace_deadline = 0
 	Gateway.s_welcome.rpc_id(peer_id, _welcome_info(rec, room))
-	if room.battle == null:
+	if room.story_run != null: # a story is under way: rejoin it
+		room.story_run.set_present(rec.player_id, true)
+		room.grace_deadline = 0
+		_push_story_all(room)
+		if room.story_run.finished and not room.result_info.is_empty():
+			Gateway.s_result.rpc_id(peer_id, _result_for(room, rec))
+	elif room.battle == null:
 		_broadcast_lobby(room)
 		if _members(room).size() >= _seats(room):
-			_start_battle(room)
+			_start_activity(room)
 		elif room.gather_deadline == 0 and persistence != null:
 			room.gather_deadline = Time.get_ticks_msec() + int(cfg.get_value("lobby", "gather_seconds")) * 1000
 	else:
@@ -336,7 +356,7 @@ func _on_hello(peer_id: int, display_name: String, token: String, world_id: Stri
 
 func _welcome_info(rec: PlayerRec, room: Room) -> Dictionary:
 	return {"token": "" if persistence != null else rec.token, "player_id": rec.player_id,
-		"combatant_id": rec.combatant_id, "players_required": _seats(room), "in_battle": room.battle != null}
+		"combatant_id": rec.combatant_id, "players_required": _seats(room), "in_battle": room.battle != null or room.story_run != null}
 
 
 func _broadcast_lobby(room: Room) -> void:
@@ -366,6 +386,19 @@ func _seats(room: Room) -> int:
 
 ## Fills in a party room from the API's description of the party. Returns a reason if it cannot run.
 func _setup_party_room(room: Room, world_id: String, party: Dictionary) -> String:
+	if str(party.get("activity_type", "battle")) == "story":
+		var story := StoryDef.load_story(str(party.get("story", "")))
+		if story == null or not story.problems().is_empty():
+			return "This activity's story is missing"
+		room.story_def = story
+		room.story_id = str(party["story"])
+		room.world_id = world_id
+		room.instance_id = room.key
+		room.roster = party["roster"]
+		for r: Dictionary in room.roster:
+			if str(r["id"]) == str(party.get("leader_character_id", "")):
+				room.leader_user = str(r["user_id"])
+		return ""
 	var def := Encounter.load_definition(str(party.get("encounter", "")))
 	if def == null:
 		return "This activity's encounter is missing"
@@ -379,6 +412,13 @@ func _setup_party_room(room: Room, world_id: String, party: Dictionary) -> Strin
 
 
 # ---------- Battle lifecycle ----------
+
+func _start_activity(room: Room) -> void:
+	if room.story_def != null:
+		_start_story(room)
+	else:
+		_start_battle(room)
+
 
 func _start_battle(room: Room) -> void:
 	var seed := fixed_seed if fixed_seed >= 0 else randi()
@@ -502,6 +542,7 @@ func _reset_room(room: Room, kick: bool = false) -> void:
 		_by_peer.erase(rec.peer_id)
 		_players.erase(rec.token)
 	room.battle = null
+	room.story_run = null
 	room.reset_at = 0
 	room.result_info = {}
 	room.grace_deadline = 0
@@ -573,6 +614,129 @@ func _push(rec: PlayerRec) -> void:
 		Gateway.s_events.rpc_id(rec.peer_id, evs)
 
 
+# ---------- Stories ----------
+
+func _start_story(room: Room) -> void:
+	room.gather_deadline = 0
+	var seats: Array[String] = []
+	for rec in _members(room):
+		seats.append(rec.player_id)
+	var chooser := room.leader_user if seats.has(room.leader_user) else (seats[0] if not seats.is_empty() else "")
+	room.story_run = StoryRun.new(room.story_def, seats, chooser)
+	room.result_info = {}
+	room.reset_at = 0
+	print("[server] story started with %d players (party %s)" % [seats.size(), room.key])
+	for rec in _members(room):
+		if rec.peer_id != -1:
+			Gateway.s_welcome.rpc_id(rec.peer_id, _welcome_info(rec, room))
+	_push_story_all(room)
+
+
+func _story_state_for(room: Room, rec: PlayerRec) -> Dictionary:
+	var run := room.story_run
+	var names: Array = []
+	for m in _members(room):
+		if run.waiting().has(m.player_id):
+			names.append(m.display_name)
+	return {"story": room.story_id, "path": run.path.duplicate(), "waiting": names,
+		"you_continued": run.has_continued(rec.player_id), "can_choose": rec.player_id == run.chooser, "finished": run.finished}
+
+
+func _push_story_all(room: Room) -> void:
+	for rec in _members(room):
+		if rec.peer_id != -1:
+			Gateway.s_story.rpc_id(rec.peer_id, _story_state_for(room, rec))
+
+
+func _story_room_of(peer_id: int) -> Array:
+	var rec := _rec_for(peer_id)
+	var room := _room_of(rec) if rec != null else null
+	if room == null or room.story_run == null or room.story_run.finished:
+		return []
+	return [rec, room]
+
+
+func _on_story_continue(peer_id: int) -> void:
+	var both := _story_room_of(peer_id)
+	if both.is_empty():
+		return
+	(both[1] as Room).story_run.press_continue((both[0] as PlayerRec).player_id)
+	_after_story_change(both[1])
+
+
+func _on_story_choice(peer_id: int, choice_id: String) -> void:
+	var both := _story_room_of(peer_id)
+	if both.is_empty():
+		return
+	(both[1] as Room).story_run.choose((both[0] as PlayerRec).player_id, choice_id)
+	_after_story_change(both[1])
+
+
+func _after_story_change(room: Room) -> void:
+	_push_story_all(room)
+	if room.story_run.finished and room.reset_at == 0:
+		_conclude_story(room)
+
+
+## The story is over: tell the players, have the API pay its rewards to the characters who are still here, then show what it paid.
+func _conclude_story(room: Room) -> void:
+	room.reset_at = Time.get_ticks_msec() + RESULT_HOLD_MS
+	print("[server] story finished (party %s)" % room.key)
+	room.result_info = {"outcome": "story_complete", "rounds": 0, "saved": persistence == null, "rewards": {}}
+	_send_results(room)
+	if persistence == null or room.instance_id == "":
+		return
+	var story_run := room.story_run
+	var here: Array = []
+	for rec in _members(room):
+		if rec.peer_id != -1 and not rec.character.is_empty():
+			here.append(rec.character["id"])
+	for attempt in 5:
+		var r := await persistence.finish_instance(room.instance_id, true, here)
+		if r["ok"]:
+			if room.story_run == story_run:
+				room.result_info["rewards"] = r.get("rewards", {})
+				room.result_info["saved"] = true
+				_send_results(room)
+			return
+		push_warning("[server] story completion failed (%s); retrying" % r["error"])
+		await get_tree().create_timer(1.0 * (attempt + 1)).timeout
+	push_error("[server] could not complete story %s" % room.instance_id)
+
+
+func _story_member_left(room: Room, rec: PlayerRec, token: String) -> void:
+	if room.story_run.finished:
+		_players.erase(token) # left the result screen; the last one out resets the room
+		if _members(room).is_empty():
+			_reset_room(room)
+		return
+	room.story_run.set_present(rec.player_id, false)
+	_after_story_change(room)
+
+
+func _tick_story(room: Room, now: int) -> void:
+	if room.story_run.finished:
+		if room.reset_at != 0 and now >= room.reset_at:
+			_reset_room(room, true)
+		return
+	var connected := 0
+	for rec in _members(room):
+		if rec.peer_id != -1:
+			connected += 1
+	if connected > 0:
+		room.grace_deadline = 0
+	elif room.grace_deadline == 0:
+		room.grace_deadline = now + int(cfg.get_value("instance", "disconnect_grace_seconds")) * 1000
+	elif now >= room.grace_deadline:
+		print("[server] grace period expired; party story abandoned")
+		for rec in _members(room):
+			_players.erase(rec.token)
+		_finish_instance(room.instance_id, false)
+		room.story_run = null
+		room.grace_deadline = 0
+		_drop_if_idle(room)
+
+
 # ---------- Persistence ----------
 
 ## Tells the players how it ended, stores the result, then tells them it is saved.
@@ -589,7 +753,7 @@ func _finish_battle(room: Room, battle: Battle, key: String) -> void:
 		_send_results(room, battle)
 
 
-func _send_results(room: Room, battle: Battle) -> void:
+func _send_results(room: Room, battle: Battle = null) -> void:
 	for rec in _members(room):
 		if rec.peer_id == -1:
 			continue
@@ -599,8 +763,7 @@ func _send_results(room: Room, battle: Battle) -> void:
 ## The result as one player sees it: the room's outcome plus what became of their own character.
 func _result_for(room: Room, rec: PlayerRec) -> Dictionary:
 	var info := room.result_info.duplicate()
-	var c := room.battle.state.get_c(rec.combatant_id)
-	info["you"] = _fate(c)
+	info["you"] = "survived" if room.battle == null else _fate(room.battle.state.get_c(rec.combatant_id))
 	var all: Dictionary = info.get("rewards", {})
 	info["rewards"] = all.get(str(rec.character.get("id", "")), {})
 	return info

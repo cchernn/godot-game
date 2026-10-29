@@ -11,6 +11,7 @@ signal plan_result(ok: bool, error: String)
 signal notice(text: String)
 signal lobby(info: Dictionary)
 signal result(info: Dictionary)
+signal story(state: Dictionary)
 signal rejected(text: String)
 
 const RETRY_MS := 2000
@@ -47,6 +48,7 @@ func _ready() -> void:
 	Gateway.notice_received.connect(func(t: String) -> void: notice.emit(t))
 	Gateway.lobby_received.connect(func(i: Dictionary) -> void: lobby.emit(i))
 	Gateway.result_received.connect(func(i: Dictionary) -> void: result.emit(i))
+	Gateway.story_received.connect(func(s: Dictionary) -> void: story.emit(s))
 	Gateway.rejected.connect(func(t: String) -> void:
 		_fatal = t.begins_with("Guest access") or t.begins_with("A battle") or t.begins_with("The party") \
 			or t.begins_with("Sign-in failed") or t.begins_with("Create a character") or t.begins_with("Choose a world") \
@@ -135,3 +137,13 @@ func send_ready(flag: bool) -> void:
 func send_escape() -> void:
 	if connected:
 		Gateway.c_escape.rpc_id(1)
+
+
+func send_story_continue() -> void:
+	if connected:
+		Gateway.c_story_continue.rpc_id(1)
+
+
+func send_story_choice(choice_id: String) -> void:
+	if connected:
+		Gateway.c_story_choose.rpc_id(1, choice_id)

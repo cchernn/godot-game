@@ -1,0 +1,74 @@
+[gd_resource type="Resource" script_class="StoryDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/story_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://game/shared/domain/story_slide.gd" id="2_slide"]
+[ext_resource type="Script" path="res://game/shared/domain/story_choice.gd" id="3_choice"]
+[ext_resource type="Resource" path="res://game/content/stories/actors/village_elder.tres" id="4_elder"]
+[ext_resource type="Resource" path="res://game/content/stories/actors/scout.tres" id="5_scout"]
+[sub_resource type="Resource" id="S0"]
+script = ExtResource("2_slide")
+text = "Dusk settles over Kampung Lama. Smoke from the cookfires drifts toward the dark line of the forest."
+backdrop_color = Color(0.1, 0.09, 0.14, 1)
+
+[sub_resource type="Resource" id="S1"]
+script = ExtResource("2_slide")
+actor = ExtResource("4_elder")
+text = "Travellers. Good. I hoped someone would come before the lamps burned low."
+
+[sub_resource type="Resource" id="S2"]
+script = ExtResource("2_slide")
+actor = ExtResource("5_scout")
+side = 1
+text = "The hunters say the old paths have moved. Trails they walked all their lives lead nowhere now."
+
+[sub_resource type="Resource" id="S3"]
+script = ExtResource("2_slide")
+actor = ExtResource("4_elder")
+text = "Past the Blackwood lies a wood that no map names. People here call it the Lost Woods."
+
+[sub_resource type="Resource" id="S4"]
+script = ExtResource("2_slide")
+actor = ExtResource("4_elder")
+text = "Something there has woken. At night the elders hear a hiss, like water over stone, and the wolves have gone silent."
+
+[sub_resource type="Resource" id="S5"]
+script = ExtResource("2_slide")
+actor = ExtResource("5_scout")
+side = 1
+text = "Do you mean to send them in blind?"
+
+[sub_resource type="Resource" id="C1"]
+script = ExtResource("3_choice")
+id = "yes"
+text = "We will go."
+next = "go"
+
+[sub_resource type="Resource" id="C2"]
+script = ExtResource("3_choice")
+id = "ask"
+text = "Tell us more first."
+next = "more"
+
+[sub_resource type="Resource" id="S6"]
+script = ExtResource("2_slide")
+actor = ExtResource("4_elder")
+text = "I mean to send them with the way found. The path opens to anyone who will walk it. Will you?"
+choices = Array[ExtResource("3_choice")]([SubResource("C1"), SubResource("C2")])
+
+[sub_resource type="Resource" id="S7"]
+script = ExtResource("2_slide")
+id = "more"
+actor = ExtResource("4_elder")
+text = "Ten winters ago a serpent was sealed beneath that wood, wrapped in emerald. The seal is failing."
+
+[sub_resource type="Resource" id="S8"]
+script = ExtResource("2_slide")
+id = "go"
+actor = ExtResource("5_scout")
+side = 1
+text = "Whatever guards it will not welcome us. But the road is open now. Go carefully."
+
+[resource]
+script = ExtResource("1_def")
+title = "The Elder's Request"
+slides = Array[ExtResource("2_slide")]([SubResource("S0"), SubResource("S1"), SubResource("S2"), SubResource("S3"), SubResource("S4"), SubResource("S5"), SubResource("S6"), SubResource("S7"), SubResource("S8")])

@@ -2,6 +2,7 @@ extends SceneTree
 ## Minimal headless test runner. Usage:
 ##   scripts/godot.sh --headless --path . --script res://tests/run_tests.gd
 ## Test files: tests/unit/test_*.gd extending TestCase; methods named test_*.
+## Add `-- --only=story` to run just the files whose name contains "story".
 
 var _failures := 0
 var _passed := 0
@@ -15,6 +16,10 @@ func _initialize() -> void:
 		if f.begins_with("test_") and f.ends_with(".gd"):
 			files.append(f)
 	files.sort()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--only="):
+			var part := arg.get_slice("=", 1)
+			files = files.filter(func(f: String) -> bool: return part in f)
 	for f in files:
 		var script: GDScript = load("res://tests/unit/" + f)
 		var tc: TestCase = script.new()

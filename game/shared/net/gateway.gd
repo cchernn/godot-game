@@ -6,6 +6,8 @@ signal hello_received(peer_id: int, display_name: String, token: String, world_i
 signal plan_received(peer_id: int, actions: Variant)
 signal ready_received(peer_id: int, flag: bool)
 signal escape_received(peer_id: int)
+signal story_continue_received(peer_id: int)
+signal story_choice_received(peer_id: int, choice_id: String)
 
 signal welcomed(info: Dictionary)
 signal snapshot_received(snap: Dictionary)
@@ -14,6 +16,7 @@ signal plan_result_received(ok: bool, error: String)
 signal notice_received(text: String)
 signal lobby_received(info: Dictionary)
 signal result_received(info: Dictionary)
+signal story_received(state: Dictionary)
 signal rejected(text: String)
 
 
@@ -42,6 +45,20 @@ func c_ready(flag: bool) -> void:
 func c_escape() -> void:
 	if multiplayer.is_server():
 		escape_received.emit(multiplayer.get_remote_sender_id())
+
+
+## The sender has read the current story slide (the story moves on when everyone present has).
+@rpc("any_peer", "call_remote", "reliable")
+func c_story_continue() -> void:
+	if multiplayer.is_server():
+		story_continue_received.emit(multiplayer.get_remote_sender_id())
+
+
+## The party leader picks a choice on the current story slide.
+@rpc("any_peer", "call_remote", "reliable")
+func c_story_choose(choice_id: String) -> void:
+	if multiplayer.is_server():
+		story_choice_received.emit(multiplayer.get_remote_sender_id(), choice_id)
 
 
 # ---- server -> client ----
@@ -87,3 +104,10 @@ func s_lobby(info: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func s_result(info: Dictionary) -> void:
 	result_received.emit(info)
+
+
+## Where the party's story stands: {story: id, path: [slide indices shown so far], waiting: [names still to continue],
+## you_continued: bool, can_choose: bool, finished: bool}.
+@rpc("authority", "call_remote", "reliable")
+func s_story(state: Dictionary) -> void:
+	story_received.emit(state)

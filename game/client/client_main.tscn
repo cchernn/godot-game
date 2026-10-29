@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://game/content/ui/action_button.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://game/content/ui/unit_card.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/content/ui/menu_background.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://game/client/screens/story_player.tscn" id="10"]
 
 [node name="ClientMain" type="Control"]
 layout_mode = 3
@@ -215,6 +216,11 @@ offset_right = 200.0
 offset_bottom = 23.0
 grow_horizontal = 2
 horizontal_alignment = 1
+
+[node name="StoryPlayer" parent="." instance=ExtResource("10")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
 
 [node name="ResultPanel" type="PanelContainer" parent="."]
 unique_name_in_owner = true

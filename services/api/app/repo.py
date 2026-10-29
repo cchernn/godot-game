@@ -248,6 +248,7 @@ class Repository(PartyMixin, WorldMixin):
                     for it in activity.get("rewards", {}).get("items", []):
                         reward["items"][it["id"]] = reward["items"].get(it["id"], 0) + it["count"]
                     reward["flags"] = list(activity.get("rewards", {}).get("flags", []))
+                    reward["gold"] += int(activity.get("rewards", {}).get("gold", 0))
                     conn.execute("insert into activity_completions (world_id, activity_id, character_id, instance_id) values (%s,%s,%s,%s) "
                                  "on conflict do nothing", (world_id, activity["id"], p["character_id"], instance_id))
                 if reward["gold"]:

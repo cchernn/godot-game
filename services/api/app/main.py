@@ -80,6 +80,10 @@ class ParticipantIn(BaseModel):
     gold: int = Field(default=0, ge=0, le=100_000)  # what the game server decided this character earns (paid on a win, unless escaped)
 
 
+class CompleteIn(BaseModel):
+    participants: list[uuid.UUID] | None = Field(default=None, max_length=16)  # characters who reached the end (a story pays them); None = the roster
+
+
 class GrantItemIn(BaseModel):
     item_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
     quantity: int = Field(ge=1, le=99)
@@ -380,8 +384,8 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
         return r.get_instance(instance_id)
 
     @app.post("/internal/instances/{instance_id}/complete", dependencies=[Depends(server_only)])
-    def internal_complete(instance_id: uuid.UUID, r: Repository = Depends(repo)) -> dict:
-        res, dup = r.complete_instance(instance_id)
+    def internal_complete(instance_id: uuid.UUID, body: CompleteIn | None = None, r: Repository = Depends(repo)) -> dict:
+        res, dup = r.complete_instance(instance_id, body.participants if body else None)
         return {**res, "duplicate": dup}
 
     @app.post("/internal/instances/{instance_id}/cancel", dependencies=[Depends(server_only)])
