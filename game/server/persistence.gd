@@ -14,8 +14,15 @@ func verify_session(_token: String, _world_id: String, _instance_id: String = ""
 ## participants: [{character_id, outcome, gold, items_used: {item id: copies}, items_gained: {item id: copies}, flags_set: [flag]}].
 ## `instance_id` is the activity run this battle was ("" for none): its authored rewards are applied on a win.
 ## Idempotent per key. Returns {ok, duplicate, rewards: {character id: {gold, items: {item id: copies}, flags}}, error}.
-func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: int, _participants: Array, _instance_id: String = "") -> Dictionary:
+## `step_id` names the event step a battle was (events only): that step's own rewards apply, on a win or on the lose route.
+func commit_result(_world_id: String, _key: String, _outcome: String, _rounds: int, _participants: Array, _instance_id: String = "", _step_id: String = "") -> Dictionary:
 	return {"ok": true, "duplicate": false, "rewards": {}}
+
+
+## A story step of an event ended: pays the step's rewards once to `participants` (character ids), plus the flags of the `choice` made.
+## Returns {ok, rewards: {character id: {gold, items, flags}}, error}.
+func complete_step(_instance_id: String, _step_id: String, _participants: Array, _choice: String = "") -> Dictionary:
+	return {"ok": true, "rewards": {}}
 
 
 ## Returns {ok, instance: {status, encounter, max_players, roster: [{id, user_id, name, class}]}, error}.

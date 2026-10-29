@@ -9,7 +9,7 @@ from psycopg_pool import ConnectionPool
 from .errors import Conflict, Forbidden, Invalid, Locked, NotFound, RepoError  # noqa: F401
 from .templates import TemplateError, TemplateStore
 from .party_repo import PartyMixin
-from .world_repo import WorldMixin
+from .world_repo import WorldMixin, authored_reward
 
 
 def _row(r: dict | None) -> dict | None:
@@ -204,12 +204,13 @@ class Repository(PartyMixin, WorldMixin):
     # ---- combat results ----
 
     def commit_combat_result(self, key: str, world_id: uuid.UUID, outcome: str, rounds: int,
-                             participants: list[dict], instance_id: uuid.UUID | None = None) -> tuple[dict, bool]:
+                             participants: list[dict], instance_id: uuid.UUID | None = None,
+                             step_id: str | None = None) -> tuple[dict, bool]:
         """Atomically records a finished encounter and what it earned (gold, items, flags).
         On a win, every participant who did not escape is paid the gold the game server computed (equal for all), and, when the result
         belongs to an activity run, that activity's authored rewards (flags, items) and its completion record. Idempotent per key: replaying the same
         payload returns the stored result; reusing a key for a different payload is a conflict."""
-        canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds, "i": str(instance_id or ""),
+        canonical = json.dumps({"w": str(world_id), "o": outcome, "r": rounds, "i": str(instance_id or ""), "s": step_id or "",
                                 "p": sorted((str(p["character_id"]), p["outcome"],
                                              sorted((p.get("items_used") or {}).items()),
                                              sorted((p.get("items_gained") or {}).items()), sorted(set(p.get("flags_set") or [])),
@@ -226,6 +227,12 @@ class Repository(PartyMixin, WorldMixin):
                 if inst is None or inst["world_id"] != world_id or inst["status"] not in ("active", "finished"):
                     raise Invalid("Unknown or closed activity run")
                 activity = self.definition(world_id).activities[inst["activity_id"]]
+            step_key, step_src = "", {}
+            if activity is not None and activity["type"] == "event":  # an event's battle pays its step, not the event (that is paid at the end)
+                step = self.event_step(activity, step_id, "battle")
+                lost = outcome != "players_win"
+                step_key, step_src = step["id"] + (":lose" if lost else ""), authored_reward(step, "lose_rewards" if lost else "rewards")
+                step_src["reveal"] = (step.get("lose_rewards" if lost else "rewards") or {}).get("reveal", [])
             res = conn.execute(
                 "insert into combat_results (idempotency_key, payload_hash, world_id, outcome, rounds, instance_id) "
                 "values (%s,%s,%s,%s,%s,%s) on conflict (idempotency_key) do nothing returning *",
@@ -236,6 +243,7 @@ class Repository(PartyMixin, WorldMixin):
                     raise Conflict("Idempotency key was already used with a different result")
                 return {**_row(existing), "rewards": self._stored_rewards(conn, existing["id"])}, True
             rewards: dict[str, dict] = {}
+            step_paid = False
             for p in participants:
                 ok = conn.execute(
                     "select id, flags from characters where id=%s and world_id=%s and status='active' for update",
@@ -244,7 +252,12 @@ class Repository(PartyMixin, WorldMixin):
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
                 paid = outcome == "players_win" and p["outcome"] != "escaped"
                 reward = {"gold": int(p.get("gold") or 0) if paid else 0, "items": {}, "flags": []}
-                if paid and activity is not None:
+                if step_key and p["outcome"] != "escaped" and self.claim_step_pay(conn, instance_id, step_key, p["character_id"]):
+                    reward["gold"] += step_src["gold"]
+                    reward["items"] = dict(step_src["items"])
+                    reward["flags"] = list(step_src["flags"])
+                    step_paid = True
+                elif paid and activity is not None and activity["type"] != "event":
                     for it in activity.get("rewards", {}).get("items", []):
                         reward["items"][it["id"]] = reward["items"].get(it["id"], 0) + it["count"]
                     reward["flags"] = list(activity.get("rewards", {}).get("flags", []))
@@ -276,6 +289,8 @@ class Repository(PartyMixin, WorldMixin):
                         conn.execute("delete from character_items where character_id=%s and item_id=%s", (p["character_id"], item_id))
                 conn.execute("insert into combat_result_participants (result_id, character_id, outcome, items_used, rewards) "
                              "values (%s,%s,%s,%s,%s)", (res["id"], p["character_id"], p["outcome"], Jsonb(used), Jsonb(reward)))
+            if step_paid and self._apply_reveals(conn, world_id, step_src):
+                self._bump(conn, world_id)
         return {**_row(res), "rewards": rewards}, False
 
     @staticmethod

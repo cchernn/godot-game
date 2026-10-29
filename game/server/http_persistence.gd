@@ -42,13 +42,23 @@ func verify_session(token: String, world_id: String, instance_id: String = "") -
 	return {"ok": true, "user_id": b["user_id"], "character": b["character"], "instance": b.get("instance", {})}
 
 
-func commit_result(world_id: String, key: String, outcome: String, rounds: int, participants: Array, instance_id: String = "") -> Dictionary:
+func commit_result(world_id: String, key: String, outcome: String, rounds: int, participants: Array, instance_id: String = "", step_id: String = "") -> Dictionary:
 	var body := {"idempotency_key": key, "world_id": world_id, "outcome": outcome, "rounds": rounds, "participants": participants}
 	if instance_id != "":
 		body["instance_id"] = instance_id
+	if step_id != "":
+		body["step_id"] = step_id
 	var r := await _post("/internal/combat-results", body)
 	var b: Dictionary = r["body"]
 	return {"ok": r["ok"], "duplicate": b.get("duplicate", false), "rewards": b.get("rewards", {}), "error": r["error"]}
+
+
+func complete_step(instance_id: String, step_id: String, participants: Array, choice: String = "") -> Dictionary:
+	var body := {"participants": participants}
+	if choice != "":
+		body["choice"] = choice
+	var r := await _post("/internal/instances/%s/steps/%s" % [instance_id, step_id], body)
+	return {"ok": r["ok"], "rewards": (r["body"] as Dictionary).get("rewards", {}), "error": r["error"]}
 
 
 func get_instance(instance_id: String) -> Dictionary:

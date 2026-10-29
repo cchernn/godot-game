@@ -92,7 +92,10 @@ func _ready() -> void:
 	net.snapshot.connect(_on_snapshot)
 	net.events.connect(_on_events)
 	net.plan_result.connect(_on_plan_result)
-	net.notice.connect(func(t: String) -> void: connect_status.text = t)
+	net.notice.connect(func(t: String) -> void:
+		connect_status.text = t
+		if _state == "battle" or _state == "story":
+			banner.text = t) # e.g. an event's "the way ahead opens"; cleared when the next step begins
 	net.lobby.connect(_on_lobby)
 	net.result.connect(_on_result)
 	net.story.connect(_on_story)
@@ -203,6 +206,8 @@ func _on_welcome(info: Dictionary) -> void:
 	_log_beat = -1
 	_round_tally.clear()
 	_plan_round = -1
+	banner.text = ""
+	board.reset() # an event's next battle starts on a clean board
 	if not _in_battle:
 		connect_panel.show()
 
@@ -324,16 +329,20 @@ func _on_story(state: Dictionary) -> void:
 		_set_state("story")
 	connect_panel.hide()
 	menu_background.set_playing(false)
+	board_holder.hide() # an event can lead from a battle into a story
+	side_panel.hide()
+	unit_strip.hide()
 	story_player.show()
 	story_player.show_state(state)
 
 
 func _on_result(info: Dictionary) -> void:
 	_set_state("result")
-	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED", "story_complete": "STORY COMPLETE"}
+	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED", "story_complete": "STORY COMPLETE",
+		"event_complete": "EVENT COMPLETE", "event_failed": "EVENT FAILED"}
 	result_title.text = titles.get(info["outcome"], "BATTLE OVER")
 	var lines: Array[String] = []
-	if info["outcome"] != "story_complete":
+	if not ["story_complete", "event_complete", "event_failed"].has(info["outcome"]):
 		lines.append("Round %d" % info["rounds"])
 	if info["you"] == "escaped":
 		lines.append("You escaped.")

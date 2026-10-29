@@ -43,6 +43,11 @@ class Room:
 	var story_id: String = ""
 	var story_run: StoryRun = null
 	var leader_user: String = "" # the user id of the party leader (picks story choices)
+	var on_fail: String = "restart" # an event's rule for a failure: start over, or end
+	var event_run: EventRun = null # set when the party's activity is an event: the step it is on and what carries between battles
+	var event_paid: Dictionary = {} # character id -> what the event's steps have paid so far (shown with the final result)
+	var step_busy: bool = false # a finished step is being stored; the next one starts when that is done
+	var step_due: int = 0 # when the next step starts (a pause after a battle so the players see how it ended)
 	var result_info: Dictionary = {} # last battle's result, resent to a player who reconnects to the result screen
 
 var cfg: GameConfig
@@ -217,7 +222,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 		_players.erase(token) # lobby: free the seat
 		_broadcast_lobby(room)
 		_drop_if_idle(room)
-	elif room.battle.state.phase == Enums.RoundPhase.FINISHED:
+	elif room.battle.state.phase == Enums.RoundPhase.FINISHED and room.event_run == null:
 		_players.erase(token) # left the result screen: free the seat; the last one out resets the room
 		if _members(room).is_empty():
 			_reset_room(room)
@@ -386,6 +391,28 @@ func _seats(room: Room) -> int:
 
 ## Fills in a party room from the API's description of the party. Returns a reason if it cannot run.
 func _setup_party_room(room: Room, world_id: String, party: Dictionary) -> String:
+	if str(party.get("activity_type", "battle")) == "event":
+		var steps: Array = party.get("steps", [])
+		for step: Dictionary in steps:
+			if step["type"] == "story":
+				var story := StoryDef.load_story(str(step["story"]))
+				if story == null or not story.problems().is_empty():
+					return "This event's story %s is missing" % step["story"]
+			else:
+				var def := Encounter.load_definition(str(step["encounter"]))
+				if def == null:
+					return "This event's encounter %s is missing" % step["encounter"]
+				if (party["roster"] as Array).size() > def.max_players():
+					return "This event's encounter %s has fewer seats than the party" % step["encounter"]
+		room.event_run = EventRun.new(steps)
+		room.on_fail = str(party.get("on_fail", "restart"))
+		room.world_id = world_id
+		room.instance_id = room.key
+		room.roster = party["roster"]
+		for r: Dictionary in room.roster:
+			if str(r["id"]) == str(party.get("leader_character_id", "")):
+				room.leader_user = str(r["user_id"])
+		return ""
 	if str(party.get("activity_type", "battle")) == "story":
 		var story := StoryDef.load_story(str(party.get("story", "")))
 		if story == null or not story.problems().is_empty():
@@ -414,9 +441,28 @@ func _setup_party_room(room: Room, world_id: String, party: Dictionary) -> Strin
 # ---------- Battle lifecycle ----------
 
 func _start_activity(room: Room) -> void:
-	if room.story_def != null:
+	if room.event_run != null:
+		_start_event_step(room)
+	elif room.story_def != null:
 		_start_story(room)
 	else:
+		_start_battle(room)
+
+
+## Starts the event's current step: a story the party reads, or a battle they fight (hit points and items carry over).
+func _start_event_step(room: Room) -> void:
+	var step := room.event_run.step()
+	room.step_busy = false
+	room.step_due = 0
+	room.battle = null
+	room.story_run = null
+	room.story_def = null
+	if step["type"] == "story":
+		room.story_def = StoryDef.load_story(str(step["story"]))
+		room.story_id = str(step["story"])
+		_start_story(room)
+	else:
+		room.def = Encounter.load_definition(str(step["encounter"]))
 		_start_battle(room)
 
 
@@ -439,6 +485,11 @@ func _start_battle(room: Room) -> void:
 		var c := room.battle.state.get_c(rec.combatant_id)
 		c.controller = rec.player_id
 		c.items = _loadout(rec.character)
+		if room.event_run != null:
+			var carried := room.event_run.carried(str(rec.character.get("id", "")))
+			if not carried.is_empty():
+				c.hp = EventRun.hp_after(int(carried["hp"]), c.max_hp, int(cfg.get_value("event", "revive_hp_percent")))
+				c.items = carried["items"]
 		c.display_name = rec.display_name if persistence != null else "%s (%s)" % [c.display_name, rec.display_name]
 		i += 1
 	room.planning_deadline = Time.get_ticks_msec() + int(cfg.get_value("combat", "planning_timeout_seconds")) * 1000
@@ -481,7 +532,9 @@ func _tick_battle(room: Room, now: int) -> void:
 	var battle := room.battle
 	if battle.state.phase == Enums.RoundPhase.FINISHED:
 		# The result screen: no clock to run. Reset once everyone has left, or after a hold time.
-		if room.reset_at != 0 and now >= room.reset_at:
+		if room.step_due != 0 and now >= room.step_due:
+			_start_event_step(room)
+		elif room.reset_at != 0 and now >= room.reset_at:
 			print("[server] result hold expired; resetting")
 			_reset_room(room, true)
 		return
@@ -529,6 +582,10 @@ func _conclude_if_finished(room: Room, now: int) -> void:
 	var battle := room.battle
 	if battle.state.phase != Enums.RoundPhase.FINISHED or room.reset_at != 0:
 		return
+	if room.event_run != null:
+		if not room.step_busy:
+			_event_battle_done(room)
+		return
 	room.reset_at = now + RESULT_HOLD_MS
 	print("[server] battle finished: outcome %d (party %s)" % [battle.outcome, room.key if room.key != "" else "-"])
 	_finish_battle(room, battle, room.battle_key)
@@ -543,6 +600,10 @@ func _reset_room(room: Room, kick: bool = false) -> void:
 		_players.erase(rec.token)
 	room.battle = null
 	room.story_run = null
+	room.event_run = null
+	room.event_paid = {}
+	room.step_busy = false
+	room.step_due = 0
 	room.reset_at = 0
 	room.result_info = {}
 	room.grace_deadline = 0
@@ -674,8 +735,11 @@ func _on_story_choice(peer_id: int, choice_id: String) -> void:
 
 func _after_story_change(room: Room) -> void:
 	_push_story_all(room)
-	if room.story_run.finished and room.reset_at == 0:
-		_conclude_story(room)
+	if room.story_run.finished and room.reset_at == 0 and not room.step_busy:
+		if room.event_run != null:
+			_event_story_done(room)
+		else:
+			_conclude_story(room)
 
 
 ## The story is over: tell the players, have the API pay its rewards to the characters who are still here, then show what it paid.
@@ -705,7 +769,7 @@ func _conclude_story(room: Room) -> void:
 
 
 func _story_member_left(room: Room, rec: PlayerRec, token: String) -> void:
-	if room.story_run.finished:
+	if room.story_run.finished and room.event_run == null:
 		_players.erase(token) # left the result screen; the last one out resets the room
 		if _members(room).is_empty():
 			_reset_room(room)
@@ -737,6 +801,132 @@ func _tick_story(room: Room, now: int) -> void:
 		_drop_if_idle(room)
 
 
+# ---------- Events ----------
+
+## A battle step ended: remember how everyone leaves it, store its result (and the step's payout), then move on after a pause.
+func _event_battle_done(room: Room) -> void:
+	var battle := room.battle
+	var run := room.event_run
+	room.step_busy = true
+	var step_id := run.current
+	var won := battle.outcome == Enums.Outcome.PLAYERS_WIN
+	for rec in _members(room):
+		var c := battle.state.get_c(rec.combatant_id)
+		var cid := str(rec.character.get("id", ""))
+		if c.life_state == Enums.LifeState.ESCAPED:
+			run.forfeit(cid)
+			continue
+		var left := {}
+		for id: String in c.items:
+			var n: int = int(c.items[id]) - int(c.items_used.get(id, 0))
+			if n > 0:
+				left[id] = n
+		run.remember(cid, c.hp, left)
+	print("[server] event step %s finished: outcome %d (party %s)" % [step_id, battle.outcome, room.key])
+	if persistence != null:
+		await _commit_results(room, battle, room.battle_key, step_id)
+	if room.battle != battle or room.event_run != run:
+		return # the room reset while we were storing
+	run.finish_battle(won)
+	var restart := run.ending == EventRun.FAIL and room.on_fail == "restart" and battle.outcome != Enums.Outcome.ESCAPED
+	if run.running() or restart:
+		if restart:
+			run.restart()
+		_notice_all(room, "The party was defeated. The event starts over." if restart else "Victory! The way ahead opens…" if won else "The party falls back…")
+		room.step_due = Time.get_ticks_msec() + int(cfg.get_value("event", "step_pause_ms"))
+		return
+	_event_conclude(room)
+
+
+## A story step ended: the API pays its rewards once to whoever is here, then the route it chose decides what comes next.
+func _event_story_done(room: Room) -> void:
+	var run := room.event_run
+	var story_run := room.story_run
+	room.step_busy = true
+	var choice := story_run.outcome
+	if persistence != null:
+		for attempt in 5:
+			var r := await persistence.complete_step(room.instance_id, run.current, _characters_here(room), choice)
+			if r["ok"]:
+				_merge_paid(room, r.get("rewards", {}))
+				break
+			push_warning("[server] event step failed to store (%s); retrying" % r["error"])
+			await get_tree().create_timer(1.0 * (attempt + 1)).timeout
+	if room.story_run != story_run or room.event_run != run:
+		return
+	run.finish_story(choice)
+	if run.running():
+		_start_event_step(room)
+	else:
+		_event_conclude(room)
+
+
+## The event is over: show the result, then (on a good ending) have the API pay the event's rewards to whoever reached the end.
+func _event_conclude(room: Room) -> void:
+	var run := room.event_run
+	var won := run.ending == EventRun.END
+	var here: Array = []
+	for rec in _members(room):
+		var cid := str(rec.character.get("id", ""))
+		if rec.peer_id != -1 and run.reached_end(cid):
+			here.append(cid)
+	room.event_run = null # from here the room behaves like any finished battle or story
+	room.step_busy = false
+	room.reset_at = Time.get_ticks_msec() + RESULT_HOLD_MS
+	print("[server] event %s (party %s)" % ["completed" if won else "failed", room.key])
+	room.result_info = {"outcome": "event_complete" if won else "event_failed", "rounds": 0, "saved": persistence == null,
+		"rewards": room.event_paid.duplicate(true)}
+	_send_results(room)
+	if persistence == null or room.instance_id == "":
+		return
+	if not won:
+		await _finish_instance(room.instance_id, false)
+		room.result_info["saved"] = true
+		_send_results(room)
+		return
+	var marker := room.result_info
+	for attempt in 5:
+		var r := await persistence.finish_instance(room.instance_id, true, here)
+		if r["ok"]:
+			if room.result_info == marker:
+				_merge_paid(room, r.get("rewards", {}))
+				room.result_info["rewards"] = room.event_paid
+				room.result_info["saved"] = true
+				_send_results(room)
+			return
+		push_warning("[server] event completion failed (%s); retrying" % r["error"])
+		await get_tree().create_timer(1.0 * (attempt + 1)).timeout
+	push_error("[server] could not complete event %s" % room.instance_id)
+
+
+func _characters_here(room: Room) -> Array:
+	var out: Array = []
+	for rec in _members(room):
+		if rec.peer_id != -1 and not rec.character.is_empty():
+			out.append(rec.character["id"])
+	return out
+
+
+func _notice_all(room: Room, text: String) -> void:
+	for rec in _members(room):
+		if rec.peer_id != -1:
+			Gateway.s_notice.rpc_id(rec.peer_id, text)
+
+
+## Adds what a step paid ({character id: {gold, items, flags}}) to the event's running total.
+func _merge_paid(room: Room, paid: Dictionary) -> void:
+	for cid: String in paid:
+		var have: Dictionary = room.event_paid.get(cid, {"gold": 0, "items": {}, "flags": []})
+		var add: Dictionary = paid[cid]
+		have["gold"] = int(have["gold"]) + int(add.get("gold", 0))
+		for id: String in add.get("items", {}):
+			have["items"][id] = int(have["items"].get(id, 0)) + int(add["items"][id])
+		for f: String in add.get("flags", []):
+			if not (have["flags"] as Array).has(f):
+				(have["flags"] as Array).append(f)
+		room.event_paid[cid] = have
+
+
 # ---------- Persistence ----------
 
 ## Tells the players how it ended, stores the result, then tells them it is saved.
@@ -763,7 +953,8 @@ func _send_results(room: Room, battle: Battle = null) -> void:
 ## The result as one player sees it: the room's outcome plus what became of their own character.
 func _result_for(room: Room, rec: PlayerRec) -> Dictionary:
 	var info := room.result_info.duplicate()
-	info["you"] = "survived" if room.battle == null else _fate(room.battle.state.get_c(rec.combatant_id))
+	var event_over := str(info.get("outcome", "")).begins_with("event_")
+	info["you"] = "survived" if room.battle == null or event_over else _fate(room.battle.state.get_c(rec.combatant_id))
 	var all: Dictionary = info.get("rewards", {})
 	info["rewards"] = all.get(str(rec.character.get("id", "")), {})
 	return info
@@ -782,8 +973,8 @@ func _fate(c: Combatant) -> String:
 
 ## Commits the finished encounter once. Retried with the same idempotency key, so a retry after a
 ## lost response can never apply rewards twice.
-func _commit_results(room: Room, battle: Battle, key: String) -> void:
-	if room.instance_id != "":
+func _commit_results(room: Room, battle: Battle, key: String, step_id: String = "") -> void:
+	if room.instance_id != "" and room.event_run == null:
 		_finish_instance(room.instance_id, battle.outcome == Enums.Outcome.PLAYERS_WIN)
 	var participants: Array = []
 	var win := battle.outcome == Enums.Outcome.PLAYERS_WIN
@@ -796,9 +987,10 @@ func _commit_results(room: Room, battle: Battle, key: String) -> void:
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String
 	for attempt in 5:
-		var r := await persistence.commit_result(room.world_id, key, outcome_name, battle.state.round_number, participants, room.instance_id)
+		var r := await persistence.commit_result(room.world_id, key, outcome_name, battle.state.round_number, participants, room.instance_id, step_id)
 		if r["ok"]:
 			room.result_info["rewards"] = r.get("rewards", {})
+			_merge_paid(room, r.get("rewards", {}))
 			print("[server] result committed (%s%s)" % [key, ", duplicate" if r["duplicate"] else ""])
 			return
 		push_warning("[server] result commit failed (%s); retrying" % r["error"])

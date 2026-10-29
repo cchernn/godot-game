@@ -20,6 +20,7 @@ if you add a placeholder anywhere, add it here.
 | `combat.sight_range`, `max_step_height`, `revive_hp_fraction` | 8, 1, 0.2 | Fog of war, climbing, revive |
 | `ai.weights` | see file | How enemies choose actions |
 | `instance.disconnect_grace_seconds` | 300 | A battle nobody is connected to is cancelled after this |
+| `event.revive_hp_percent`, `event.step_pause_ms` | 25, 3000 | An event's characters start each battle with at least this percent of their maximum hit points; how long the party sees a battle's end before the next step |
 | `lobby.players_required`, `gather_seconds` | 2, 30 | Guest lobby size, and how long a party battle waits for late arrivals |
 
 Client-side, on the scene root (`client_main.tscn`): `timer_warn_seconds` 30 and `timer_urgent_seconds` 10 (countdown colours), `escape_confirm_seconds` 4.

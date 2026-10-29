@@ -84,6 +84,11 @@ class CompleteIn(BaseModel):
     participants: list[uuid.UUID] | None = Field(default=None, max_length=16)  # characters who reached the end (a story pays them); None = the roster
 
 
+class StepIn(BaseModel):
+    participants: list[uuid.UUID] = Field(max_length=16)  # characters who were there for the step
+    choice: str | None = Field(default=None, max_length=64)  # the option the party picked, if the step offers any
+
+
 class GrantItemIn(BaseModel):
     item_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
     quantity: int = Field(ge=1, le=99)
@@ -104,6 +109,7 @@ class CombatResultIn(BaseModel):
     outcome: Literal["players_win", "players_lose", "draw", "escaped"]
     rounds: int = Field(ge=1, le=10_000)
     instance_id: uuid.UUID | None = None  # the activity run this battle was; its authored rewards apply on a win
+    step_id: str | None = Field(default=None, max_length=64)  # an event's battle step: the step's own rewards apply (win or lose route)
     participants: list[ParticipantIn] = Field(max_length=16)
 
 
@@ -267,7 +273,7 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def combat_result(body: CombatResultIn, r: Repository = Depends(repo)) -> dict:
         res, dup = r.commit_combat_result(
             body.idempotency_key, body.world_id, body.outcome, body.rounds,
-            [p.model_dump() for p in body.participants], body.instance_id)
+            [p.model_dump() for p in body.participants], body.instance_id, body.step_id)
         return {"result": res, "duplicate": dup, "rewards": res.get("rewards", {})}
 
     @app.post("/internal/characters/{character_id}/items", dependencies=[Depends(server_only)])
@@ -387,6 +393,10 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def internal_complete(instance_id: uuid.UUID, body: CompleteIn | None = None, r: Repository = Depends(repo)) -> dict:
         res, dup = r.complete_instance(instance_id, body.participants if body else None)
         return {**res, "duplicate": dup}
+
+    @app.post("/internal/instances/{instance_id}/steps/{step_id}", dependencies=[Depends(server_only)])
+    def internal_step(instance_id: uuid.UUID, step_id: str, body: StepIn, r: Repository = Depends(repo)) -> dict:
+        return r.complete_step(instance_id, step_id, body.participants, body.choice)
 
     @app.post("/internal/instances/{instance_id}/cancel", dependencies=[Depends(server_only)])
     def internal_cancel(instance_id: uuid.UUID, r: Repository = Depends(repo)) -> dict:

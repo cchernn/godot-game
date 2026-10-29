@@ -34,6 +34,10 @@
   "instance": {
     "disconnect_grace_seconds": 300
   },
+  "event": {
+    "revive_hp_percent": 25,
+    "step_pause_ms": 3000
+  },
   "ai": {
     "weights": {
       "damage": 1.0,

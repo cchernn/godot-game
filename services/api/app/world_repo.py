@@ -33,8 +33,8 @@ def pay_character(conn, character_id, reward: dict) -> None:
             conn.execute("update characters set flags=%s where id=%s", (Jsonb(list(have) + new), character_id))
 
 
-def authored_reward(act: dict) -> dict:
-    r = act.get("rewards", {})
+def authored_reward(act: dict, key: str = "rewards") -> dict:
+    r = act.get(key, {})
     items: dict[str, int] = {}
     for it in r.get("items", []):
         items[it["id"]] = items.get(it["id"], 0) + it["count"]
@@ -277,6 +277,60 @@ class WorldMixin:
 
     # ---- activity runs (an instance is one activity being played by a party) ----
 
+    @staticmethod
+    def _apply_reveals(conn, world_id, rewards: dict) -> bool:
+        """Reveals what a reward uncovers on the map (world scope). True when something new appeared."""
+        changed = False
+        for rv in rewards.get("reveal", []):
+            new = conn.execute("insert into world_discoveries (world_id, kind, target_id, scope) values (%s,%s,%s,'world') "
+                               "on conflict (world_id, kind, target_id) where scope='world' do nothing returning id",
+                               (world_id, rv["kind"], rv["id"])).fetchone()
+            changed = changed or new is not None
+        return changed
+
+    @staticmethod
+    def event_step(act: dict, step_id: str | None, kind: str) -> dict:
+        """The named step of an event activity (it must be a `kind` step)."""
+        step = next((s for s in act.get("steps", []) if s["id"] == step_id), None) if act["type"] == "event" else None
+        if step is None or step["type"] != kind:
+            raise Invalid("Unknown step for this event")
+        return step
+
+    @staticmethod
+    def claim_step_pay(conn, instance_id, step_key: str, character_id) -> bool:
+        """True the first time this character is paid for this step of this run."""
+        return conn.execute("insert into event_step_pays (instance_id, step_key, character_id) values (%s,%s,%s) "
+                            "on conflict do nothing returning character_id", (instance_id, step_key, character_id)).fetchone() is not None
+
+    def complete_step(self, instance_id: uuid.UUID, step_id: str, participants: list[uuid.UUID], choice: str | None = None) -> dict:
+        """A story step of an event ended: pays its rewards (and the chosen option's flags) once to the characters who were there."""
+        with self.pool.connection() as conn:
+            inst = conn.execute("select * from activity_instances where id=%s for update", (instance_id,)).fetchone()
+            if inst is None:
+                raise NotFound("Instance not found")
+            if inst["status"] != "active":
+                raise Conflict("Only an active instance has steps")
+            wid = inst["world_id"]
+            act = self.definition(wid).activities[inst["activity_id"]]
+            step = self.event_step(act, step_id, "story")
+            picked = None
+            if step.get("choices"):
+                picked = next((c for c in step["choices"] if c["id"] == choice), None)
+                if picked is None:
+                    raise Invalid("Unknown choice for this step")
+            roster = {str(r["character_id"]) for r in conn.execute("select character_id from activity_roster where instance_id=%s", (instance_id,)).fetchall()}
+            rewards: dict[str, dict] = {}
+            for cid in sorted({str(p) for p in participants} & roster):
+                pay = authored_reward(step)
+                if picked is not None:
+                    pay["flags"] = list(dict.fromkeys(pay["flags"] + list(picked.get("flags", []))))
+                if self.claim_step_pay(conn, instance_id, step_id, cid):
+                    pay_character(conn, cid, pay)
+                    rewards[cid] = pay
+            changed = bool(rewards) and self._apply_reveals(conn, wid, step.get("rewards", {}))
+            revision = self._bump(conn, wid) if changed else conn.execute("select state_revision from worlds where id=%s", (wid,)).fetchone()["state_revision"]
+        return {"rewards": rewards, "world_changed": changed, "state_revision": revision}
+
     def cancel_instance(self, instance_id: uuid.UUID) -> dict:
         """The game server cancels a run that never got going (or was abandoned); its party is idle again."""
         with self.pool.connection() as conn:
@@ -302,7 +356,7 @@ class WorldMixin:
             loadouts = self._loadouts(conn, [r["id"] for r in roster])
         act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
         roster = [{**_row(r), "items": loadouts.get(str(r["id"]), [])} for r in roster]
-        return {**_row(inst), "roster": roster, "activity_type": act["type"], "encounter": act.get("encounter"), "story": act.get("story"), "steps": act.get("steps"),
+        return {**_row(inst), "roster": roster, "activity_type": act["type"], "encounter": act.get("encounter"), "story": act.get("story"), "steps": act.get("steps"), "on_fail": act.get("on_fail", "restart"),
                 "activity_name": act["name"], "max_players": act.get("max_players")}
 
     def party_seat(self, instance_id: uuid.UUID, user_id: uuid.UUID) -> dict:
@@ -336,13 +390,9 @@ class WorldMixin:
                 if won is None:
                     raise Conflict("This activity was already completed")
                 changed = True
-            for rv in act.get("rewards", {}).get("reveal", []):
-                new = conn.execute("insert into world_discoveries (world_id, kind, target_id, scope) values (%s,%s,%s,'world') "
-                                   "on conflict (world_id, kind, target_id) where scope='world' do nothing returning id",
-                                   (wid, rv["kind"], rv["id"])).fetchone()
-                changed = changed or new is not None
+            changed = self._apply_reveals(conn, wid, act.get("rewards", {})) or changed
             rewards: dict[str, dict] = {}
-            if act["type"] == "story":  # a story has no battle result, so its authored rewards are paid here
+            if act["type"] in ("story", "event"):  # these have no battle result of their own, so their authored rewards are paid here
                 roster = {str(r["character_id"]) for r in conn.execute(
                     "select character_id from activity_roster where instance_id=%s", (instance_id,)).fetchall()}
                 chosen = {str(p) for p in participants} & roster if participants is not None else roster

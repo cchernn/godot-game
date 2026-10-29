@@ -971,3 +971,64 @@ def test_a_story_pays_its_rewards_to_the_players_who_reached_the_end(pool, tmp_p
     again = c.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER).json()
     assert again["duplicate"] and again["rewards"] == {}
     assert c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()["gold"] == 7, "a replay pays nothing twice"
+
+
+def event_world(pool, tmp_path):
+    d = json.loads((DEFAULT_DIR / "prototype@1.json").read_text())
+    d["activities"].append({
+        "id": "haunting", "node": "hollowmere", "name": "The haunting", "class": "quest", "type": "event", "max_players": 4,
+        "steps": [{"id": "warning", "type": "story", "story": "the_warning", "rewards": {"gold": 3},
+                   "choices": [{"id": "fight", "next": "ghouls", "flags": ["brave"]}, {"id": "bargain", "next": "ghouls"}]},
+                  {"id": "ghouls", "type": "battle", "encounter": "prototype", "on_lose": "fail",
+                   "rewards": {"gold": 5, "flags": ["ghouls_down"]}, "lose_rewards": {"gold": 1}},
+                  {"id": "dawn", "type": "story", "story": "the_dawn"}],
+        "rewards": {"flags": ["laid_to_rest"], "gold": 30}})
+    (tmp_path / "prototype@1.json").write_text(json.dumps(d))
+    c = TestClient(create_app(make_settings(templates_dir=str(tmp_path)), pool))
+    w, [t1, t2], [c1, c2] = party(c, pool)
+    join_party(c, my_party(c, w["id"], t1)["id"], t1, t2)
+    return c, w, (t1, t2), (c1, c2), new_party(c, w["id"], t1, "haunting")
+
+
+def event_result(c, w, iid, who, step, outcome="players_win", key=None):
+    body = {"idempotency_key": key or str(uuid.uuid4()), "world_id": w["id"], "outcome": outcome, "rounds": 2, "instance_id": iid, "step_id": step,
+            "participants": [{"character_id": cid, "outcome": o, "gold": g} for cid, o, g in who]}
+    return c.post("/internal/combat-results", headers=SERVER, json=body)
+
+
+def test_an_event_pays_each_step_once_and_the_event_at_the_end(pool, tmp_path):
+    c, w, (t1, t2), (c1, c2), iid = event_world(pool, tmp_path)
+    inst = c.get(f"/internal/instances/{iid}", headers=SERVER).json()
+    assert inst["activity_type"] == "event" and [s["id"] for s in inst["steps"]] == ["warning", "ghouls", "dawn"]
+    assert inst["on_fail"] == "restart"
+    step = c.post(f"/internal/instances/{iid}/steps/warning", json={"participants": [c1["id"], c2["id"]], "choice": "fight"}, headers=SERVER).json()
+    assert step["rewards"][c1["id"]] == {"gold": 3, "items": {}, "flags": ["brave"]}
+    again = c.post(f"/internal/instances/{iid}/steps/warning", json={"participants": [c1["id"]], "choice": "fight"}, headers=SERVER).json()
+    assert again["rewards"] == {}, "a step pays a character once"
+    assert c.post(f"/internal/instances/{iid}/steps/warning", json={"participants": [c1["id"]], "choice": "run"}, headers=SERVER).status_code == 422
+    assert c.post(f"/internal/instances/{iid}/steps/ghouls", json={"participants": [c1["id"]]}, headers=SERVER).status_code == 422, "a battle step is paid by its result"
+    assert event_result(c, w, iid, [(c1["id"], "survived", 10), (c2["id"], "escaped", 10)], None).status_code == 422, "a battle result names its step"
+    res = event_result(c, w, iid, [(c1["id"], "survived", 10), (c2["id"], "escaped", 10)], "ghouls", key="ghouls-1")
+    assert res.status_code == 200, res.text
+    assert res.json()["rewards"][c1["id"]] == {"gold": 15, "items": {}, "flags": ["ghouls_down"]}, "the encounter's gold plus the step's"
+    assert res.json()["rewards"][c2["id"]]["gold"] == 0, "an escaped character earns nothing"
+    again = event_result(c, w, iid, [(c1["id"], "survived", 10)], "ghouls", key="ghouls-2")
+    assert again.json()["rewards"][c1["id"]]["gold"] == 10 and again.json()["rewards"][c1["id"]]["flags"] == [], "a retried step pays its own rewards once"
+    done = c.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER).json()
+    assert done["rewards"] == {c1["id"]: {"gold": 30, "items": {}, "flags": ["laid_to_rest"]}}
+    me, other = (c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t)).json() for t in (t1, t2))
+    assert me["gold"] == 3 + 15 + 10 + 30 and set(me["flags"]) == {"brave", "ghouls_down", "laid_to_rest"}
+    assert other["gold"] == 3 and other["flags"] == ["brave"], "the second character only got the story step"
+    assert next(a for a in overview(c, w["id"], t1)["activities"] if a["id"] == "haunting")["completed"]
+    assert not next(a for a in overview(c, w["id"], t2)["activities"] if a["id"] == "haunting")["completed"], "only who reached the end"
+
+
+def test_a_lost_battle_step_pays_its_lose_rewards_and_a_failed_event_pays_no_end(pool, tmp_path):
+    c, w, (t1, _), (c1, c2), iid = event_world(pool, tmp_path)
+    res = event_result(c, w, iid, [(c1["id"], "downed", 10), (c2["id"], "escaped", 10)], "ghouls", outcome="players_lose")
+    assert res.json()["rewards"][c1["id"]] == {"gold": 1, "items": {}, "flags": []}, "the lose route pays lose_rewards, not the win's, and no encounter gold"
+    assert res.json()["rewards"][c2["id"]] == {"gold": 0, "items": {}, "flags": []}
+    assert c.post(f"/internal/instances/{iid}/cancel", headers=SERVER).status_code == 200
+    me = c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()
+    assert me["gold"] == 1 and me["flags"] == []
+    assert not next(a for a in overview(c, w["id"], t1)["activities"] if a["id"] == "haunting")["completed"]
