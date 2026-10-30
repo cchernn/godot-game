@@ -1,0 +1,72 @@
+# Everything on one machine under your own domain: the API, the battle server and the web client behind a single Caddy
+# that owns ports 80/443 and gets the HTTPS certificates. Only the edge publishes ports; the API's private port is never
+# exposed (the battle server reaches it over the compose network). Settings come from deploy/vm/.env (see .env.example).
+# Run from the repository root:  docker compose -f deploy/vm/compose.yaml up -d --build
+name: unnamed-vm
+services:
+  api:
+    image: ${API_IMAGE:-unnamed-api}
+    build:
+      context: ../../services/api
+      dockerfile: ../../deploy/api.Dockerfile
+    environment:
+      GAME_API_ENVIRONMENT: production
+      GAME_API_ALLOW_GUESTS: "false"
+      GAME_API_DATABASE_URL: ${GAME_API_DATABASE_URL:?set GAME_API_DATABASE_URL in deploy/vm/.env}
+      GAME_API_JWKS_URL: ${GAME_API_JWKS_URL:-}
+      GAME_API_JWT_SECRET: ${GAME_API_JWT_SECRET:-}
+      GAME_API_JWT_ISSUER: ${GAME_API_JWT_ISSUER:?set GAME_API_JWT_ISSUER in deploy/vm/.env}
+      GAME_API_JWT_AUDIENCE: ${GAME_API_JWT_AUDIENCE:-authenticated}
+      GAME_API_SERVER_API_KEY: ${GAME_API_SERVER_API_KEY:?set GAME_API_SERVER_API_KEY in deploy/vm/.env}
+      GAME_API_CORS_ORIGINS: '["https://${WEB_HOST:?set WEB_HOST in deploy/vm/.env}"]'
+    restart: unless-stopped
+
+  game:
+    image: ${GAME_IMAGE:-unnamed-game}
+    build:
+      context: ../..
+      dockerfile: deploy/game.Dockerfile
+    environment:
+      GAME_API_SERVER_KEY: ${GAME_API_SERVER_API_KEY:?set GAME_API_SERVER_API_KEY in deploy/vm/.env}
+      API_URL: http://api:8000
+      GAME_ENV: production
+      ALLOW_GUESTS: "false"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  web:
+    image: ${WEB_IMAGE:-unnamed-web}
+    build:
+      context: ../..
+      dockerfile: deploy/web.Dockerfile
+      args:
+        SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in deploy/vm/.env}
+        SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?set SUPABASE_PUBLISHABLE_KEY in deploy/vm/.env}
+        API_URL: https://${API_HOST:?set API_HOST in deploy/vm/.env}
+        SERVER_URL: wss://${PLAY_HOST:?set PLAY_HOST in deploy/vm/.env}
+    restart: unless-stopped
+
+  edge:
+    image: caddy:2.8-alpine
+    environment:
+      WEB_HOST: ${WEB_HOST}
+      API_HOST: ${API_HOST}
+      PLAY_HOST: ${PLAY_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - game
+      - web
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

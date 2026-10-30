@@ -30,6 +30,18 @@ build (use the *public* address, not 192.168.x.x), allows its origin in CORS and
 Then forward TCP 8080, 8081 and 8082 on your router to your PC and allow them in the Windows firewall. Never forward 8000.
 Everything is plain http/ws on bare ports, so use throwaway test accounts. Run `init` again without `PUBLIC_HOST` to go back to localhost.
 
+## One machine under your own domain
+For a single VM, `deploy/vm/` runs all three services behind one Caddy that owns ports 80 and 443 (the per-service stacks above each want those ports, so they
+suit one host per service). Only Caddy publishes ports; the API's private port stays on the compose network, where the battle server reaches it.
+1. **DNS:** three A records pointing at the machine's public IP, for example `game.example.com` (what players open), `api.example.com` and `play.example.com` (the battle server's `wss://`).
+2. **Firewall:** allow 80 and 443 (TCP, and UDP 443 for HTTP/3) from anywhere and 22 from your IP. Nothing else.
+3. **Supabase:** make a production project (separate from your test one). In Authentication, set the Site URL to `https://<WEB_HOST>`.
+4. **Settings:** `cp deploy/vm/.env.example deploy/vm/.env` and fill it in (host names, Supabase values, a new `openssl rand -hex 32` service key).
+5. **Start:** `docker compose -f deploy/vm/compose.yaml up -d --build` (the first web build downloads ~1.3 GB of export templates).
+6. **Check:** `https://<API_HOST>/health` shows `"environment":"production","guests_enabled":false`; open `https://<WEB_HOST>` and sign in.
+Update with `git pull` and the same `up -d --build`. The game server and the web client share a message protocol, so rebuild them together; recreating `game` ends battles in progress.
+The images build for the machine's CPU. The Dockerfiles fetch the x86-64 Godot build, so an ARM machine (such as Oracle's free Ampere VMs) first needs those downloads switched to the arm64 build.
+
 ## How the services find each other
 - **Browser -> API:** the API's public `https://` address. The API's `GAME_API_CORS_ORIGINS` must list the web client's origin.
 - **Browser -> game server:** its public `wss://` address.

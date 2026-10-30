@@ -1,0 +1,17 @@
+# The one public front for the single-machine stack. Caddy fetches and renews a certificate for each host name.
+{$WEB_HOST} {
+	reverse_proxy web:80
+}
+
+# /internal/* is for the battle server only and stays off the public address.
+{$API_HOST} {
+	encode zstd gzip
+	@internal path /internal/*
+	respond @internal 404
+	reverse_proxy api:8000
+}
+
+# WebSocket traffic (wss://) for the battle server.
+{$PLAY_HOST} {
+	reverse_proxy game:9080
+}
