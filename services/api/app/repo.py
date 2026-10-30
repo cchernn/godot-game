@@ -108,6 +108,16 @@ class Repository(GearMixin, PartyMixin, WorldMixin):
                 self._attach_inventory(conn, [c])
         return c
 
+    def chat_name(self, world_id: uuid.UUID, user_id: uuid.UUID) -> str:
+        """The name a member speaks under in world chat: their active character's."""
+        if not self.is_member(world_id, user_id):
+            raise Forbidden("Not a member of this world")
+        with self.pool.connection() as conn:
+            row = conn.execute("select name from characters where world_id=%s and user_id=%s and status='active'", (world_id, user_id)).fetchone()
+        if row is None:
+            raise Forbidden("You need an active character in this world")
+        return row["name"]
+
     # ---- items ----
 
     @staticmethod

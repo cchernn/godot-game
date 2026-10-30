@@ -5,6 +5,8 @@ A party of four plays the hub story ("The Elder's request", which reveals Lost W
 The bots are simple (walk up and strike), so the party may lose a battle; the event then restarts, which this run also covers.
 Run: uv run --project services/api python scripts/e2e_event.py [--minutes=15] [--hp-base=N]
 (--hp-base raises every unit's base HP for the run, so the scripted bots can survive to the later battles)
+(--hub-only stops after the hub story: a quick check of the party, the story and chat)
+Chat is checked on the way: world chat through the API in the overworld, and party chat between the bots in the hub story.
 """
 import os
 import pathlib
@@ -24,6 +26,7 @@ API_PORT, GAME_PORT = 8767, 9185
 SERVER_KEY, SECRET = "e2e-service-key", "e2e-secret-e2e-secret-e2e-secret-1"
 SEED = next((a for a in sys.argv[1:] if a.startswith("--seed=")), "")  # unset: every battle gets its own seed, so a retry is not the same fight
 HP_BASE = next((a.split("=")[1] for a in sys.argv[1:] if a.startswith("--hp-base=")), "")
+HUB_ONLY = "--hub-only" in sys.argv
 MINUTES = next((int(a.split("=")[1]) for a in sys.argv[1:] if a.startswith("--minutes=")), 15)
 tmp = pathlib.Path(tempfile.mkdtemp())
 procs: list[subprocess.Popen] = []
@@ -95,6 +98,15 @@ try:
         rid = httpx.post(f"{api}/parties/{pid}/requests", headers=h(u)).json()["id"]
         assert httpx.post(f"{api}/parties/{pid}/requests/{rid}/approve", headers=h(users[0])).status_code == 200
 
+    # world chat (the overworld): spoken under the character's name, heard by the others, nothing from before
+    first = httpx.get(f"{api}/worlds/{world}/chat", headers=h(users[1])).json()
+    assert first == {"messages": [], "last": 0}, first
+    said = httpx.post(f"{api}/worlds/{world}/chat", json={"text": "  Well   met\n"}, headers=h(users[0]))
+    assert said.status_code == 201 and said.json()["from"] == "Aldric" and said.json()["text"] == "Well met", said.text
+    heard = httpx.get(f"{api}/worlds/{world}/chat?after=0", headers=h(users[1])).json()["messages"]
+    assert [(m["from"], m["text"], m["mine"]) for m in heard] == [("Aldric", "Well met", False)], heard
+    print("world chat: heard in the overworld")
+
     start(["scripts/run_server.sh", f"--port={GAME_PORT}", f"--api-url={api}"] + ([SEED] if SEED else []) + ["--set=combat.beat_delay_ms=30",
            "--set=combat.planning_timeout_seconds=20", "--set=event.step_pause_ms=400"] + ([f"--set=stats.hp_base={HP_BASE}"] if HP_BASE else []), env={"GAME_API_SERVER_KEY": SERVER_KEY}, log="server")
     time.sleep(4)
@@ -107,6 +119,15 @@ try:
     if "lost_woods" not in {n["id"] for n in ov["nodes"]}:
         fail("the hub story did not reveal Lost Woods")
     print("hub story played: Lost Woods revealed")
+    for i in range(4):  # party chat: every bot said hello once and heard all four hellos (its own included)
+        heard = (tmp / f"hub{i}.log").read_text()
+        for name in ("hub0", "hub1", "hub2", "hub3"):
+            if f"CHAT " not in heard or f"Hello from {name}" not in heard:
+                fail(f"hub{i} did not hear {name}'s hello in party chat")
+    print("party chat: all four heard each other")
+    if HUB_ONLY:
+        print("E2E HUB OK")
+        sys.exit(0)
 
     # 2. the event
     assert httpx.post(f"{api}/parties/{pid}/travel", json={"node_id": "lost_woods"}, headers=h(users[0])).status_code == 200

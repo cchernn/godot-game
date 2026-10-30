@@ -16,6 +16,7 @@
 [ext_resource type="PackedScene" path="res://game/content/board/markers/target_marker.tscn" id="13_target"]
 [ext_resource type="PackedScene" path="res://game/content/board/markers/select_marker.tscn" id="14_select"]
 [ext_resource type="PackedScene" path="res://game/content/board/markers/floating_text.tscn" id="15_float"]
+[ext_resource type="PackedScene" path="res://game/content/board/markers/chat_bubble.tscn" id="16_bubble"]
 
 [sub_resource type="Environment" id="Environment_2kpgk"]
 background_mode = 1
@@ -39,6 +40,7 @@ path_material = ExtResource("12_path")
 target_marker_scene = ExtResource("13_target")
 select_marker_scene = ExtResource("14_select")
 floating_text_scene = ExtResource("15_float")
+chat_bubble_scene = ExtResource("16_bubble")
 camera_rig = NodePath("CameraRig")
 map_root = NodePath("Map")
 units_root = NodePath("Units")

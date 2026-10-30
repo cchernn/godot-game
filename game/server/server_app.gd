@@ -23,6 +23,7 @@ class PlayerRec:
 	var combatant_id: String = ""
 	var sent_seq: int = 0
 	var character: Dictionary = {} # API mode: the persisted character this seat plays
+	var chat_limiter: ChatLimiter = null # made on the first message
 
 ## One party's gathering and battle, with its own clocks.
 class Room:
@@ -100,6 +101,7 @@ func _ready() -> void:
 	Gateway.escape_received.connect(_on_escape)
 	Gateway.story_continue_received.connect(_on_story_continue)
 	Gateway.story_choice_received.connect(_on_story_choice)
+	Gateway.chat_received.connect(_on_chat)
 	print("[server] listening on %s port %d (env=%s, guests=%s, persistence=%s, players_required=%d, worlds=%s)" % [
 		"wss" if tls else "ws", port, env, allow_guests, "api" if persistence else "off", players_required,
 		_world_filter if _world_filter != "" else "any"])
@@ -637,6 +639,29 @@ func _on_escape(peer_id: int) -> void:
 		Gateway.s_plan_result.rpc_id(peer_id, false, r["error"])
 	_push_all(room)
 	_conclude_if_finished(room, Time.get_ticks_msec())
+
+
+# ---------- Chat ----------
+
+## Party chat: whatever a seated player says goes to everyone in their room (the party, or the guest lobby), watchers included.
+## The text is cleaned here and the speaker is taken from the connection, so nobody can speak for someone else.
+func _on_chat(peer_id: int, text: String) -> void:
+	var rec := _rec_for(peer_id)
+	var room := _room_of(rec) if rec != null else null
+	if room == null:
+		return
+	var text_ok := ChatRules.clean(text, int(cfg.get_value("chat", "max_length")))
+	if text_ok == "":
+		return
+	if rec.chat_limiter == null:
+		rec.chat_limiter = ChatLimiter.new(int(cfg.get_value("chat", "rate_messages")), int(cfg.get_value("chat", "rate_seconds")) * 1000)
+	if not rec.chat_limiter.allow(Time.get_ticks_msec()):
+		Gateway.s_chat.rpc_id(peer_id, {"from": "", "text": "You are sending messages too fast", "unit": "", "mine": false, "system": true})
+		return
+	var speaker: String = rec.character.get("name", rec.display_name)
+	for other in _members(room):
+		if other.peer_id != -1:
+			Gateway.s_chat.rpc_id(other.peer_id, {"from": speaker, "text": text_ok, "unit": rec.combatant_id, "mine": other == rec})
 
 
 # ---------- Outbound state ----------

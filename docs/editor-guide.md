@@ -221,6 +221,20 @@ After adding, removing or changing gear, items or a class's starting gear, regen
 Redeploy with `scripts/stack.sh up api game web`. Dev tool: `GAME_API_SERVER_KEY=... scripts/grant_gear.sh <character_id> <gear_id>`.
 The Inventory is a tab on the Character window (`client/screens/inventory_screen.tscn`; edit the layout in the 2D editor like the other screens).
 
+## Chat (panel and bubbles)
+
+- **The chat box** is `game/client/screens/chat_panel.tscn` (a `ChatPanel`): a title button that folds it, the lines (`Log`, a RichTextLabel) and the
+  line to type in (`Input`). Restyle it in the scene; the colours of the speaker names and of the game's own lines are exported on the root. It is placed
+  twice: in `overworld_screen.tscn` (node `ChatPanel`, bottom left, title "World chat") and in `client_main.tscn` (node `PartyChat`, top left, title "Party chat",
+  shown in the lobby, stories, battles and the result). Move or resize either one by its anchors and offsets. Enter starts typing, Enter sends, Esc leaves the box.
+- **The bubble over a unit's head** is `game/content/board/markers/chat_bubble.tscn`. `Text` is the Label3D (font, size, outline, the wrap `Width`); `Box` is the
+  background quad (its material sets the colour and transparency). The root exports how much space surrounds the text, how long a bubble stays (a base time plus a
+  little per character) and how long it fades. The box is sized by the script, so only restyle it. A unit's bubble height is `Bubble Height` on `units/unit.tscn`
+  (above the status badges); the board uses the scene named `Chat Bubble Scene` on `board_3d.tscn`. A unit that speaks again replaces its old bubble; only units that
+  are on your board get one (a unit you cannot see shows no bubble), and the chat box always has the line.
+- The limits (longest message, messages per window) are in `balance.json` under `chat` (PROVISIONAL). After changing them run `tools/export_catalog.gd` (the API reads
+  the same numbers from `catalog.json`).
+
 ## Map objects and context actions (Inspector)
 
 Chests, levers, doors and traps are **map objects**. Their state lasts for one battle only.

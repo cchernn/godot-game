@@ -14,6 +14,8 @@ extends Node3D
 ## Where the status badges stand (above the head, centred) and the scene each one is made from (content/board/markers/status_icon.tscn).
 @export var status_row: Node3D
 @export var status_icon_scene: PackedScene
+## Chat bubbles stand this high above the unit's feet, clear of the status badges (the bubble scene itself is set on the board).
+@export var bubble_height: float = 2.35
 ## A ring on the ground (and a glow on the body) shown while the mouse is over the unit or its menu is open.
 @export var hover_ring: Node3D
 
@@ -47,6 +49,7 @@ var _moving_for: float = 0.0
 var _status_sig: int = 0
 var _hovered: bool = false
 var _status_icons: Array[StatusIcon] = []
+var _bubble: ChatBubble = null
 
 
 func _ready() -> void:
@@ -60,6 +63,16 @@ func _ready() -> void:
 		hp_fill.material_override = _fill_material
 	_last_pos = position
 	_play("idle")
+
+
+## Shows `text` in a bubble over the unit, replacing the one it had.
+func say(bubble_scene: PackedScene, text: String) -> void:
+	if is_instance_valid(_bubble):
+		_bubble.queue_free()
+	_bubble = bubble_scene.instantiate() as ChatBubble
+	add_child(_bubble)
+	_bubble.position = Vector3(0.0, bubble_height, 0.0)
+	_bubble.play(text)
 
 
 ## Applies a snapshot unit dictionary.

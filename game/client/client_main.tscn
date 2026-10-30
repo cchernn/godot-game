@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://game/client/client_main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://game/content/board/board_3d.tscn" id="2"]
@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" path="res://game/content/ui/unit_card.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/content/ui/menu_background.tscn" id="7"]
 [ext_resource type="PackedScene" path="res://game/client/screens/story_player.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://game/client/screens/chat_panel.tscn" id="11"]
 
 [node name="ClientMain" type="Control"]
 layout_mode = 3
@@ -309,3 +310,13 @@ autowrap_mode = 3
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
+
+[node name="PartyChat" parent="." instance=ExtResource("11")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 372.0
+offset_bottom = 200.0
+title = "Party chat"

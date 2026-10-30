@@ -72,6 +72,8 @@ var _preview_sig: int = 0
 @onready var party_cards: HBoxContainer = %PartyCards
 @onready var enemy_cards: HBoxContainer = %EnemyCards
 @onready var story_player: StoryPlayer = %StoryPlayer
+## Party chat, over the top left of the lobby, story and battle screens.
+@onready var party_chat: ChatPanel = %PartyChat
 @onready var result_panel: Control = %ResultPanel
 @onready var result_title: Label = %ResultTitle
 @onready var result_detail: Label = %ResultDetail
@@ -99,6 +101,8 @@ func _ready() -> void:
 	net.lobby.connect(_on_lobby)
 	net.result.connect(_on_result)
 	net.story.connect(_on_story)
+	net.chat.connect(_on_chat)
+	party_chat.submitted.connect(func(text: String) -> void: net.send_chat(text))
 	story_player.continue_pressed.connect(func() -> void: net.send_story_continue())
 	story_player.choice_chosen.connect(func(id: String) -> void: net.send_story_choice(id))
 	net.rejected.connect(func(t: String) -> void:
@@ -310,8 +314,19 @@ func _set_battle_view(on: bool) -> void:
 ## browser, so automated tests can wait for it. Harmless elsewhere.
 func _set_state(state: String) -> void:
 	_state = state
+	party_chat.visible = state != "menu" # party chat is for the party's activity: the lobby, story, battle and result
+	if state == "menu":
+		party_chat.clear()
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.unnamedState = '%s'" % state)
+
+
+## A line of party chat: it goes in the log, and over the speaker's head if they are on the board (so only units you can see speak).
+func _on_chat(m: Dictionary) -> void:
+	var system: bool = m.get("system", false)
+	party_chat.add_line(m["from"], m["text"], m["mine"], system)
+	if not system and m["unit"] != "" and board_holder.visible:
+		board.say(m["unit"], m["text"])
 
 
 func _on_lobby(info: Dictionary) -> void:

@@ -8,8 +8,9 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
-from . import rules
+from . import catalog, rules
 from .auth import AuthError, Identity, TokenVerifier, server_key_ok
+from .chat import ChatBoard, ChatError
 from .config import Settings, get_settings
 from .db import make_pool, migrate
 from .repo import Conflict, Forbidden, Invalid, Locked, NotFound, Repository, RepoError
@@ -19,6 +20,10 @@ from .templates import TemplateStore
 class WorldIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     template_id: str = Field(default="prototype", max_length=64)
+
+
+class ChatIn(BaseModel):
+    text: str = Field(max_length=2000)  # only a guard on the body size; the board cuts a message to the game's limit
 
 
 class LeaderIn(BaseModel):
@@ -161,6 +166,9 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
         migrate(pool)
     app.state.repo = Repository(pool, TemplateStore(settings.templates_dir), presence_seconds=settings.presence_seconds,
                                session_seconds=settings.session_seconds)
+
+    chat_limits = catalog.load()["chat"]
+    app.state.chat = ChatBoard(chat_limits["max_length"], chat_limits["rate_messages"], chat_limits["rate_seconds"])
 
     def repo(request: Request) -> Repository:
         return request.app.state.repo
@@ -383,6 +391,7 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def delete_world(world_id: uuid.UUID, body: WorldDeleteIn, user: Identity = Depends(current_user),
                      r: Repository = Depends(repo)) -> None:
         r.delete_world(world_id, user.user_id, body.confirm_name)
+        app.state.chat.forget(world_id)
 
     # ---- world view & activities ----
 
@@ -397,6 +406,22 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     @app.post("/worlds/{world_id}/presence", status_code=204)
     def presence(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> None:
         r.touch_presence(world_id, user.user_id)
+
+    @app.post("/worlds/{world_id}/chat", status_code=201)
+    def say(world_id: uuid.UUID, body: ChatIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        """World chat (the overworld): everyone in the world hears it. Kept in memory only."""
+        name = r.chat_name(world_id, user.user_id)
+        try:
+            return app.state.chat.post(world_id, user.user_id, name, body.text)
+        except ChatError as e:
+            raise HTTPException(e.status, str(e)) from e
+
+    @app.get("/worlds/{world_id}/chat")
+    def hear(world_id: uuid.UUID, after: int | None = None, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        """What was said after message `after` (omit it on the first look: nothing from before is shown) and the latest message number."""
+        if not r.is_member(world_id, user.user_id):
+            raise Forbidden("Not a member of this world")
+        return app.state.chat.since(world_id, user.user_id, after)
 
     @app.get("/worlds/{world_id}/parties/me")
     def my_party(world_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:

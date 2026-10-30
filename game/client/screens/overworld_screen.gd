@@ -21,6 +21,10 @@ signal resume_pressed
 signal refresh_requested
 ## The Character window was opened (the coordinator loads the page).
 signal character_requested
+## A line of world chat was written.
+signal chat_submitted(text: String)
+## Asked on a timer while the screen is visible, to fetch what others said.
+signal chat_poll_requested
 signal settings_pressed
 signal management_pressed
 signal switch_world_pressed
@@ -53,6 +57,9 @@ var _place_activities: Array = []
 @onready var _others_list: ItemList = %OthersList
 @onready var _ask: Button = %AskButton
 @onready var _timer: Timer = %OverworldTimer
+@onready var _chat_timer: Timer = %ChatTimer
+## World chat, bottom left. The coordinator feeds it.
+@onready var chat_panel: ChatPanel = %ChatPanel
 @onready var _hud: Label = %HudLabel
 @onready var _manage: Button = %ManagementButton
 @onready var _party_toggle: Button = %PartyToggle
@@ -105,9 +112,12 @@ func _ready() -> void:
 			start_requested.emit(id))
 	_ask.pressed.connect(_on_ask_pressed)
 	_timer.timeout.connect(func() -> void: refresh_requested.emit())
+	_chat_timer.timeout.connect(func() -> void: chat_poll_requested.emit())
+	chat_panel.submitted.connect(func(text: String) -> void: chat_submitted.emit(text))
 	visibility_changed.connect(func() -> void:
 		if not is_visible_in_tree():
-			_timer.stop()) # never keep refreshing a screen nobody sees
+			_timer.stop() # never keep refreshing a screen nobody sees
+			_chat_timer.stop())
 
 
 func _close_others(keep: String) -> void:
@@ -162,6 +172,7 @@ func show_loading() -> void:
 	_pending_requests = 0
 	_party_toggle.text = "Party"
 	_timer.start()
+	_chat_timer.start()
 
 
 ## overview: the API's world overview ({nodes, routes, activities}); parties: the API's party views.

@@ -117,6 +117,8 @@ func _ready() -> void:
 	_overworld.decision_made.connect(_decide_party_request)
 	_overworld.resume_pressed.connect(_resume_party)
 	_overworld.refresh_requested.connect(_refresh_overworld)
+	_overworld.chat_submitted.connect(_say_in_world)
+	_overworld.chat_poll_requested.connect(_hear_world)
 	_management.decision_made.connect(_decide)
 	_management.rename_requested.connect(_on_rename_requested)
 	_management.remove_member_requested.connect(_on_remove_member_requested)
@@ -417,6 +419,8 @@ func _post_presence() -> void:
 ## creator comes first.
 func _enter_game() -> void:
 	status.text = ""
+	_chat_after = -1 # world chat shows only what is said from now on
+	_overworld.chat_panel.clear()
 	_idle_seen = false
 	_shown_requests = []
 	_show(_overworld)
@@ -629,6 +633,37 @@ func _decide(request_id: String, approve: bool, row: JoinRequestRow) -> void:
 	else:
 		status.text = r["error"]
 		_management.row_failed(row)
+
+
+# ---------- World chat ----------
+
+## The number of the last world-chat message shown; -1 until the first look (which shows nothing from before).
+var _chat_after: int = -1
+var _chat_busy: bool = false
+
+
+func _hear_world() -> void:
+	if _chat_busy or _world.is_empty() or not _overworld.is_visible_in_tree():
+		return
+	_chat_busy = true
+	var path := "/worlds/%s/chat" % _world["id"]
+	if _chat_after >= 0:
+		path += "?after=%d" % _chat_after
+	var r := await api(HTTPClient.METHOD_GET, path)
+	_chat_busy = false
+	if r["status"] != 200 or not _overworld.is_visible_in_tree():
+		return
+	for m: Dictionary in r["data"]["messages"]:
+		_overworld.chat_panel.add_line(m["from"], m["text"], m["mine"])
+	_chat_after = int(r["data"]["last"])
+
+
+func _say_in_world(text: String) -> void:
+	var r := await api(HTTPClient.METHOD_POST, "/worlds/%s/chat" % _world["id"], {"text": text})
+	if r["status"] != 201:
+		_overworld.chat_panel.add_line("", r["error"], false, true)
+		return
+	_hear_world()
 
 
 # ---------- Overworld ----------

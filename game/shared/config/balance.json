@@ -65,5 +65,11 @@
   "items": {
     "_note": "PROVISIONAL: how many different kinds of item a character brings into a battle.",
     "battle_slots": 4
+  },
+  "chat": {
+    "_note": "PROVISIONAL: the longest message (characters), and how many a player may send in a window of seconds. Also read by the API for world chat (via catalog.json).",
+    "max_length": 200,
+    "rate_messages": 5,
+    "rate_seconds": 10
   }
 }

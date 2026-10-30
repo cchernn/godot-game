@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://game/client/screens/overworld_screen.gd" id="1"]
 [ext_resource type="PackedScene" path="res://game/content/ui/join_request_row.tscn" id="2"]
@@ -7,6 +7,7 @@
 [ext_resource type="Resource" path="res://game/content/overworld/map_layout.tres" id="5"]
 [ext_resource type="PackedScene" path="res://game/content/ui/floating_window.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://game/client/screens/character_screen.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://game/client/screens/chat_panel.tscn" id="8"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toast"]
 bg_color = Color(0.08, 0.08, 0.1, 0.88)
@@ -289,6 +290,19 @@ size_flags_horizontal = 3
 toggle_mode = true
 text = "Menu"
 
+[node name="ChatPanel" parent="." instance=ExtResource("8")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = -240.0
+offset_right = 372.0
+offset_bottom = -12.0
+grow_vertical = 0
+title = "World chat"
+
 [node name="ToastBox" type="PanelContainer" parent="."]
 unique_name_in_owner = true
 visible = false
@@ -313,6 +327,10 @@ autowrap_mode = 3
 [node name="OverworldTimer" type="Timer" parent="."]
 unique_name_in_owner = true
 wait_time = 3.0
+
+[node name="ChatTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 2.0
 
 [editable path="Windows/ActivityWindow"]
 [editable path="Windows/PartyWindow"]

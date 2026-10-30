@@ -39,6 +39,8 @@ const MOVE_SPEED := 6.0   ## tiles per second for smoothed unit movement
 @export_group("Floating text")
 ## One scene per number or word that rises from a unit (content/board/markers/floating_text.tscn).
 @export var floating_text_scene: PackedScene
+## What a unit says is shown over its head in this scene (content/board/markers/chat_bubble.tscn).
+@export var chat_bubble_scene: PackedScene
 @export var damage_color: Color = Color(1, 0.4, 0.35)
 @export var crit_color: Color = Color(1, 0.8, 0.25)
 @export var heal_color: Color = Color(0.45, 0.9, 0.5)
@@ -350,6 +352,13 @@ func _refresh_markers() -> void:
 
 
 # ---------- Floating text ----------
+
+## Shows a line of chat over a unit. Nothing happens for a unit that is not on the board (not in sight, or gone).
+func say(unit_id: String, text: String) -> void:
+	var node: Unit3D = _unit_nodes.get(unit_id)
+	if node != null and chat_bubble_scene != null:
+		node.say(chat_bubble_scene, text)
+
 
 ## Floats a number or word over a unit. `delay` staggers texts that start together.
 func float_text(unit_id: String, text: String, color: Color, size: float = 1.0, delay: float = 0.0) -> void:

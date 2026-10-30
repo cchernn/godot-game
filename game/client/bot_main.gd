@@ -12,6 +12,7 @@ var _drop_round: int = -1
 var _drop_plan_round: int = -1
 var _dropped_plan: bool = false
 var _welcomes: int = 0
+var _said_hello: bool = false
 var _finished: bool = false
 var _escape_round: int = -1
 var _escaped: bool = false
@@ -64,6 +65,7 @@ func _ready() -> void:
 		_welcomes += 1
 		_planned_round = -1 # a new step may start at round 1 again
 		print("[%s] welcomed #%d as %s" % [nm, _welcomes, i["combatant_id"]]))
+	net.chat.connect(func(m: Dictionary) -> void: print("[%s] CHAT %s: %s" % [nm, m["from"], m["text"]]))
 	net.notice.connect(func(t: String) -> void: print("[%s] notice: %s" % [nm, t]))
 	net.lobby.connect(func(i: Dictionary) -> void: print("[%s] lobby: %s (need %d)" % [nm, str(i["players"]), i["needed"]]))
 	net.result.connect(func(i: Dictionary) -> void:
@@ -90,7 +92,15 @@ func _ready() -> void:
 		get_tree().quit(2))
 
 
+## Says hello in party chat once, when the activity has begun (everyone is seated by then, so everyone hears it).
+func _say_hello() -> void:
+	if not _said_hello:
+		_said_hello = true
+		net.send_chat("Hello from %s" % _name)
+
+
 func _on_snapshot(s: Dictionary) -> void:
+	_say_hello()
 	snap = s
 	var me := _me()
 	if _drop_round > 0 and not _dropped and s["round"] == _drop_round and s["phase"] == Enums.RoundPhase.RESOLVING:
@@ -179,6 +189,7 @@ func _make_plan(s: Dictionary, me: Dictionary) -> Array:
 
 ## Reads each slide the server shows and presses Continue, or picks an option when the slide offers choices and this bot is the leader.
 func _on_story(state: Dictionary) -> void:
+	_say_hello()
 	if state["finished"]:
 		return
 	var story := StoryDef.load_story(str(state["story"]))

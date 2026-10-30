@@ -1,0 +1,35 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://game/client/board/chat_bubble.gd" id="1_bubble"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_box"]
+size = Vector2(1, 0.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_box"]
+transparency = 1
+shading_mode = 0
+no_depth_test = true
+albedo_color = Color(0.08, 0.08, 0.1, 0.85)
+billboard_mode = 1
+render_priority = 8
+
+[node name="ChatBubble" type="Node3D" node_paths=PackedStringArray("label", "background")]
+script = ExtResource("1_bubble")
+label = NodePath("Text")
+background = NodePath("Box")
+
+[node name="Box" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_box")
+mesh = SubResource("QuadMesh_box")
+
+[node name="Text" type="Label3D" parent="."]
+pixel_size = 0.006
+billboard = 1
+no_depth_test = true
+render_priority = 10
+outline_render_priority = 9
+text = "..."
+font_size = 40
+outline_size = 8
+autowrap_mode = 3
+width = 420.0

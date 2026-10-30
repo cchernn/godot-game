@@ -217,6 +217,17 @@ creator, world management, settings, lobby). Messages (`StatusLine`) show under 
 world template (that is game data); they live in `game/content/overworld/map_layout.tres` (a `MapLayout`, fractions of the map area). Nodes missing from it are
 spread around a ring, so a new template node always shows up. Why a button is disabled is written under it (`OverworldScreen.travel_problem` / `start_problem`).
 
+## Chat
+Two channels, both in memory only (no database; nothing is kept, and someone who joins sees only what is said after they arrive).
+- **World chat (overworld)** is carried by the API: `POST /worlds/{id}/chat {text}` and `GET /worlds/{id}/chat?after=N` (`app/chat.py`, `ChatBoard`: the last 100
+  messages per world, a per-sender rate limit). Members only; the speaker is the caller's active character, never a client-supplied name or id. The overworld asks
+  every 2 s (`ChatTimer`); the first look (no `after`) shows nothing from before. It assumes one API process (a second one would need a shared store).
+- **Party chat (activities)** is carried by the game server: `Gateway.c_chat(text)` in, `s_chat({from, text, unit, mine})` out to everyone in the sender's room
+  (the lobby, a story, a battle, the result, and watchers). The server cleans the text (`ChatRules.clean`), rate limits per player (`ChatLimiter`) and
+  speaks for the connection's own character. `unit` is the speaker's combatant id; the client shows a bubble over that unit only if the unit is on its board.
+- The limits are `chat.max_length`, `chat.rate_messages`, `chat.rate_seconds` in `balance.json`, copied into `catalog.json` for the API. Profanity filtering, mute and
+  report are not built.
+
 ## Activity classes and types
 Each world-template activity has a **type** (what is played: `battle` with an `encounter` id, `story` with a `story` id, `shop` with a `stock` of `{item, price}`, or `event` with `steps`; battles, stories and events run today, shops do not yet) and a **class** (its role in the world):
 - `campaign`: moves the world forward; once per world (first completion wins). Replaces the old "major"/"one_time".

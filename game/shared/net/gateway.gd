@@ -8,6 +8,7 @@ signal ready_received(peer_id: int, flag: bool)
 signal escape_received(peer_id: int)
 signal story_continue_received(peer_id: int)
 signal story_choice_received(peer_id: int, choice_id: String)
+signal chat_received(peer_id: int, text: String)
 
 signal welcomed(info: Dictionary)
 signal snapshot_received(snap: Dictionary)
@@ -17,6 +18,7 @@ signal notice_received(text: String)
 signal lobby_received(info: Dictionary)
 signal result_received(info: Dictionary)
 signal story_received(state: Dictionary)
+signal chat_heard(message: Dictionary)
 signal rejected(text: String)
 
 
@@ -59,6 +61,13 @@ func c_story_continue() -> void:
 func c_story_choose(choice_id: String) -> void:
 	if multiplayer.is_server():
 		story_choice_received.emit(multiplayer.get_remote_sender_id(), choice_id)
+
+
+## A line of party chat. The server cleans it and speaks it for the sender; the client never says who it is from.
+@rpc("any_peer", "call_remote", "reliable")
+func c_chat(text: String) -> void:
+	if multiplayer.is_server():
+		chat_received.emit(multiplayer.get_remote_sender_id(), text)
 
 
 # ---- server -> client ----
@@ -111,3 +120,10 @@ func s_result(info: Dictionary) -> void:
 @rpc("authority", "call_remote", "reliable")
 func s_story(state: Dictionary) -> void:
 	story_received.emit(state)
+
+
+## Party chat: {from: the speaker's character name, text, unit: their combatant id in the battle ("" before it starts), mine: bool}.
+## A line from the server itself ("too fast") has system: true and no speaker.
+@rpc("authority", "call_remote", "reliable")
+func s_chat(message: Dictionary) -> void:
+	chat_heard.emit(message)
