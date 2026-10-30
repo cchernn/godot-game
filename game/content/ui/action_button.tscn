@@ -1,5 +1,7 @@
 [gd_scene format=3]
 
 [node name="ActionButton" type="Button"]
+custom_minimum_size = Vector2(0, 34)
 text = "Action"
+expand_icon = true
 alignment = 0

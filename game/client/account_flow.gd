@@ -94,6 +94,7 @@ func _ready() -> void:
 	_settings.sign_out_pressed.connect(sign_out_and_show)
 	_settings.change_password_requested.connect(_on_change_password_requested)
 	_settings.display_name_requested.connect(_on_display_name_requested)
+	_settings.volume_changed.connect(AudioSettings.set_volume)
 	_character_screen.retire_requested.connect(_on_retire_requested)
 	_character_screen.inventory.equip_requested.connect(func(row: String, place: String) -> void:
 		_change_inventory(HTTPClient.METHOD_POST, "gear/%s/equip" % row, {"place": place}))
@@ -494,6 +495,7 @@ func _on_retire_requested() -> void:
 func _step_settings() -> void:
 	status.text = ""
 	_settings.show_account(user_email)
+	_settings.show_volumes(AudioSettings.load_volumes())
 	_show(_settings)
 	var p := await api(HTTPClient.METHOD_GET, "/me/profile")
 	if _settings.visible and p["status"] == 200:

@@ -98,7 +98,7 @@ func _fill_worn(keep: String) -> void:
 		var title: String = PLACE_TITLES[place]
 		if by_place.has(place):
 			var g: Dictionary = by_place[place]
-			worn_list.add_item("%s: %s" % [title, _name_of(str(g["gear_id"]))])
+			worn_list.add_item("%s: %s" % [title, _name_of(str(g["gear_id"]))], _gear_icon(str(g["gear_id"])))
 			_worn_rows.append(str(g["id"]))
 		else:
 			worn_list.add_item("%s: (empty)" % title)
@@ -112,7 +112,7 @@ func _fill_bag(keep: String) -> void:
 	_bag_rows.clear()
 	for g: Dictionary in _inv.get("gear", []):
 		if g.get("place") == null:
-			gear_list.add_item(_name_of(str(g["gear_id"])))
+			gear_list.add_item(_name_of(str(g["gear_id"])), _gear_icon(str(g["gear_id"])))
 			_bag_rows.append(str(g["id"]))
 			if str(g["id"]) == keep:
 				gear_list.select(gear_list.item_count - 1)
@@ -123,7 +123,7 @@ func _fill_items(keep: String) -> void:
 	_item_rows.clear()
 	for it: Dictionary in _inv.get("items", []):
 		var id := str(it["item_id"])
-		items_list.add_item("%s x%d" % [_item_name(id), int(it["quantity"])])
+		items_list.add_item("%s x%d" % [_item_name(id), int(it["quantity"])], _item_icon(id))
 		_item_rows.append(id)
 		if id == keep:
 			items_list.select(items_list.item_count - 1)
@@ -141,6 +141,7 @@ func _fill_battle_items() -> void:
 		var id := str(it["item_id"])
 		var box := CheckBox.new()
 		box.text = _item_name(id)
+		box.icon = _item_icon(id)
 		box.set_meta("item_id", id)
 		box.set_pressed_no_signal(chosen is Array and (chosen as Array).has(id))
 		box.toggled.connect(func(_on: bool) -> void:
@@ -243,6 +244,16 @@ func _gear_id_of(row: String) -> String:
 func _name_of(gear_id: String) -> String:
 	var g := _gear_set.get_gear(gear_id) if _gear_set != null else null
 	return g.display_name if g != null else gear_id.replace("_", " ")
+
+
+func _gear_icon(gear_id: String) -> Texture2D:
+	var g := _gear_set.get_gear(gear_id) if _gear_set != null else null
+	return g.icon if g != null else null
+
+
+func _item_icon(id: String) -> Texture2D:
+	var def: ItemDef = _skills.items.get(id) if _skills != null else null
+	return def.icon if def != null else null
 
 
 func _item_name(id: String) -> String:

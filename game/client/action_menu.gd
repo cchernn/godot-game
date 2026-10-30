@@ -26,6 +26,7 @@ func open(opts: Array[Dictionary], title: String, at: Vector2, bounds: Rect2) ->
 	for o in opts:
 		var b := entry_scene.instantiate() as Button
 		b.text = _text_for(o)
+		b.icon = o.get("icon") as Texture2D
 		b.disabled = not o["enabled"]
 		b.tooltip_text = _tooltip_for(o)
 		b.pressed.connect(_on_pressed.bind(o))

@@ -3,6 +3,8 @@
 Anything visual lives in scenes and resources you edit here (Godot 4.7.2). Code only reads them. Open the
 project from `project.godot`; the first open imports everything.
 
+**Bringing in outside art, models and sound, and tuning the game:** `docs/asset-guide.md` (step by step). **Where to get free assets, with their licences:** `docs/asset-sources.md`.
+
 ## Where things are
 
 | What | File | Edit it in |
@@ -70,7 +72,7 @@ If they disagree, the client logs a warning and draws the server's layout, and t
 - **Giving a class or enemy its own look:** create a new scene (Scene > New Inherited Scene > `unit.tscn`), save it in `units/`, then open
   `unit_visuals.tres` and add an entry under **Scenes**. The key is the **lower-case template name** (`warrior`, `hunter`, `mage`,
   `ghoul`, `cultist`); anything without an entry uses the default scene.
-- Colours, health-bar size and pick size are exported on the root (`Look` and `Picking` groups).
+- Colours, health-bar size and pick size are exported on the root (`Look` and `Picking` groups). The names of the animations played for idle, walking and downed are under **Animation names** (so an imported model's own names work).
 
 ## Triggers, dormant and immobile enemies (Inspector)
 - An encounter's **Triggers** list (`EncounterTrigger`) makes things happen mid-fight. **When:** a round beginning (`Round Reached` + `At Round`) or one of the enemies being defeated (`Enemy Defeated` + `Enemy`, its place in the Enemies list, 0 = first). **Effect** on the enemies listed in **Targets** (also places in the Enemies list): `Wake` (they start dormant: on the map, dimmed, inert, and can be attacked, until the trigger wakes them), `Appear` (they start off the map and arrive on their spawn marker, or the nearest free tile, when it fires) or `Remove` (they fall still and leave the fight). **Message** goes in the combat log. A dormant or not-yet-arrived enemy still counts as an enemy left to beat.
@@ -220,6 +222,29 @@ After adding, removing or changing gear, items or a class's starting gear, regen
 `scripts/godot.sh --headless --path . --script res://tools/export_catalog.gd` and commit `services/api/app/catalog.json`; a test fails while the two disagree.
 Redeploy with `scripts/stack.sh up api game web`. Dev tool: `GAME_API_SERVER_KEY=... scripts/grant_gear.sh <character_id> <gear_id>`.
 The Inventory is a tab on the Character window (`client/screens/inventory_screen.tscn`; edit the layout in the 2D editor like the other screens).
+
+## Sound (Inspector)
+
+- **The sound bank** is `game/content/audio/sound_bank.tres`: a list of **cues**, one per thing the game can make a sound for (a button click, a hit, a miss, a heal, a unit going down, a new round, the music
+  for the menu, the battle, a win or a defeat...). Every cue is already in the list and **empty, so the game is silent until you fill them**. Open the bank, click a cue and drop an `.ogg` or `.wav` file
+  into **Streams** (several files = one is picked at random each time). Also per cue: **Volume Db** (quieter or louder than the file), **Pitch Jitter** (a few percent of random pitch so repeats differ),
+  **Min Gap Ms** (the same cue will not play again within this time, so six hits in one beat are not six stacked sounds) and **Bus**. The meaning of each cue is in `game/client/audio/sound_bank.gd`
+  (the `CUES` list). Do not rename a cue; a test checks the bank against the list.
+- **Skills can have their own sound:** every skill under *Look and sound* has **Cast Sound** (when a stage starts that does nothing yet, such as drawing a bow) and **Hit Sound** (when it lands: a hit, a heal, a shield).
+  A skill with no sound of its own uses the generic `hit`, `heal`, `shield` or `cast` cue. Items use the skill inside them. The server tells the client which skill caused each event.
+- **Buttons need no wiring:** every button in the game plays `ui_click` when pressed and `ui_hover` when the mouse moves over it. A button that should stay quiet gets the metadata `silent` (Inspector > Node > Metadata).
+- **Music** follows the screen: `music_menu` (menus and the overworld), `music_story` (the lobby and stories), `music_battle`, and `music_victory` / `music_defeat` once on the result screen. A track fades in as the previous one fades out
+  (`Crossfade Seconds` on the director). In a music file's **Import** dock turn **Loop** on (except the victory and defeat stingers).
+- **The director** is `game/client/audio/audio_director.tscn`, instanced in `client_main.tscn`: its Inspector holds the bank, how many sounds may play at once (**Voices**) and the crossfade.
+- **Buses and volume:** `default_bus_layout.tres` (the Audio panel at the bottom of the editor) has `Music`, `Effects` and `UI` under Master. Sounds on those buses obey the three sliders on the **Settings** screen
+  (`settings_screen.tscn`, remembered per device). Put new sounds on one of the three buses.
+- Browsers do not let a page play sound before the player has clicked once; the first click starts it. Music begins then.
+
+## Icons (Inspector)
+
+Skills, gear and items each have an **Icon** (a 64 x 64 PNG or an SVG is plenty). Where it shows: gear and consumables in the Inventory lists and the battle-items check boxes (`fixed_icon_size` on the lists sets the
+size), and a skill's or item's buttons in the battle's ability list and the click menu (`ui/action_button.tscn`, with *Expand Icon* so it fits the button's height). An item's icon also goes on its use button. No icon = text only.
+Statuses already had theirs (the badge over a unit).
 
 ## Chat (panel and bubbles)
 

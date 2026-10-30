@@ -17,6 +17,7 @@ text = "Wearing"
 
 [node name="WornList" type="ItemList" parent="."]
 unique_name_in_owner = true
+fixed_icon_size = Vector2i(28, 28)
 custom_minimum_size = Vector2(0, 96)
 layout_mode = 2
 
@@ -26,6 +27,7 @@ text = "Gear in your bag"
 
 [node name="GearBagList" type="ItemList" parent="."]
 unique_name_in_owner = true
+fixed_icon_size = Vector2i(28, 28)
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 size_flags_vertical = 3
@@ -59,6 +61,7 @@ text = "Consumables"
 
 [node name="ConsumablesList" type="ItemList" parent="."]
 unique_name_in_owner = true
+fixed_icon_size = Vector2i(28, 28)
 custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 

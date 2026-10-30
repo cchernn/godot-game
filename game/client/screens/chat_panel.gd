@@ -49,6 +49,8 @@ func clear() -> void:
 
 ## `speaker` is who said it; "" with system = true is a line from the game itself.
 func add_line(speaker: String, text: String, mine: bool = false, system: bool = false) -> void:
+	if not mine and not system and speaker != "":
+		AudioDirector.cue("chat")
 	var safe := text.replace("[", "[lb]")
 	if system or speaker == "":
 		_log.append_text("[color=#%s][i]%s[/i][/color]\n" % [system_color.to_html(false), safe])

@@ -107,7 +107,7 @@ static func _skill_problem(ctx: Dictionary, sk: SkillDef, clicked: Dictionary, o
 static func _option(ctx: Dictionary, sk: SkillDef, label: String, problem: String, armor: int, cell: Vector2i, unit_id: String) -> Dictionary:
 	return {"kind": "skill", "id": sk.id, "label": label, "ap": sk.total_ap(), "enabled": problem == "", "reason": problem,
 		"summary": TargetingPreview.effect_summary(sk, int(ctx["me"].get("power", 0)), armor, ctx["cfg"]),
-		"hint": sk.description if sk.description != "" else sk.hint, "cell": cell, "unit": unit_id}
+		"hint": sk.description if sk.description != "" else sk.hint, "cell": cell, "unit": unit_id, "icon": sk.icon}
 
 
 static func _move_option(ctx: Dictionary, sk: SkillDef) -> Dictionary:

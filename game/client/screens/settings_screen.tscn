@@ -41,6 +41,64 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Change password"
 
+[node name="SoundTitle" type="Label" parent="."]
+layout_mode = 2
+text = "Sound"
+
+[node name="MusicRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="MusicLabel" type="Label" parent="MusicRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Music"
+
+[node name="MusicVolumeSlider" type="HSlider" parent="MusicRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.8
+
+[node name="EffectsRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="EffectsLabel" type="Label" parent="EffectsRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Sound effects"
+
+[node name="EffectsVolumeSlider" type="HSlider" parent="EffectsRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.8
+
+[node name="UIRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="UILabel" type="Label" parent="UIRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Interface sounds"
+
+[node name="UIVolumeSlider" type="HSlider" parent="UIRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.8
+
 [node name="SettingsSignOutButton" type="Button" parent="."]
 unique_name_in_owner = true
 layout_mode = 2

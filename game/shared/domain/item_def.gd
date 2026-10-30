@@ -8,6 +8,8 @@ extends Resource
 @export var display_name: String = ""
 ## One line shown on the Item list and when the item is picked.
 @export_multiline var hint: String = ""
+## A small picture (64 x 64 works well) shown in the Inventory and on the item's buttons in battle. Empty = text only.
+@export var icon: Texture2D
 ## Most copies a character can carry (the grant script and later shops respect it).
 @export_range(1, 99) var max_stack: int = 5
 ## What using it does: targeting, range, area, speed and stages with effects, exactly like a skill. Its id and frequency are set by
@@ -47,5 +49,7 @@ func make_skill() -> SkillDef:
 		sk.display_name = display_name
 	if sk.hint == "":
 		sk.hint = hint
+	if sk.icon == null:
+		sk.icon = icon
 	sk.frequency = Enums.Frequency.UNLIMITED
 	return sk

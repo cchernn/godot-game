@@ -1,0 +1,130 @@
+[gd_resource type="Resource" script_class="SoundBank" format=3]
+
+[ext_resource type="Script" path="res://game/client/audio/sound_bank.gd" id="1_bank"]
+[ext_resource type="Script" path="res://game/client/audio/sound_cue.gd" id="2_cue"]
+
+[sub_resource type="Resource" id="Resource_ui_click"]
+script = ExtResource("2_cue")
+id = "ui_click"
+bus = &"UI"
+
+[sub_resource type="Resource" id="Resource_ui_hover"]
+script = ExtResource("2_cue")
+id = "ui_hover"
+bus = &"UI"
+
+[sub_resource type="Resource" id="Resource_chat"]
+script = ExtResource("2_cue")
+id = "chat"
+bus = &"UI"
+
+[sub_resource type="Resource" id="Resource_hit"]
+script = ExtResource("2_cue")
+id = "hit"
+
+[sub_resource type="Resource" id="Resource_crit"]
+script = ExtResource("2_cue")
+id = "crit"
+
+[sub_resource type="Resource" id="Resource_miss"]
+script = ExtResource("2_cue")
+id = "miss"
+
+[sub_resource type="Resource" id="Resource_heal"]
+script = ExtResource("2_cue")
+id = "heal"
+
+[sub_resource type="Resource" id="Resource_shield"]
+script = ExtResource("2_cue")
+id = "shield"
+
+[sub_resource type="Resource" id="Resource_cast"]
+script = ExtResource("2_cue")
+id = "cast"
+
+[sub_resource type="Resource" id="Resource_move"]
+script = ExtResource("2_cue")
+id = "move"
+volume_db = -6.0
+
+[sub_resource type="Resource" id="Resource_downed"]
+script = ExtResource("2_cue")
+id = "downed"
+
+[sub_resource type="Resource" id="Resource_eliminated"]
+script = ExtResource("2_cue")
+id = "eliminated"
+
+[sub_resource type="Resource" id="Resource_revived"]
+script = ExtResource("2_cue")
+id = "revived"
+
+[sub_resource type="Resource" id="Resource_status_apply"]
+script = ExtResource("2_cue")
+id = "status_apply"
+
+[sub_resource type="Resource" id="Resource_status_end"]
+script = ExtResource("2_cue")
+id = "status_end"
+
+[sub_resource type="Resource" id="Resource_interrupt"]
+script = ExtResource("2_cue")
+id = "interrupt"
+
+[sub_resource type="Resource" id="Resource_round_start"]
+script = ExtResource("2_cue")
+id = "round_start"
+
+[sub_resource type="Resource" id="Resource_resolution_start"]
+script = ExtResource("2_cue")
+id = "resolution_start"
+
+[sub_resource type="Resource" id="Resource_escape"]
+script = ExtResource("2_cue")
+id = "escape"
+
+[sub_resource type="Resource" id="Resource_alert"]
+script = ExtResource("2_cue")
+id = "alert"
+
+[sub_resource type="Resource" id="Resource_pickup"]
+script = ExtResource("2_cue")
+id = "pickup"
+
+[sub_resource type="Resource" id="Resource_object"]
+script = ExtResource("2_cue")
+id = "object"
+
+[sub_resource type="Resource" id="Resource_music_menu"]
+script = ExtResource("2_cue")
+id = "music_menu"
+bus = &"Music"
+min_gap_ms = 0
+
+[sub_resource type="Resource" id="Resource_music_story"]
+script = ExtResource("2_cue")
+id = "music_story"
+bus = &"Music"
+min_gap_ms = 0
+
+[sub_resource type="Resource" id="Resource_music_battle"]
+script = ExtResource("2_cue")
+id = "music_battle"
+bus = &"Music"
+min_gap_ms = 0
+
+[sub_resource type="Resource" id="Resource_music_victory"]
+script = ExtResource("2_cue")
+id = "music_victory"
+bus = &"Music"
+min_gap_ms = 0
+
+[sub_resource type="Resource" id="Resource_music_defeat"]
+script = ExtResource("2_cue")
+id = "music_defeat"
+bus = &"Music"
+min_gap_ms = 0
+
+[resource]
+script = ExtResource("1_bank")
+cues = [SubResource("Resource_ui_click"), SubResource("Resource_ui_hover"), SubResource("Resource_chat"), SubResource("Resource_hit"), SubResource("Resource_crit"), SubResource("Resource_miss"), SubResource("Resource_heal"), SubResource("Resource_shield"), SubResource("Resource_cast"), SubResource("Resource_move"), SubResource("Resource_downed"), SubResource("Resource_eliminated"), SubResource("Resource_revived"), SubResource("Resource_status_apply"), SubResource("Resource_status_end"), SubResource("Resource_interrupt"), SubResource("Resource_round_start"), SubResource("Resource_resolution_start"), SubResource("Resource_escape"), SubResource("Resource_alert"), SubResource("Resource_pickup"), SubResource("Resource_object"), SubResource("Resource_music_menu"), SubResource("Resource_music_story"), SubResource("Resource_music_battle"), SubResource("Resource_music_victory"), SubResource("Resource_music_defeat")]

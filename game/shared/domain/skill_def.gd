@@ -20,6 +20,15 @@ extends Resource
 		kind = v
 		notify_property_list_changed()
 
+@export_group("Look and sound")
+## A small picture (64 x 64 works well) shown on the skill's buttons and menu entries. Empty = text only.
+@export var icon: Texture2D
+## Played when the skill begins a stage that has no effect yet (a draw, a wind-up). Empty = the generic "cast" cue of the sound bank.
+@export var cast_sound: AudioStream
+## Played when the skill lands (a hit, a heal, a shield). Empty = the generic cue for what happened.
+@export var hit_sound: AudioStream
+
+
 @export_group("Targeting")
 ## What the player clicks: a character (the skill follows them), a tile (it hits whatever is there when it lands),
 ## yourself (no click), or nothing (moves, reactions). Anyone can be aimed at, friend or foe.

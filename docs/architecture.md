@@ -228,6 +228,12 @@ Two channels, both in memory only (no database; nothing is kept, and someone who
 - The limits are `chat.max_length`, `chat.rate_messages`, `chat.rate_seconds` in `balance.json`, copied into `catalog.json` for the API. Profanity filtering, mute and
   report are not built.
 
+## Sound and icons
+- **Sound** is client-only. `AudioDirector` (a scene in `client_main.tscn`, static helpers `AudioDirector.cue/music/event`) plays cues from the `SoundBank` resource (`game/content/audio/sound_bank.tres`), pooled
+  voices on the `Music`/`Effects`/`UI` buses (`default_bus_layout.tres`), and hooks every `BaseButton` on the tree for click and hover. Battle events map to cues; the server adds the causing skill's id to the data of
+  `windup`, `hit`, `miss`, `heal` and `shield` events so a skill's own `cast_sound`/`hit_sound` can win over the generic cue. Volumes are `AudioSettings` (user://audio.cfg).
+- **Icons** are an `icon` on `SkillDef`, `GearDef` and `ItemDef` (an item's skill takes the item's icon). Nothing server-side reads them.
+
 ## Activity classes and types
 Each world-template activity has a **type** (what is played: `battle` with an `encounter` id, `story` with a `story` id, `shop` with a `stock` of `{item, price}`, or `event` with `steps`; battles, stories and events run today, shops do not yet) and a **class** (its role in the world):
 - `campaign`: moves the world forward; once per world (first completion wins). Replaces the old "major"/"one_time".

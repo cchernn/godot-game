@@ -34,6 +34,8 @@ func _all_templates() -> Array[UnitTemplate]:
 func test_class_attributes_give_the_expected_battle_numbers() -> void:
 	var seen := {}
 	for t in _all_templates():
+		if not ORIGINAL.has(t.id):
+			continue # later units (the Emerald Serpent's) have placeholder numbers; test_every_template_and_the_encounter_are_valid covers them
 		var want: Dictionary = ORIGINAL[t.id]
 		seen[t.id] = true
 		assert_eq(t.display_name, want["name"], t.id)

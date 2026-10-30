@@ -19,6 +19,13 @@ extends Node3D
 ## A ring on the ground (and a glow on the body) shown while the mouse is over the unit or its menu is open.
 @export var hover_ring: Node3D
 
+@export_group("Animation names")
+## Which animation of the AnimationPlayer plays in each state. The defaults match unit.tscn; with an imported model, type the names it came with
+## (look them up in the AnimationPlayer panel). A state whose animation is missing just keeps the last pose.
+@export var idle_animation: StringName = &"idle"
+@export var walk_animation: StringName = &"walk"
+@export var downed_animation: StringName = &"downed"
+
 @export_group("Look")
 ## Multiplies the Body's own scale: a quick way to make a unit broader, taller or smaller.
 @export var body_scale: Vector3 = Vector3.ONE
@@ -62,7 +69,7 @@ func _ready() -> void:
 		_fill_material = (hp_fill.material_override as StandardMaterial3D).duplicate()
 		hp_fill.material_override = _fill_material
 	_last_pos = position
-	_play("idle")
+	_play(idle_animation)
 
 
 ## Shows `text` in a bubble over the unit, replacing the one it had.
@@ -109,7 +116,7 @@ func apply(u: Dictionary, is_you: bool) -> void:
 			status_label.text = ""
 	_show_statuses(u.get("statuses", []))
 	if downed:
-		_play("downed")
+		_play(downed_animation)
 
 
 ## Shows or hides the hover highlight (ring and glow).
@@ -149,9 +156,9 @@ func set_world_position(p: Vector3, delta: float) -> void:
 	position = p
 	_moving_for = 0.15 if moved else maxf(_moving_for - delta, 0.0)
 	if not downed:
-		_play("walk" if _moving_for > 0.0 else "idle")
+		_play(walk_animation if _moving_for > 0.0 else idle_animation)
 
 
-func _play(anim: String) -> void:
+func _play(anim: StringName) -> void:
 	if animation_player != null and animation_player.has_animation(anim) and animation_player.current_animation != anim:
 		animation_player.play(anim)

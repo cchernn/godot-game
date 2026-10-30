@@ -14,6 +14,8 @@ const WORN_PLACES: Array[String] = ["weapon_1", "weapon_2", "armor", "accessory"
 @export var display_name: String = ""
 @export_multiline var description: String = ""
 @export var slot: Slot = Slot.WEAPON
+## A small picture (64 x 64 works well) shown in the Inventory. Empty = text only.
+@export var icon: Texture2D
 
 @export_group("Effect")
 ## Flat damage taken off every hit (after flanking and crits, before a shield; a hit still does at least 1). Adds up over all gear worn.

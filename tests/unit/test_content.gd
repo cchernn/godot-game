@@ -26,9 +26,19 @@ func test_every_unit_scene_loads_and_can_show_a_unit() -> void:
 
 func test_unit_animations_exist() -> void:
 	var u := (load("res://game/content/units/unit.tscn") as PackedScene).instantiate() as Unit3D
-	for anim in ["idle", "walk", "downed"]:
+	for anim in [u.idle_animation, u.walk_animation, u.downed_animation]:
 		assert_true(u.animation_player.has_animation(anim), anim)
 	u.free()
+
+
+func test_the_animation_names_a_unit_plays_can_be_changed_in_the_inspector() -> void:
+	var u := (load("res://game/content/units/unit.tscn") as PackedScene).instantiate() as Unit3D
+	(Engine.get_main_loop() as SceneTree).root.add_child(u)
+	u.animation_player.get_animation_library("").rename_animation("downed", "Death_A") # as an imported model would name it
+	u.downed_animation = &"Death_A"
+	u.apply(_unit_dict("x", Enums.Team.ENEMIES, Enums.LifeState.DOWNED, 0), false)
+	assert_eq(String(u.animation_player.current_animation), "Death_A")
+	u.queue_free()
 
 
 func test_visuals_resource_maps_ids_to_scenes_with_a_default() -> void:

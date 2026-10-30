@@ -284,6 +284,7 @@ func _on_events(list: Array) -> void:
 			col = "#b69af0" # something happened out of sight
 		log_view.append_text("[color=%s]%s[/color]\n" % [col, e["text"]])
 		board.show_event(e, slots)
+		AudioDirector.event(e, skills)
 
 
 ## One line summing up the round that just resolved, from the event types seen since the last recap.
@@ -317,6 +318,10 @@ func _set_state(state: String) -> void:
 	party_chat.visible = state != "menu" # party chat is for the party's activity: the lobby, story, battle and result
 	if state == "menu":
 		party_chat.clear()
+	match state: # music follows the screen; the result screen picks win or defeat in _on_result
+		"menu": AudioDirector.music("music_menu")
+		"lobby", "story": AudioDirector.music("music_story")
+		"battle": AudioDirector.music("music_battle")
 	if OS.has_feature("web"):
 		JavaScriptBridge.eval("window.unnamedState = '%s'" % state)
 
@@ -355,6 +360,7 @@ func _on_story(state: Dictionary) -> void:
 
 func _on_result(info: Dictionary) -> void:
 	_set_state("result")
+	AudioDirector.music("music_victory" if ["players_win", "story_complete", "event_complete"].has(info["outcome"]) else "music_defeat")
 	var titles := {"players_win": "VICTORY", "players_lose": "DEFEAT", "draw": "DRAW", "escaped": "ESCAPED", "story_complete": "STORY COMPLETE",
 		"event_complete": "EVENT COMPLETE", "event_failed": "EVENT FAILED"}
 	result_title.text = titles.get(info["outcome"], "BATTLE OVER")
@@ -602,7 +608,7 @@ func _ability_entries() -> Array[Dictionary]:
 		var label := "Move  1 AP/%d tile%s" % [me["tiles_per_ap"], "" if me["tiles_per_ap"] == 1 else "s"] if sk.kind == Enums.SkillKind.MOVE else "%s  %d AP" % [sk.display_name, cost]
 		out.append({"id": sk.id, "label": label, "name": sk.display_name, "enabled": why == "", "reason": why,
 			"summary": TargetingPreview.effect_summary(sk, int(me.get("power", 0)), 0, _cfg),
-			"hint": sk.description if sk.description != "" else sk.hint})
+			"hint": sk.description if sk.description != "" else sk.hint, "icon": sk.icon})
 	for it: Dictionary in me.get("items", []):
 		var sk := skills.get_skill(ItemDef.skill_id_for(it["id"]))
 		if sk == null:
@@ -610,7 +616,8 @@ func _ability_entries() -> Array[Dictionary]:
 		var left := _items_left(it["id"])
 		var why := "none left" if left <= 0 else ("needs %d AP, %d left" % [sk.total_ap(), ap_left] if sk.total_ap() > ap_left else "")
 		out.append({"id": sk.id, "label": "%s ×%d  %d AP" % [sk.display_name, left, sk.total_ap()], "name": sk.display_name, "enabled": why == "",
-			"reason": why, "summary": TargetingPreview.effect_summary(sk, 0, 0, _cfg), "hint": sk.description if sk.description != "" else sk.hint})
+			"reason": why, "summary": TargetingPreview.effect_summary(sk, 0, 0, _cfg), "hint": sk.description if sk.description != "" else sk.hint,
+			"icon": sk.icon})
 	return out
 
 
@@ -629,6 +636,7 @@ func _rebuild_abilities() -> void:
 	for e in entries:
 		var b := action_button_scene.instantiate() as Button
 		b.text = e["label"]
+		b.icon = e.get("icon") as Texture2D
 		b.toggle_mode = true
 		b.button_pressed = e["id"] == _armed
 		b.disabled = not can or not e["enabled"]

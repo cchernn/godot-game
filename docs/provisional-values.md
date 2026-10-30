@@ -70,6 +70,9 @@ Greybox maps `woods_gate`, `woods_clearing`, `theatre`, `dragon_pit`; encounters
 ### The event "The Emerald Serpent" (`prototype@1.json`, activity `emerald_serpent`, at Lost Woods)
 A `quest` (once per character), up to 4 players, `on_fail: restart`. Steps: story `emerald_arrival`, battle `emerald_trolls`, story `emerald_lich_intro`, battle `emerald_lich`, story `emerald_theatre_intro`, battle `emerald_statues`, story `emerald_pit_intro` (choices `defy` or `listen`; `listen` sets the flag `heard_the_serpent`), battle `emerald_dragon`, story `emerald_epilogue`. Reward at the end: 50 gold and the flag `emerald_serpent_slain`. It is unlocked by the hub story `elder_rumor` ("The Elder's request" in Kampung Lama), which reveals Lost Woods and the road to it; the party then travels there to start it. All the dialogue is placeholder, and so are the rewards, the class and the actors' colours.
 
+## Sound (PROVISIONAL)
+Starting volumes (kept per device, changed on the Settings screen): music 0.7, sound effects 0.9, interface sounds 0.8 (`AudioSettings.DEFAULTS`). At most 16 sounds play at once; music crossfades over 1 second. Every cue has a 60 ms minimum gap by default. The game ships with no sound files.
+
 ## Chat (PROVISIONAL, `balance.json` `chat`)
 A message is cut to 200 characters; a player may send 5 messages in 10 seconds (over that is refused with "too fast"). World chat keeps the last 100 messages per world in the
 API's memory. A bubble stays up 3 seconds plus 0.04 per character, then fades for 0.6 (exported on `chat_bubble.tscn`). No filtering of words yet.

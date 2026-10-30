@@ -272,7 +272,7 @@ func _run_effects(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionar
 	var effects: Array = stage.get("effects", [])
 	if effects.is_empty():
 		b.emit("windup", "{a} begins %s%s." % [sk.display_name, " on {t}" if victim else ""],
-			c.id, victim.id if victim else "")
+			c.id, victim.id if victim else "", {"skill": sk.id})
 		return
 	# Who is hit: the one target, or everyone on the covered tiles (found now, so it follows a target that moved).
 	var victims: Array[Combatant] = []
@@ -298,7 +298,7 @@ func _run_effects(c: Combatant, a: PlannedAction, sk: SkillDef, stage: Dictionar
 			any_landed = any
 	if victims.is_empty() and sk.targeting == Enums.Targeting.TILE:
 		var hurts := effects.any(func(e: Dictionary) -> bool: return e["type"] == "damage")
-		b.emit("miss", "{a}'s %s %s." % [sk.display_name, "strikes empty ground" if hurts else "finds no one there"], c.id)
+		b.emit("miss", "{a}'s %s %s." % [sk.display_name, "strikes empty ground" if hurts else "finds no one there"], c.id, "", {"skill": sk.id})
 
 
 ## Everyone standing on the skill's covered tiles, caster included, in id order so that rolls come out the same every time.
@@ -317,11 +317,11 @@ func _area_victims(c: Combatant, sk: SkillDef, aim: Vector2i) -> Array[Combatant
 func _apply_effect(c: Combatant, sk: SkillDef, e: Dictionary, who: Combatant, connected: bool) -> bool:
 	match e["type"] as String:
 		"damage":
-			return _damage(c, sk.display_name, e, who)
+			return _damage(c, sk.display_name, e, who, sk.id)
 		"heal":
-			_heal(c, sk.display_name, e, who)
+			_heal(c, sk.display_name, e, who, sk.id)
 		"shield":
-			_shield(c, sk.display_name, e, who)
+			_shield(c, sk.display_name, e, who, sk.id)
 		"interrupt":
 			if connected and who.life_state == Enums.LifeState.ALIVE:
 				_add_interrupt(who, e["points"] as int)
@@ -362,9 +362,10 @@ func _set_flag(c: Combatant, e: Dictionary, who: Combatant) -> void:
 
 
 ## Returns true when the damage connected (a miss returns false, so a following interrupt effect does not land).
-func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> bool:
+## `skill_id` rides along in the events' data so the client can play that skill's own sound; empty for a status effect's tick.
+func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant, skill_id: String = "") -> bool:
 	if victim.life_state == Enums.LifeState.DOWNED:
-		b.emit("hit", "{a}'s %s finishes {t}." % label, c.id, victim.id)
+		b.emit("hit", "{a}'s %s finishes {t}." % label, c.id, victim.id, {"skill": skill_id})
 		_defeat(victim)
 		return true
 	if not victim.is_present() or victim.life_state != Enums.LifeState.ALIVE:
@@ -373,7 +374,7 @@ func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> b
 		var per: float = b.cfg.get_value("combat", "accuracy_per_point")
 		var chance := clampf((b.cfg.get_value("combat", "base_hit_chance") as float) + (c.stat("accuracy") - victim.stat("evasion")) * per, 0.05, 1.0)
 		if b.rng.randf() >= chance:
-			b.emit("miss", "{a}'s %s misses {t}." % label, c.id, victim.id)
+			b.emit("miss", "{a}'s %s misses {t}." % label, c.id, victim.id, {"skill": skill_id})
 			return false
 	var mult := 1.0
 	var note := ""
@@ -405,23 +406,23 @@ func _damage(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> b
 	victim.hp = maxi(0, victim.hp - (dmg - absorbed))
 	if absorbed > 0:
 		note += " (%d absorbed by the shield)" % absorbed
-	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [label, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed, "crit": crit, "flank": flank})
+	b.emit("hit", "{a}'s %s hits {t} for %d%s." % [label, dmg, note], c.id, victim.id, {"amount": dmg, "absorbed": absorbed, "crit": crit, "flank": flank, "skill": skill_id})
 	if victim.hp == 0:
 		_defeat(victim)
 		return false # nothing left to interrupt
 	return true
 
 
-func _heal(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> void:
+func _heal(c: Combatant, label: String, e: Dictionary, victim: Combatant, skill_id: String = "") -> void:
 	if victim.life_state != Enums.LifeState.ALIVE:
 		b.emit("no_effect", "{a}'s %s has no effect on {t}." % label, c.id, victim.id)
 		return
 	var gained := mini(e["amount"] as int, victim.max_hp - victim.hp)
 	victim.hp += gained
-	b.emit("heal", "{a}'s %s heals {t} for %d." % [label, gained], c.id, victim.id, {"amount": gained})
+	b.emit("heal", "{a}'s %s heals {t} for %d." % [label, gained], c.id, victim.id, {"amount": gained, "skill": skill_id})
 
 
-func _shield(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> void:
+func _shield(c: Combatant, label: String, e: Dictionary, victim: Combatant, skill_id: String = "") -> void:
 	if victim.life_state != Enums.LifeState.ALIVE:
 		b.emit("no_effect", "{a}'s %s has no effect on {t}." % label, c.id, victim.id)
 		return
@@ -430,7 +431,7 @@ func _shield(c: Combatant, label: String, e: Dictionary, victim: Combatant) -> v
 		victim.beat_shield = maxi(victim.beat_shield, amount) # does not stack: only a higher shield replaces it
 	else:
 		victim.shield = maxi(victim.shield, amount)
-	b.emit("shield", "{a}'s %s shields {t} (%d)." % [label, amount], c.id, victim.id, {"amount": amount})
+	b.emit("shield", "{a}'s %s shields {t} (%d)." % [label, amount], c.id, victim.id, {"amount": amount, "skill": skill_id})
 
 
 ## 0 = front, 1 = side, 2 = rear.
