@@ -955,7 +955,10 @@ func _refresh() -> void:
 	var secs := ""
 	if snap.get("timer_ms", -1) >= 0:
 		secs = "  (%ds)" % maxi(0, ceili((snap["timer_ms"] - (Time.get_ticks_msec() - _snap_time_ms)) / 1000.0))
-	status_label.text = "Round %d — %s%s   Beat %d/%d" % [snap["round"], phase_names[snap["phase"]], secs,
+	var round_text := "Round %d" % snap["round"]
+	if snap.get("max_rounds", 0) > 0:
+		round_text += " of %d" % snap["max_rounds"] # the fight is a draw after the last one
+	status_label.text = "%s — %s%s   Beat %d/%d" % [round_text, phase_names[snap["phase"]], secs,
 		snap["beat"], snap["beats_per_round"]]
 	status_label.modulate = Color.WHITE
 	if snap.get("timer_ms", -1) >= 0:

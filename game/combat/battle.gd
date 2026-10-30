@@ -12,6 +12,8 @@ var state: BattleState = BattleState.new()
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var beat: int = 0
 var beats_per_round: int = 8
+## A fight that lasts this many rounds ends as a draw (PROVISIONAL). 0 = no limit.
+var max_rounds: int = 0
 var sight: int = 8
 var outcome: int = Enums.Outcome.NONE
 ## Tests turn this off to script enemies by hand.
@@ -32,6 +34,7 @@ func _init(p_cfg: GameConfig, p_skills: SkillDb, p_bf: Battlefield, p_seed: int 
 	bf = p_bf
 	rng.seed = p_seed
 	beats_per_round = cfg.get_value("combat", "beats_per_round")
+	max_rounds = int(cfg.get_value("combat", "max_rounds"))
 	sight = cfg.get_value("combat", "sight_range")
 	_resolver = BeatResolver.new(self)
 
@@ -298,8 +301,18 @@ func _end_round() -> void:
 	for c: Combatant in state.combatants.values():
 		_resolver.forfeit_all(c) # unused reservations expire; AP never carries over
 	_resolver.run_turn_end()
+	if max_rounds > 0 and state.round_number >= max_rounds:
+		_time_out()
+		return
 	state.round_number += 1
 	_begin_planning()
+
+
+## The fight went on too long (an unreachable enemy, a player who never acts): it ends as a draw, which counts as a failed run.
+func _time_out() -> void:
+	outcome = Enums.Outcome.DRAW
+	state.phase = Enums.RoundPhase.FINISHED
+	emit("victory", "Out of time after %d rounds. The fight is a draw." % max_rounds)
 
 
 ## Encounter objective: elimination (prototype). Simultaneous wipe is a provisional draw.
@@ -416,7 +429,7 @@ func snapshot_for(cid: String) -> Dictionary:
 	var eliminated := me != null and me.life_state == Enums.LifeState.ELIMINATED
 	var escaped := me != null and me.life_state == Enums.LifeState.ESCAPED
 	return {"round": state.round_number, "phase": state.phase, "beat": beat,
-		"beats_per_round": beats_per_round, "outcome": outcome, "you": cid, "eliminated": eliminated, "escaped": escaped,
+		"beats_per_round": beats_per_round, "max_rounds": max_rounds, "outcome": outcome, "you": cid, "eliminated": eliminated, "escaped": escaped,
 		"map": {"id": map_id, "w": bf.width, "h": bf.height, "terrain": Array(bf.terrain), "elev": Array(bf.elevation)},
 		"units": units, "plan": plan, "objects": _object_view()}
 

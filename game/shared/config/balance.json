@@ -19,6 +19,7 @@
   },
   "combat": {
     "beats_per_round": 8,
+    "max_rounds": 30,
     "planning_timeout_seconds": 90,
     "revive_hp_fraction": 0.2,
     "base_hit_chance": 0.9,

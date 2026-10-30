@@ -264,7 +264,10 @@ class Repository(GearMixin, PartyMixin, WorldMixin):
                 if ok is None:  # rolls the whole transaction back: no partial outcomes
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
                 paid = outcome == "players_win" and p["outcome"] != "escaped"
-                reward = {"gold": int(p.get("gold") or 0) if paid else 0, "items": {}, "flags": [], "gear": []}
+                gold = int(p.get("gold") or 0) if paid else 0
+                if gold and step_key and not self.claim_step_pay(conn, instance_id, step_key + ":gold", p["character_id"]):
+                    gold = 0  # an event's step pays its encounter's gold once per run, so replaying the step after a setback is no farm
+                reward = {"gold": gold, "items": {}, "flags": [], "gear": []}
                 if step_key and p["outcome"] != "escaped" and self.claim_step_pay(conn, instance_id, step_key, p["character_id"]):
                     reward["gold"] += step_src["gold"]
                     reward["items"] = dict(step_src["items"])

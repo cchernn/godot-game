@@ -1013,14 +1013,27 @@ def test_an_event_pays_each_step_once_and_the_event_at_the_end(pool, tmp_path):
     assert res.json()["rewards"][c1["id"]] == {"gold": 15, "items": {}, "flags": ["ghouls_down"], "gear": []}, "the encounter's gold plus the step's"
     assert res.json()["rewards"][c2["id"]]["gold"] == 0, "an escaped character earns nothing"
     again = event_result(c, w, iid, [(c1["id"], "survived", 10)], "ghouls", key="ghouls-2")
-    assert again.json()["rewards"][c1["id"]]["gold"] == 10 and again.json()["rewards"][c1["id"]]["flags"] == [], "a retried step pays its own rewards once"
+    assert again.json()["rewards"][c1["id"]]["gold"] == 0 and again.json()["rewards"][c1["id"]]["flags"] == [], \
+        "a replayed step pays nothing more: not its own rewards and not the encounter's gold"
     done = c.post(f"/internal/instances/{iid}/complete", json={"participants": [c1["id"]]}, headers=SERVER).json()
     assert done["rewards"] == {c1["id"]: {"gold": 30, "items": {}, "flags": ["laid_to_rest"], "gear": []}}
     me, other = (c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t)).json() for t in (t1, t2))
-    assert me["gold"] == 3 + 15 + 10 + 30 and set(me["flags"]) == {"brave", "ghouls_down", "laid_to_rest"}
+    assert me["gold"] == 3 + 15 + 30 and set(me["flags"]) == {"brave", "ghouls_down", "laid_to_rest"}
     assert other["gold"] == 3 and other["flags"] == ["brave"], "the second character only got the story step"
     assert next(a for a in overview(c, w["id"], t1)["activities"] if a["id"] == "haunting")["completed"]
     assert not next(a for a in overview(c, w["id"], t2)["activities"] if a["id"] == "haunting")["completed"], "only who reached the end"
+
+
+def test_a_step_lost_first_still_pays_its_encounter_gold_on_the_first_win_and_not_again(pool, tmp_path):
+    c, w, (t1, _), (c1, _c2), iid = event_world(pool, tmp_path)
+    lost = event_result(c, w, iid, [(c1["id"], "downed", 10)], "ghouls", outcome="players_lose")
+    assert lost.json()["rewards"][c1["id"]]["gold"] == 1, "a loss pays only the lose rewards"
+    won = event_result(c, w, iid, [(c1["id"], "survived", 10)], "ghouls")
+    assert won.json()["rewards"][c1["id"]]["gold"] == 15, "the first win after the setback pays the encounter's gold and the step's"
+    for _ in range(3):  # restarts that get this far again
+        replay = event_result(c, w, iid, [(c1["id"], "survived", 10)], "ghouls")
+        assert replay.json()["rewards"][c1["id"]]["gold"] == 0
+    assert c.get(f"/worlds/{w['id']}/characters/me", headers=auth(t1)).json()["gold"] == 1 + 15
 
 
 def test_a_lost_battle_step_pays_its_lose_rewards_and_a_failed_event_pays_no_end(pool, tmp_path):
