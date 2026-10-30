@@ -71,12 +71,19 @@ class ProfileIn(BaseModel):
         return v
 
 
+class LootIn(BaseModel):
+    """What the encounter's drops gave this character: separate pieces of gear and copies of consumables."""
+    gear: list[Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]] = Field(default_factory=list, max_length=16)
+    items: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)
+
+
 class ParticipantIn(BaseModel):
     character_id: uuid.UUID
     outcome: Literal["survived", "downed", "eliminated", "escaped"]
     items_used: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)
     items_gained: dict[str, Annotated[int, Field(ge=0, le=99)]] = Field(default_factory=dict, max_length=16)  # from map objects
     flags_set: list[Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]] = Field(default_factory=list, max_length=32)
+    loot: LootIn = Field(default_factory=LootIn)  # the drops, rolled by the game server (paid only on a win, unless escaped)
     gold: int = Field(default=0, ge=0, le=100_000)  # what the game server decided this character earns (paid on a win, unless escaped)
 
 
@@ -87,6 +94,22 @@ class CompleteIn(BaseModel):
 class StepIn(BaseModel):
     participants: list[uuid.UUID] = Field(max_length=16)  # characters who were there for the step
     choice: str | None = Field(default=None, max_length=64)  # the option the party picked, if the step offers any
+
+
+class GrantGearIn(BaseModel):
+    gear_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
+
+
+class EquipIn(BaseModel):
+    place: Literal["weapon_1", "weapon_2", "armor", "accessory"]
+
+
+class BattleItemsIn(BaseModel):
+    items: list[Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")]] | None = Field(max_length=16)  # null = automatic
+
+
+class DiscardItemsIn(BaseModel):
+    quantity: int = Field(ge=1, le=99)
 
 
 class GrantItemIn(BaseModel):
@@ -131,7 +154,7 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
 
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
-                           allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
+                           allow_methods=["GET", "POST", "PUT"], allow_headers=["Authorization", "Content-Type"])
     app.state.verifier = verifier or TokenVerifier(settings)
     if pool is None:
         pool = make_pool(settings.database_url)
@@ -247,6 +270,34 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def retire(character_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
         return r.retire_character(character_id, user.user_id)
 
+    # ---- inventory and gear ----
+
+    @app.get("/characters/{character_id}/inventory")
+    def inventory(character_id: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.inventory(user.user_id, character_id)
+
+    @app.post("/characters/{character_id}/gear/{gear_row}/equip")
+    def equip(character_id: uuid.UUID, gear_row: uuid.UUID, body: EquipIn, user: Identity = Depends(current_user),
+              r: Repository = Depends(repo)) -> dict:
+        return r.equip_gear(user.user_id, character_id, gear_row, body.place)
+
+    @app.post("/characters/{character_id}/gear/{gear_row}/unequip")
+    def unequip(character_id: uuid.UUID, gear_row: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.unequip_gear(user.user_id, character_id, gear_row)
+
+    @app.post("/characters/{character_id}/gear/{gear_row}/discard")
+    def discard_gear(character_id: uuid.UUID, gear_row: uuid.UUID, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.discard_gear(user.user_id, character_id, gear_row)
+
+    @app.put("/characters/{character_id}/battle-items")
+    def battle_items(character_id: uuid.UUID, body: BattleItemsIn, user: Identity = Depends(current_user), r: Repository = Depends(repo)) -> dict:
+        return r.set_battle_items(user.user_id, character_id, body.items)
+
+    @app.post("/characters/{character_id}/items/{item_id}/discard")
+    def discard_items(character_id: uuid.UUID, item_id: str, body: DiscardItemsIn, user: Identity = Depends(current_user),
+                      r: Repository = Depends(repo)) -> dict:
+        return r.discard_items(user.user_id, character_id, item_id, body.quantity)
+
     # ---- service-to-service (Godot server) ----
 
     @app.post("/internal/auth/session", dependencies=[Depends(server_only)])
@@ -280,6 +331,11 @@ def create_app(settings: Settings | None = None, pool=None, verifier: TokenVerif
     def grant_items(character_id: uuid.UUID, body: GrantItemIn, r: Repository = Depends(repo)) -> dict:
         """Dev/admin: gives a character copies of an item (see scripts/grant_item.sh). There are no shops or loot yet."""
         return r.grant_items(character_id, body.item_id, body.quantity, body.max_stack)
+
+    @app.post("/internal/characters/{character_id}/gear", dependencies=[Depends(server_only)])
+    def grant_gear(character_id: uuid.UUID, body: GrantGearIn, r: Repository = Depends(repo)) -> dict:
+        """Dev/admin: gives a character one piece of gear (see scripts/grant_gear.sh)."""
+        return r.grant_gear(character_id, body.gear_id)
 
     @app.post("/internal/characters/{character_id}/flags", dependencies=[Depends(server_only)])
     def change_flags(character_id: uuid.UUID, body: FlagsIn, r: Repository = Depends(repo)) -> dict:

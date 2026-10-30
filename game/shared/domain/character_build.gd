@@ -9,7 +9,9 @@ extends RefCounted
 
 ## {attributes: {name: int}, stats: {max_hp, power, accuracy, evasion, dexterity, agility, armor (the gear's)}, skills: Array[String] (ids,
 ## in order: starting, unlocked, then granted by gear), gear: Array[String] (ids)}. `flags` = the event flags the character holds.
-static func compose(tpl: UnitTemplate, cfg: GameConfig, flags: Array = []) -> Dictionary:
+## `worn` = the ids of the gear the character has equipped (what the database holds); null = the class's starting gear (a plain class
+## with nothing owned, and enemies). Unknown ids and more than a kind's slots allow are ignored.
+static func compose(tpl: UnitTemplate, cfg: GameConfig, flags: Array = [], worn: Variant = null) -> Dictionary:
 	var held: Array = flags.filter(func(f: Variant) -> bool: return f is String)
 	var attrs := tpl.base_attributes().to_dict()
 	for g in tpl.attribute_grants:
@@ -23,7 +25,8 @@ static func compose(tpl: UnitTemplate, cfg: GameConfig, flags: Array = []) -> Di
 	var armor := 0
 	var skills := _skills(tpl, attrs, held)
 	var gear: Array[String] = []
-	for g in tpl.gear:
+	var wearing: Array[GearDef] = tpl.gear if not worn is Array else GearSet.load_file().worn(worn as Array)
+	for g in wearing:
 		if g == null:
 			continue
 		gear.append(g.id)

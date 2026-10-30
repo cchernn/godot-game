@@ -200,14 +200,26 @@ A downed or eliminated unit loses all statuses. A unit card lists its statuses w
 
 ## Items (Inspector)
 An item is a consumable a character brings into a battle. Each is an `ItemDef` resource in `game/content/items/`, listed in `items/item_set.tres` (right-click > New Resource > ItemDef,
-save as `<id>.tres`, then add it to the set). No items ship yet. Fields: **id** (lower-case, no spaces), **display name**, **hint**, **max stack** (most copies a character can carry),
+save as `<id>.tres`, then add it to the set; `health_potion` and `fire_flask` are provisional examples). Fields: **id** (lower-case, no spaces), **display name**, **hint**, **max stack** (most copies a character can carry),
 and **Use**, which is an embedded skill: targeting, range, area, speed and stages with effects, exactly as in *Skills* above (so an item can heal, shield, damage, hit an area or apply
 a status). You do not set the skill's id or frequency: the game gives it the id `item:<id>` and lets it be used as often as the character has copies and AP.
 In a fight the **Item** button lists what you carry with the copies left (the ones already in your queue are counted as spoken for). A copy is used up when its skill *begins*; if the
 action is skipped (target gone, out of range) nothing is used. What is used is saved with the battle result; a battle that never finishes saves nothing.
 A character brings at most `items.battle_slots` kinds into a battle (`balance.json`, provisional 4). To give a character items for testing:
-`GAME_API_SERVER_KEY=... scripts/grant_item.sh <character_id> <item_id> <quantity> [max_stack]` (needs the API running; there are no shops or loot yet).
+`GAME_API_SERVER_KEY=... scripts/grant_item.sh <character_id> <item_id> <quantity> [max_stack]` (needs the API running). Encounters can drop items too (see *Gear and drops* below).
 Item changes need `scripts/stack.sh up game web` (and `up api` for a new migration).
+
+## Gear and drops (Inspector)
+A piece of gear is a `GearDef` resource in `game/content/gear/` (right-click > New Resource > GearDef, save as `<id>.tres`), and it must be added to `gear/gear_set.tres`: that list is
+what the game, the Inventory and the drops know about. Fields: **id** (the file name), **display name**, **description**, **slot** (weapon, armor or accessory), **armor** (flat damage taken off every
+hit) and **grants** (the attacks and skills wearing it gives; a weapon's attack needs the Attack action slot, and every skill granted must be in `skills/skill_set.tres`).
+A character wears two weapons, one armor and one accessory. Every piece a character owns is its own copy; characters start wearing their class's `gear` list (Stats > classes).
+An encounter's **Drops** list (Inspector on `encounters/*.tres`) holds `DropEntry` resources: set either **Gear** or **Item**, a **chance percent** and (items) a **count**. Every player still in
+the fight when it is won rolls each entry on their own. In an event, a step's drops are given once per character, however often the step is replayed.
+After adding, removing or changing gear, items or a class's starting gear, regenerate the API's copy of the content (it needs to know which slot each piece fits):
+`scripts/godot.sh --headless --path . --script res://tools/export_catalog.gd` and commit `services/api/app/catalog.json`; a test fails while the two disagree.
+Redeploy with `scripts/stack.sh up api game web`. Dev tool: `GAME_API_SERVER_KEY=... scripts/grant_gear.sh <character_id> <gear_id>`.
+The Inventory is a tab on the Character window (`client/screens/inventory_screen.tscn`; edit the layout in the 2D editor like the other screens).
 
 ## Map objects and context actions (Inspector)
 

@@ -8,6 +8,20 @@
 [ext_resource type="Resource" path="res://game/content/stats/classes/mage.tres" id="c_mage"]
 [ext_resource type="PackedScene" path="res://game/content/maps/woods_clearing.tscn" id="map"]
 [ext_resource type="Resource" path="res://game/content/stats/enemies/lich.tres" id="e_lich"]
+[ext_resource type="Script" path="res://game/shared/domain/drop_entry.gd" id="d_script"]
+[ext_resource type="Resource" path="res://game/content/items/fire_flask.tres" id="di_fire_flask"]
+[ext_resource type="Resource" path="res://game/content/gear/studded_leather.tres" id="dg_studded_leather"]
+
+[sub_resource type="Resource" id="Drop_0"]
+script = ExtResource("d_script")
+gear = ExtResource("dg_studded_leather")
+chance_percent = 25
+
+[sub_resource type="Resource" id="Drop_1"]
+script = ExtResource("d_script")
+item = ExtResource("di_fire_flask")
+chance_percent = 40
+count = 1
 
 [resource]
 script = ExtResource("2_enc")
@@ -16,3 +30,4 @@ max_party = 4
 gold = 10
 classes = Array[ExtResource("1_unit")]([ExtResource("c_warrior"), ExtResource("c_hunter"), ExtResource("c_mage")])
 enemies = Array[ExtResource("1_unit")]([ExtResource("e_lich")])
+drops = Array[ExtResource("d_script")]([SubResource("Drop_0"), SubResource("Drop_1")])

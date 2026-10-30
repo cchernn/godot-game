@@ -10,6 +10,9 @@
 [ext_resource type="Resource" path="res://game/content/stats/enemies/dragon_tail.tres" id="e_dragon_tail"]
 [ext_resource type="Resource" path="res://game/content/stats/enemies/half_dragon.tres" id="e_half_dragon"]
 [ext_resource type="Resource" path="res://game/content/stats/enemies/leshen.tres" id="e_leshen"]
+[ext_resource type="Script" path="res://game/shared/domain/drop_entry.gd" id="d_script"]
+[ext_resource type="Resource" path="res://game/content/items/health_potion.tres" id="di_health_potion"]
+[ext_resource type="Resource" path="res://game/content/gear/dragon_scale_vest.tres" id="dg_dragon_scale_vest"]
 
 [sub_resource type="Resource" id="Trigger_0"]
 script = ExtResource("3_trg")
@@ -27,6 +30,17 @@ effect = 2
 targets = PackedInt32Array(1)
 message = ""
 
+[sub_resource type="Resource" id="Drop_0"]
+script = ExtResource("d_script")
+gear = ExtResource("dg_dragon_scale_vest")
+chance_percent = 50
+
+[sub_resource type="Resource" id="Drop_1"]
+script = ExtResource("d_script")
+item = ExtResource("di_health_potion")
+chance_percent = 100
+count = 2
+
 [resource]
 script = ExtResource("2_enc")
 map = ExtResource("map")
@@ -35,3 +49,4 @@ gold = 10
 classes = Array[ExtResource("1_unit")]([ExtResource("c_warrior"), ExtResource("c_hunter"), ExtResource("c_mage")])
 enemies = Array[ExtResource("1_unit")]([ExtResource("e_half_dragon"), ExtResource("e_dragon_tail"), ExtResource("e_leshen")])
 triggers = Array[ExtResource("3_trg")]([SubResource("Trigger_0"), SubResource("Trigger_1")])
+drops = Array[ExtResource("d_script")]([SubResource("Drop_0"), SubResource("Drop_1")])

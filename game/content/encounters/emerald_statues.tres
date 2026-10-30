@@ -8,6 +8,9 @@
 [ext_resource type="Resource" path="res://game/content/stats/classes/mage.tres" id="c_mage"]
 [ext_resource type="PackedScene" path="res://game/content/maps/theatre.tscn" id="map"]
 [ext_resource type="Resource" path="res://game/content/stats/enemies/wolf_statue.tres" id="e_wolf_statue"]
+[ext_resource type="Script" path="res://game/shared/domain/drop_entry.gd" id="d_script"]
+[ext_resource type="Resource" path="res://game/content/items/health_potion.tres" id="di_health_potion"]
+[ext_resource type="Resource" path="res://game/content/gear/bone_charm.tres" id="dg_bone_charm"]
 
 [sub_resource type="Resource" id="Trigger_0"]
 script = ExtResource("3_trg")
@@ -17,6 +20,17 @@ effect = 0
 targets = PackedInt32Array(0, 1, 2, 3)
 message = "The stone wolves shudder and open their eyes."
 
+[sub_resource type="Resource" id="Drop_0"]
+script = ExtResource("d_script")
+gear = ExtResource("dg_bone_charm")
+chance_percent = 20
+
+[sub_resource type="Resource" id="Drop_1"]
+script = ExtResource("d_script")
+item = ExtResource("di_health_potion")
+chance_percent = 30
+count = 1
+
 [resource]
 script = ExtResource("2_enc")
 map = ExtResource("map")
@@ -25,3 +39,4 @@ gold = 10
 classes = Array[ExtResource("1_unit")]([ExtResource("c_warrior"), ExtResource("c_hunter"), ExtResource("c_mage")])
 enemies = Array[ExtResource("1_unit")]([ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue"), ExtResource("e_wolf_statue")])
 triggers = Array[ExtResource("3_trg")]([SubResource("Trigger_0")])
+drops = Array[ExtResource("d_script")]([SubResource("Drop_0"), SubResource("Drop_1")])

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="GearSet" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/gear_set.gd" id="1_set"]
+[ext_resource type="Resource" path="res://game/content/gear/bone_charm.tres" id="g_bone_charm"]
+[ext_resource type="Resource" path="res://game/content/gear/bow.tres" id="g_bow"]
+[ext_resource type="Resource" path="res://game/content/gear/dragon_scale_vest.tres" id="g_dragon_scale_vest"]
+[ext_resource type="Resource" path="res://game/content/gear/garb.tres" id="g_garb"]
+[ext_resource type="Resource" path="res://game/content/gear/iron_chainmail.tres" id="g_iron_chainmail"]
+[ext_resource type="Resource" path="res://game/content/gear/iron_dagger.tres" id="g_iron_dagger"]
+[ext_resource type="Resource" path="res://game/content/gear/iron_longsword.tres" id="g_iron_longsword"]
+[ext_resource type="Resource" path="res://game/content/gear/leather_armor.tres" id="g_leather_armor"]
+[ext_resource type="Resource" path="res://game/content/gear/studded_leather.tres" id="g_studded_leather"]
+[ext_resource type="Resource" path="res://game/content/gear/troll_club.tres" id="g_troll_club"]
+[ext_resource type="Resource" path="res://game/content/gear/wooden_shield.tres" id="g_wooden_shield"]
+[ext_resource type="Resource" path="res://game/content/gear/wooden_staff.tres" id="g_wooden_staff"]
+
+[resource]
+script = ExtResource("1_set")
+gear = Array[Resource]([ExtResource("g_bone_charm"), ExtResource("g_bow"), ExtResource("g_dragon_scale_vest"), ExtResource("g_garb"), ExtResource("g_iron_chainmail"), ExtResource("g_iron_dagger"), ExtResource("g_iron_longsword"), ExtResource("g_leather_armor"), ExtResource("g_studded_leather"), ExtResource("g_troll_club"), ExtResource("g_wooden_shield"), ExtResource("g_wooden_staff")])

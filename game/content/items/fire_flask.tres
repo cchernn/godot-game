@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/item_def.gd" id="item"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skill"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="stage"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="effect"]
+[ext_resource type="Script" path="res://game/shared/domain/damage_effect.gd" id="eff"]
+
+[sub_resource type="Resource" id="Eff"]
+script = ExtResource("eff")
+base = 9
+can_crit = false
+
+[sub_resource type="Resource" id="Stage"]
+script = ExtResource("stage")
+stage_name = "fire flask"
+effects = Array[ExtResource("effect")]([SubResource("Eff")])
+
+[sub_resource type="Resource" id="Use"]
+script = ExtResource("skill")
+kind = 1
+targeting = 1
+attack_range = 4
+speed = 5
+stage_defs = Array[ExtResource("stage")]([SubResource("Stage")])
+
+[resource]
+script = ExtResource("item")
+id = "fire_flask"
+display_name = "Fire flask"
+hint = "Click a character: burns for 9"
+max_stack = 5
+use = SubResource("Use")

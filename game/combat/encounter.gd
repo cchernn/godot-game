@@ -58,7 +58,8 @@ static func build(cfg: GameConfig, skills: SkillDb, player_count: int, seed: int
 				tpl = chosen
 		var made: Dictionary = {}
 		if i < builds.size() and builds[i] is Dictionary:
-			made = CharacterBuild.compose(tpl, cfg, _list((builds[i] as Dictionary).get("flags", [])))
+			var b := builds[i] as Dictionary
+			made = CharacterBuild.compose(tpl, cfg, _list(b.get("flags", [])), _list(b["gear"]) if b.has("gear") else null)
 		if made.is_empty():
 			made = CharacterBuild.compose(tpl, cfg)
 		var basics := skills.basic_ids.duplicate()

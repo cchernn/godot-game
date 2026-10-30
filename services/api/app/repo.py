@@ -8,6 +8,7 @@ from psycopg_pool import ConnectionPool
 
 from .errors import Conflict, Forbidden, Invalid, Locked, NotFound, RepoError  # noqa: F401
 from .templates import TemplateError, TemplateStore
+from .gear_repo import GearMixin
 from .party_repo import PartyMixin
 from .world_repo import WorldMixin, authored_reward
 
@@ -18,7 +19,7 @@ def _row(r: dict | None) -> dict | None:
     return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in r.items()}
 
 
-class Repository(PartyMixin, WorldMixin):
+class Repository(GearMixin, PartyMixin, WorldMixin):
     """All durable reads/writes. Gameplay rules never live here."""
 
     def __init__(self, pool: ConnectionPool, templates: TemplateStore | None = None, presence_seconds: int = 30,
@@ -104,6 +105,7 @@ class Repository(PartyMixin, WorldMixin):
                 "select * from characters where world_id=%s and user_id=%s and status='active'", (world_id, user_id)).fetchone())
             if c is not None:
                 c["items"] = self._loadouts(conn, [c["id"]]).get(c["id"], [])
+                self._attach_inventory(conn, [c])
         return c
 
     # ---- items ----
@@ -214,7 +216,8 @@ class Repository(PartyMixin, WorldMixin):
                                 "p": sorted((str(p["character_id"]), p["outcome"],
                                              sorted((p.get("items_used") or {}).items()),
                                              sorted((p.get("items_gained") or {}).items()), sorted(set(p.get("flags_set") or [])),
-                                             int(p.get("gold") or 0))
+                                             int(p.get("gold") or 0), sorted((p.get("loot") or {}).get("gear", [])),
+                                             sorted(((p.get("loot") or {}).get("items") or {}).items()))
                                             for p in participants)})
         digest = hashlib.sha256(canonical.encode()).hexdigest()
         ids = [p["character_id"] for p in participants]
@@ -251,21 +254,31 @@ class Repository(PartyMixin, WorldMixin):
                 if ok is None:  # rolls the whole transaction back: no partial outcomes
                     raise Invalid("Unknown or inactive character %s" % p["character_id"])
                 paid = outcome == "players_win" and p["outcome"] != "escaped"
-                reward = {"gold": int(p.get("gold") or 0) if paid else 0, "items": {}, "flags": []}
+                reward = {"gold": int(p.get("gold") or 0) if paid else 0, "items": {}, "flags": [], "gear": []}
                 if step_key and p["outcome"] != "escaped" and self.claim_step_pay(conn, instance_id, step_key, p["character_id"]):
                     reward["gold"] += step_src["gold"]
                     reward["items"] = dict(step_src["items"])
                     reward["flags"] = list(step_src["flags"])
+                    reward["gear"] = list(step_src["gear"])
                     step_paid = True
                 elif paid and activity is not None and activity["type"] != "event":
                     for it in activity.get("rewards", {}).get("items", []):
                         reward["items"][it["id"]] = reward["items"].get(it["id"], 0) + it["count"]
                     reward["flags"] = list(activity.get("rewards", {}).get("flags", []))
                     reward["gold"] += int(activity.get("rewards", {}).get("gold", 0))
+                    reward["gear"] = list(activity.get("rewards", {}).get("gear", []))
                     conn.execute("insert into activity_completions (world_id, activity_id, character_id, instance_id) values (%s,%s,%s,%s) "
                                  "on conflict do nothing", (world_id, activity["id"], p["character_id"], instance_id))
+                loot = p.get("loot") or {}
+                if paid and (loot.get("gear") or loot.get("items")):  # an event's step drops its loot once, so replaying the step is no farm
+                    if not step_key or self.claim_step_pay(conn, instance_id, step_key + ":loot", p["character_id"]):
+                        reward["gear"] += list(loot.get("gear") or [])
+                        for k, v in (loot.get("items") or {}).items():
+                            reward["items"][k] = reward["items"].get(k, 0) + v
                 if reward["gold"]:
                     conn.execute("update characters set gold = gold + %s where id=%s", (reward["gold"], p["character_id"]))
+                if reward["gear"]:
+                    self.add_gear(conn, p["character_id"], reward["gear"], "reward" if not loot.get("gear") else "drop")
                 gained = {k: v for k, v in (p.get("items_gained") or {}).items() if v > 0}
                 for k, v in reward["items"].items():
                     gained[k] = gained.get(k, 0) + v

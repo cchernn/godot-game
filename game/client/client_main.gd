@@ -364,6 +364,11 @@ static func reward_lines(rewards: Dictionary, db: SkillDb) -> Array[String]:
 	for id: String in items:
 		var def: ItemDef = db.items.get(id) if db != null else null
 		out.append("+%d %s" % [int(items[id]), def.display_name if def != null else id.replace("_", " ")])
+	if not (rewards.get("gear", []) as Array).is_empty():
+		var gear := GearSet.load_file()
+		for id: String in rewards["gear"]:
+			var g := gear.get_gear(id)
+			out.append("+ %s" % (g.display_name if g != null else id.replace("_", " ")))
 	return out
 
 

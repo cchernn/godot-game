@@ -95,6 +95,16 @@ func _ready() -> void:
 	_settings.change_password_requested.connect(_on_change_password_requested)
 	_settings.display_name_requested.connect(_on_display_name_requested)
 	_character_screen.retire_requested.connect(_on_retire_requested)
+	_character_screen.inventory.equip_requested.connect(func(row: String, place: String) -> void:
+		_change_inventory(HTTPClient.METHOD_POST, "gear/%s/equip" % row, {"place": place}))
+	_character_screen.inventory.unequip_requested.connect(func(row: String) -> void:
+		_change_inventory(HTTPClient.METHOD_POST, "gear/%s/unequip" % row))
+	_character_screen.inventory.discard_gear_requested.connect(func(row: String) -> void:
+		_change_inventory(HTTPClient.METHOD_POST, "gear/%s/discard" % row))
+	_character_screen.inventory.discard_item_requested.connect(func(id: String) -> void:
+		_change_inventory(HTTPClient.METHOD_POST, "items/%s/discard" % id, {"quantity": 1}))
+	_character_screen.inventory.battle_items_changed.connect(func(kinds: Variant) -> void:
+		_change_inventory(HTTPClient.METHOD_PUT, "battle-items", {"items": kinds}))
 	_creator.create_requested.connect(_on_create_character_requested)
 	_creator.back_pressed.connect(_step_worlds)
 	_creator.message.connect(_say)
@@ -430,12 +440,39 @@ func _enter_game() -> void:
 func _step_character_view() -> void:
 	_character_screen.show_checking(_world["name"])
 	_character_screen.show_character(_character)
+	_character_screen.inventory.show_checking()
+	_load_inventory()
 	var b := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters/me/battles" % _world["id"])
 	if b["status"] == 200 and _character_screen.is_visible_in_tree():
 		_character_screen.show_battles(b["data"])
 	var c := await api(HTTPClient.METHOD_GET, "/worlds/%s/characters" % _world["id"])
 	if c["status"] == 200 and _character_screen.is_visible_in_tree():
 		_character_screen.show_world_characters(c["data"])
+
+
+## Asks the API to change the bag (equip, discard, battle items) and shows the answer; the Character page is redrawn from it.
+func _change_inventory(method: int, path: String, body: Variant = null) -> void:
+	var r := await api(method, "/characters/%s/%s" % [_character["id"], path], body)
+	if r["status"] != 200:
+		_character_screen.inventory.show_error(r["error"])
+		_load_inventory()
+		return
+	_adopt_inventory(r["data"])
+
+
+func _load_inventory() -> void:
+	var r := await api(HTTPClient.METHOD_GET, "/characters/%s/inventory" % _character["id"])
+	if r["status"] == 200 and _character_screen.is_visible_in_tree():
+		_adopt_inventory(r["data"])
+
+
+## Keeps the character we hold in step with its bag, so the stats and gear line on the Overview tab follow what was just worn.
+func _adopt_inventory(inv: Dictionary) -> void:
+	_character["gear"] = inv["gear"]
+	_character["items"] = inv["items"]
+	_character["battle_items"] = inv["battle_items"]
+	_character_screen.show_character(_character)
+	_character_screen.inventory.show_inventory(inv)
 
 
 func _on_retire_requested() -> void:

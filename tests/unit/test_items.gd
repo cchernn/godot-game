@@ -144,17 +144,11 @@ func test_each_skill_db_has_its_own_items() -> void:
 	assert_eq(one.get_skill("item:potion").frequency, Enums.Frequency.UNLIMITED)
 
 
-func test_the_server_takes_at_most_the_battle_slots_of_known_items() -> void:
-	var app: Node = (load("res://game/server/server_app.gd") as GDScript).new()
-	var cfg := GameConfig.load_file()
-	cfg.data["items"]["battle_slots"] = 2
+func test_a_battle_takes_at_most_the_battle_slots_of_known_items() -> void:
 	var db := SkillDb.load_file()
 	for id in ["a", "b", "c"]:
 		db.add_item(_item(id, Enums.Targeting.SELF, [_heal(1)]))
-	app.set("cfg", cfg)
-	app.set("skills", db)
-	var got: Dictionary = app.call("_loadout", {"items": [{"item_id": "a", "quantity": 2}, {"item_id": "ghost", "quantity": 9},
-		{"item_id": "b", "quantity": 1}, {"item_id": "c", "quantity": 3}]})
+	var got := Loadout.battle_items({"items": [{"item_id": "a", "quantity": 2}, {"item_id": "ghost", "quantity": 9},
+		{"item_id": "b", "quantity": 1}, {"item_id": "c", "quantity": 3}]}, db, 2)
 	assert_eq(got, {"a": 2, "b": 1}, "unknown items are ignored and only two kinds go in")
-	assert_eq(app.call("_loadout", {}), {})
-	app.free()
+	assert_eq(Loadout.battle_items({}, db, 2), {})

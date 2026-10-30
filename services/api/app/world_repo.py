@@ -6,6 +6,7 @@ import psycopg.errors
 from psycopg.types.json import Jsonb
 
 from .errors import Conflict, Forbidden, Invalid, NotFound
+from .gear_repo import GearMixin
 from .templates import TemplateError, WorldDefinition
 
 
@@ -25,6 +26,8 @@ def pay_character(conn, character_id, reward: dict) -> None:
         conn.execute("insert into character_items (character_id, item_id, quantity) values (%s,%s,%s) "
                      "on conflict (character_id, item_id) do update set quantity = least(99, character_items.quantity + excluded.quantity)",
                      (character_id, item_id, n))
+    if reward.get("gear"):
+        GearMixin.add_gear(conn, character_id, reward["gear"], "reward")
     flags = reward.get("flags") or []
     if flags:
         have = conn.execute("select flags from characters where id=%s for update", (character_id,)).fetchone()["flags"]
@@ -38,7 +41,7 @@ def authored_reward(act: dict, key: str = "rewards") -> dict:
     items: dict[str, int] = {}
     for it in r.get("items", []):
         items[it["id"]] = items.get(it["id"], 0) + it["count"]
-    return {"gold": int(r.get("gold", 0)), "items": items, "flags": list(r.get("flags", []))}
+    return {"gold": int(r.get("gold", 0)), "items": items, "flags": list(r.get("flags", [])), "gear": list(r.get("gear", []))}
 
 
 class WorldMixin:
@@ -354,8 +357,9 @@ class WorldMixin:
                                   "where r.instance_id=%s and (%s::uuid is null or r.character_id in (select character_id from party_members where party_id=%s)) "
                                   "order by r.joined_at", (instance_id, inst["party_id"], inst["party_id"])).fetchall()
             loadouts = self._loadouts(conn, [r["id"] for r in roster])
+            roster = [{**_row(r), "items": loadouts.get(str(r["id"]), [])} for r in roster]
+            self._attach_inventory(conn, roster)
         act = self.definition(inst["world_id"]).activities[inst["activity_id"]]
-        roster = [{**_row(r), "items": loadouts.get(str(r["id"]), [])} for r in roster]
         return {**_row(inst), "roster": roster, "activity_type": act["type"], "encounter": act.get("encounter"), "story": act.get("story"), "steps": act.get("steps"), "on_fail": act.get("on_fail", "restart"),
                 "activity_name": act["name"], "max_players": act.get("max_players")}
 

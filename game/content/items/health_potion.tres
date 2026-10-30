@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/item_def.gd" id="item"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="skill"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_stage.gd" id="stage"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_effect.gd" id="effect"]
+[ext_resource type="Script" path="res://game/shared/domain/heal_effect.gd" id="eff"]
+
+[sub_resource type="Resource" id="Eff"]
+script = ExtResource("eff")
+amount = 12
+
+[sub_resource type="Resource" id="Stage"]
+script = ExtResource("stage")
+stage_name = "health potion"
+effects = Array[ExtResource("effect")]([SubResource("Eff")])
+
+[sub_resource type="Resource" id="Use"]
+script = ExtResource("skill")
+kind = 4
+targeting = 1
+attack_range = 3
+speed = 5
+stage_defs = Array[ExtResource("stage")]([SubResource("Stage")])
+
+[resource]
+script = ExtResource("item")
+id = "health_potion"
+display_name = "Health potion"
+hint = "Click an ally (or yourself): heals 12"
+max_stack = 5
+use = SubResource("Use")

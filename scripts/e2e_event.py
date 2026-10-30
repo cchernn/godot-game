@@ -121,10 +121,13 @@ try:
         pays = c.execute("select step_key, count(*) n from event_step_pays where instance_id=%s group by step_key order by step_key", (iid,)).fetchall()
         done = c.execute("select count(*) n from activity_completions where activity_id='emerald_serpent'").fetchone()["n"]
         folks = c.execute("select name, gold, flags from characters order by name").fetchall()
+        gear = c.execute("select c.name, g.source, count(*) n from character_gear g join characters c on c.id = g.character_id "
+                         "group by c.name, g.source order by c.name, g.source").fetchall()
     restarts = srv.count("finished: outcome 2")  # battles the party lost on the way
     print("server events:", [l for l in srv.splitlines() if "event" in l][-12:])
     print("instance:", inst, "| step payouts:", [(p["step_key"], p["n"]) for p in pays], "| completions:", done)
     print("characters:", [(f["name"], f["gold"], f["flags"]) for f in folks])
+    print("gear by source:", [(g["name"], g["source"], g["n"]) for g in gear])
     if "event completed" in srv:
         if inst != "finished" or done < 1:
             fail("the event completed but the API did not record it")

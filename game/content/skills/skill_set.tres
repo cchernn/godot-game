@@ -25,9 +25,10 @@
 
 [ext_resource type="Resource" path="res://game/content/skills/fire_breath.tres" id="19_breath"]
 [ext_resource type="Resource" path="res://game/content/skills/tail_lash.tres" id="20_lash"]
+[ext_resource type="Resource" path="res://game/content/skills/heavy_swing.tres" id="21_swing"]
 
 [resource]
 script = ExtResource("1_ba6hb")
-skills = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("4_drtuy"), ExtResource("5_r8irq"), ExtResource("6_xckuu"), ExtResource("7_ucasc"), ExtResource("8_7we32"), ExtResource("9_defend"), ExtResource("10_wall"), ExtResource("11_slash"), ExtResource("15_stab"), ExtResource("16_bash"), ExtResource("17_shoot"), ExtResource("18_maim"), ExtResource("12_lob"), ExtResource("13_fire"), ExtResource("14_ice"), ExtResource("19_breath"), ExtResource("20_lash")])
+skills = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("4_drtuy"), ExtResource("5_r8irq"), ExtResource("6_xckuu"), ExtResource("7_ucasc"), ExtResource("8_7we32"), ExtResource("9_defend"), ExtResource("10_wall"), ExtResource("11_slash"), ExtResource("15_stab"), ExtResource("16_bash"), ExtResource("17_shoot"), ExtResource("18_maim"), ExtResource("12_lob"), ExtResource("13_fire"), ExtResource("14_ice"), ExtResource("19_breath"), ExtResource("20_lash"), ExtResource("21_swing")])
 basic = Array[ExtResource("2_qw6bo")]([ExtResource("3_i1kfq"), ExtResource("9_defend")])
 unarmed = ExtResource("4_drtuy")

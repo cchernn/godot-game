@@ -151,10 +151,17 @@ func _make_plan(s: Dictionary, me: Dictionary) -> Array:
 			return Enums.manhattan(a["cell"], cell) < Enums.manhattan(b["cell"], cell))
 		target = enemies[0]
 		goal = target["cell"]
+	var attack := ""
+	for id: String in me.get("skills", []):
+		var sk := skills.get_skill(id)
+		if sk != null and sk.slot() == Enums.ActionSlot.ATTACK:
+			attack = id
+			break
+	var attack_cost: int = skills.get_skill(attack).total_ap() if attack != "" else 0
 	var res := Pathfinder.search(bf, cell, blocked, 1)
 	var best := cell
 	var best_d := Enums.manhattan(cell, goal)
-	var budget: int = me["ap_capacity"] - (1 if not target.is_empty() else 0)
+	var budget: int = me["ap_capacity"] - (attack_cost if not target.is_empty() else 0)
 	for c: Vector2i in (res["cost"] as Dictionary).keys():
 		var p := Pathfinder.path_to(res, cell, c)
 		if Pathfinder.ap_cost(bf, p, me["tiles_per_ap"], 1) > budget:
@@ -165,12 +172,6 @@ func _make_plan(s: Dictionary, me: Dictionary) -> Array:
 			best = c
 	if best != cell:
 		plan.append({"skill": "move", "path": Pathfinder.path_to(res, cell, best)})
-	var attack := ""
-	for id: String in me.get("skills", []):
-		var sk := skills.get_skill(id)
-		if sk != null and sk.slot() == Enums.ActionSlot.ATTACK:
-			attack = id
-			break
 	if not target.is_empty() and attack != "":
 		plan.append({"skill": attack, "target": target["id"]})
 	return plan

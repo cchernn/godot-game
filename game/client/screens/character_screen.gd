@@ -22,11 +22,15 @@ const RESULT_TEXT := {"players_win": "Victory", "players_lose": "Defeat", "draw"
 @onready var _battles: ItemList = %BattlesList
 @onready var _roster: ItemList = %RosterList
 @onready var _fallen: ItemList = %FallenList
+## The Inventory tab: what you wear and carry.
+@onready var inventory: InventoryScreen = %InventoryScreen
+@onready var _tabs: TabContainer = %CharacterTabs
 
 var _name := ""
 
 
 func _ready() -> void:
+	_tabs.set_tab_title(_tabs.get_tab_idx_from_control(inventory), "Inventory")
 	%CharacterBackButton.visible = show_back_button
 	%CharacterBackButton.pressed.connect(func() -> void: back_pressed.emit())
 	_confirm.text_changed.connect(func(_t: String) -> void: _sync_retire())
@@ -63,16 +67,19 @@ func show_character(c: Dictionary) -> void:
 		return
 	var cfg := GameConfig.load_file()
 	var flags: Variant = c.get("flags", [])
-	var build := CharacterBuild.compose(t, cfg, flags as Array if flags is Array else [])
+	var worn: Variant = Loadout.worn_ids(c) if c.has("gear") else null # what the API says is worn; none = the class's starting gear
+	var build := CharacterBuild.compose(t, cfg, flags as Array if flags is Array else [], worn)
 	var at: Dictionary = build["attributes"]
 	var st: Dictionary = build["stats"]
 	_stats.text = "Might %d   Dexterity %d   Agility %d   Vitality %d\nHP %d   Damage +%d   Accuracy %d   Evasion %d   AP %d" \
 		% [at["might"], at["dexterity"], at["agility"], at["vitality"], st["max_hp"], st["power"], st["accuracy"], st["evasion"],
 		cfg.ap_capacity(st["dexterity"])]
-	var worn: Array[String] = []
-	for g in t.gear:
-		worn.append(g.display_name)
-	_gear.text = "Gear: %s   (armor %d)" % [", ".join(worn) if not worn.is_empty() else "nothing", st["armor"]]
+	var gear_set := GearSet.load_file()
+	var names: Array[String] = []
+	for id: String in build["gear"]:
+		var g := gear_set.get_gear(id)
+		names.append(g.display_name if g != null else id)
+	_gear.text = "Gear: %s   (armor %d)" % [", ".join(names) if not names.is_empty() else "nothing", st["armor"]]
 	var db := SkillDb.load_file()
 	for sid: String in build["skills"]:
 		var sk := db.get_skill(sid)

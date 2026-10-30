@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import catalog
+
 DEFAULT_DIR = Path(__file__).resolve().parent.parent / "templates"
 _NAME = re.compile(r"^([a-z0-9_]+)@(\d+)\.json$")
 
@@ -57,6 +59,9 @@ def _check_rewards(name: str, rewards: dict, nodes: dict, routes: dict) -> None:
     for it in rewards.get("items", []):
         if not re.fullmatch(_ID, str(it.get("id", ""))) or not isinstance(it.get("count"), int) or it["count"] < 1:
             raise TemplateError(f"{name} has a bad reward item {it!r}")
+    for gear_id in rewards.get("gear", []):
+        if catalog.gear_kind(str(gear_id)) is None:
+            raise TemplateError(f"{name} rewards unknown gear {gear_id!r}")
     for rv in rewards.get("reveal", []):
         if rv["id"] not in {"node": nodes, "route": routes}.get(rv["kind"], {}):
             raise TemplateError(f"{name} reveals unknown {rv}")

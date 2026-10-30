@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://game/client/screens/character_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://game/client/screens/inventory_screen.tscn" id="2"]
 
 [node name="CharacterScreen" type="VBoxContainer"]
 theme_override_constants/separation = 6
@@ -67,11 +68,17 @@ layout_mode = 2
 disabled = true
 text = "Retire"
 
+[node name="InventoryScreen" parent="CharacterTabs" instance=ExtResource("2")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
 [node name="Battles" type="VBoxContainer" parent="CharacterTabs"]
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 6
-metadata/_tab_index = 1
+metadata/_tab_index = 2
 
 [node name="BattlesLabel" type="Label" parent="CharacterTabs/Battles"]
 unique_name_in_owner = true
@@ -87,7 +94,7 @@ size_flags_vertical = 3
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 6
-metadata/_tab_index = 2
+metadata/_tab_index = 3
 
 [node name="RosterTitle" type="Label" parent="CharacterTabs/Characters"]
 layout_mode = 2

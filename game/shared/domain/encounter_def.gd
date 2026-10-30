@@ -15,6 +15,8 @@ extends Resource
 @export_range(0, 100000) var gold: int = 0
 ## Enemies in order: the first stands on spawn marker E0, the second on E1, and so on.
 @export var enemies: Array[UnitTemplate] = []
+## What the fight may drop. Each player still in the fight at the end of a win rolls for every entry on their own (see DropEntry).
+@export var drops: Array[DropEntry] = []
 ## Things that happen during the fight: enemies waking up, arriving or falling away (see EncounterTrigger).
 @export var triggers: Array[EncounterTrigger] = []
 
@@ -57,6 +59,11 @@ func problems(known: SkillDb) -> Array[String]:
 			out.append("an enemy slot is empty")
 			continue
 		out.append_array(t.problems(known))
+	for d in drops:
+		if d == null:
+			out.append("a drop slot is empty")
+		else:
+			out.append_array(d.problems())
 	for tr in triggers:
 		if tr == null:
 			out.append("a trigger slot is empty")

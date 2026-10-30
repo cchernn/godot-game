@@ -1,7 +1,9 @@
 [gd_resource type="Resource" script_class="ItemSet" format=3]
 
 [ext_resource type="Script" path="res://game/shared/domain/item_set.gd" id="1_items"]
+[ext_resource type="Resource" path="res://game/content/items/health_potion.tres" id="i_health_potion"]
+[ext_resource type="Resource" path="res://game/content/items/fire_flask.tres" id="i_fire_flask"]
 
 [resource]
 script = ExtResource("1_items")
-items = Array[Resource]([])
+items = Array[Resource]([ExtResource("i_health_potion"), ExtResource("i_fire_flask")])

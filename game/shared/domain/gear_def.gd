@@ -5,6 +5,9 @@ extends Resource
 
 enum Slot { WEAPON, ARMOR, ACCESSORY }
 
+## The places on a character that gear goes, in the order the Inventory shows them: the slot kind each one takes. PROVISIONAL.
+const WORN_PLACES: Array[String] = ["weapon_1", "weapon_2", "armor", "accessory"]
+
 @export_group("Identity")
 ## Lower-case id: the file name.
 @export var id: String = ""
@@ -22,6 +25,23 @@ enum Slot { WEAPON, ARMOR, ACCESSORY }
 
 func slot_name() -> String:
 	return ["weapon", "armor", "accessory"][slot]
+
+
+## Which kind of gear a worn place takes ("weapon_2" -> WEAPON), or -1 for a place that does not exist.
+static func place_slot(place: String) -> int:
+	match place:
+		"weapon_1", "weapon_2":
+			return Slot.WEAPON
+		"armor":
+			return Slot.ARMOR
+		"accessory":
+			return Slot.ACCESSORY
+	return -1
+
+
+## How many of a kind a character wears at once.
+static func slot_limit(kind: int) -> int:
+	return 2 if kind == Slot.WEAPON else 1
 
 
 func problems(known: SkillDb) -> Array[String]:

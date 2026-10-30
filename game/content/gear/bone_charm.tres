@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://game/shared/domain/gear_def.gd" id="1_gear"]
+[ext_resource type="Script" path="res://game/shared/domain/skill_def.gd" id="2_skill"]
+
+[resource]
+script = ExtResource("1_gear")
+id = "bone_charm"
+display_name = "Bone charm"
+description = "A charm of small bones that turns a little of every blow."
+slot = 2
+armor = 1
+grants = Array[ExtResource("2_skill")]([])

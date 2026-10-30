@@ -475,7 +475,10 @@ func _start_battle(room: Room) -> void:
 	var builds: Array = []
 	for rec in members:
 		classes.append(rec.character.get("class", ""))
-		builds.append({"flags": rec.character.get("flags", [])})
+		var build := {"flags": rec.character.get("flags", [])}
+		if rec.character.has("gear"): # the API always sends what is worn; a character without it (no persistence) keeps its class's gear
+			build["gear"] = Loadout.worn_ids(rec.character)
+		builds.append(build)
 	room.battle = Encounter.build(cfg, skills, members.size(), seed, classes, room.def, builds)
 	room.battle_key = "battle-" + Crypto.new().generate_random_bytes(12).hex_encode()
 	var i := 0
@@ -484,7 +487,7 @@ func _start_battle(room: Room) -> void:
 		rec.sent_seq = 0
 		var c := room.battle.state.get_c(rec.combatant_id)
 		c.controller = rec.player_id
-		c.items = _loadout(rec.character)
+		c.items = Loadout.battle_items(rec.character, skills, int(cfg.get_value("items", "battle_slots")))
 		if room.event_run != null:
 			var carried := room.event_run.carried(str(rec.character.get("id", "")))
 			if not carried.is_empty():
@@ -500,17 +503,6 @@ func _start_battle(room: Room) -> void:
 		if rec.peer_id != -1:
 			Gateway.s_welcome.rpc_id(rec.peer_id, _welcome_info(rec, room))
 	_push_all(room)
-
-
-## The items a character takes into the battle: the first `items.battle_slots` kinds the API listed (in item id order) that the game knows.
-func _loadout(character: Dictionary) -> Dictionary:
-	var slots: int = cfg.get_value("items", "battle_slots")
-	var out := {}
-	for it: Dictionary in character.get("items", []):
-		var id := str(it.get("item_id", ""))
-		if out.size() < slots and skills.items.has(id) and int(it.get("quantity", 0)) > 0:
-			out[id] = int(it["quantity"])
-	return out
 
 
 ## A party's battle has a seat for every roster member, in roster order, whether or not they have arrived;
@@ -916,7 +908,7 @@ func _notice_all(room: Room, text: String) -> void:
 ## Adds what a step paid ({character id: {gold, items, flags}}) to the event's running total.
 func _merge_paid(room: Room, paid: Dictionary) -> void:
 	for cid: String in paid:
-		var have: Dictionary = room.event_paid.get(cid, {"gold": 0, "items": {}, "flags": []})
+		var have: Dictionary = room.event_paid.get(cid, {"gold": 0, "items": {}, "flags": [], "gear": []})
 		var add: Dictionary = paid[cid]
 		have["gold"] = int(have["gold"]) + int(add.get("gold", 0))
 		for id: String in add.get("items", {}):
@@ -924,6 +916,7 @@ func _merge_paid(room: Room, paid: Dictionary) -> void:
 		for f: String in add.get("flags", []):
 			if not (have["flags"] as Array).has(f):
 				(have["flags"] as Array).append(f)
+		(have["gear"] as Array).append_array(add.get("gear", []))
 		room.event_paid[cid] = have
 
 
@@ -983,7 +976,8 @@ func _commit_results(room: Room, battle: Battle, key: String, step_id: String = 
 		# every encounter pays the same gold to everyone still in the fight when it is won
 		participants.append({"character_id": rec.character["id"], "outcome": _fate(c),
 			"gold": _encounter_of(room).gold if win and c.life_state != Enums.LifeState.ESCAPED else 0,
-			"items_used": c.items_used.duplicate(), "items_gained": c.items_gained.duplicate(), "flags_set": c.flags_gained.duplicate()})
+			"items_used": c.items_used.duplicate(), "items_gained": c.items_gained.duplicate(), "flags_set": c.flags_gained.duplicate(),
+			"loot": Loadout.roll_drops(_encounter_of(room), key + str(rec.character["id"]), skills) if win and c.life_state != Enums.LifeState.ESCAPED else {"gear": [], "items": {}}})
 	var outcome_name := {Enums.Outcome.PLAYERS_WIN: "players_win", Enums.Outcome.PLAYERS_LOSE: "players_lose",
 		Enums.Outcome.DRAW: "draw", Enums.Outcome.ESCAPED: "escaped"}[battle.outcome] as String
 	for attempt in 5:
